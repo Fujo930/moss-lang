@@ -18,6 +18,36 @@ fn checkSelfHostFile(path: Text) -> Result<CheckResult, Text> uses FileSystem {
 
 fn checkSelfHostDirectory(path: Text) -> Result<CheckResult, Text> uses FileSystem {
   result = emptyCheckResult()
+  parsedFiles = []
+  projectTypes = builtInTypeNames()
+
+  for file in listFiles(path) {
+    if textEndsWith(file, ".moss") {
+      source = readText(file)
+      parsed = parseProgram(sketchTokens(source))
+      parsedFiles = listPush(parsedFiles, { path: file, state: parsed })
+      projectTypes = addTypeNames(projectTypes, parsed.nodes)
+    }
+  }
+
+  for file in parsedFiles {
+    checked = checkProgramNodesWithTypes(file.state.nodes, projectTypes)
+    for error in file.state.errors {
+      checked = checked with errors = listPush(checked.errors, "parse: " + error)
+    }
+    for warning in checked.warnings {
+      result = appendProjectWarning(result, file.path, warning)
+    }
+    for error in checked.errors {
+      result = appendProjectError(result, file.path, error)
+    }
+  }
+
+  return Ok(result)
+}
+
+fn checkSelfHostDirectorySlow(path: Text) -> Result<CheckResult, Text> uses FileSystem {
+  result = emptyCheckResult()
 
   for file in listFiles(path) {
     if textEndsWith(file, ".moss") {
