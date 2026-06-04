@@ -369,9 +369,11 @@ fn takeBeforeColon(text: Text) -> Text {
 print(takeBeforeColon("mo-ss:language"))
 print(textJoin(textSplit("a,b,c", ","), "|"))
 print(textSlice("abcdef", 1, 4))
+print(textIndexOf("moss language", "lang"))
+print(textIndexOf("moss language", "missing"))
 """
         _, output = self.run_source(source)
-        self.assertEqual(output, ["moss", "a|b|c", "bcd"])
+        self.assertEqual(output, ["moss", "a|b|c", "bcd", "5", "-1"])
 
     def test_else_if_chains(self) -> None:
         source = """

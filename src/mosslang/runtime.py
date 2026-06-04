@@ -210,6 +210,7 @@ class Runtime:
         self.globals.define("textTrim", BuiltinFunction("textTrim", self.builtin_text_trim))
         self.globals.define("textSlice", BuiltinFunction("textSlice", self.builtin_text_slice))
         self.globals.define("textContains", BuiltinFunction("textContains", self.builtin_text_contains))
+        self.globals.define("textIndexOf", BuiltinFunction("textIndexOf", self.builtin_text_index_of))
         self.globals.define("textStartsWith", BuiltinFunction("textStartsWith", self.builtin_text_starts_with))
         self.globals.define("textEndsWith", BuiltinFunction("textEndsWith", self.builtin_text_ends_with))
         self.globals.define("pathJoin", BuiltinFunction("pathJoin", self.builtin_path_join))
@@ -641,6 +642,11 @@ class Runtime:
         require_text(text, "textContains")
         require_text(needle, "textContains needle")
         return needle in text
+
+    def builtin_text_index_of(self, text: Any, needle: Any) -> int:
+        require_text(text, "textIndexOf")
+        require_text(needle, "textIndexOf needle")
+        return text.find(needle)
 
     def builtin_text_starts_with(self, text: Any, prefix: Any) -> bool:
         require_text(text, "textStartsWith")
