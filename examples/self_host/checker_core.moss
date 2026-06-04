@@ -196,21 +196,42 @@ fn checkDuplicateImport(nodes: List<MossNode>, result: CheckResult) -> CheckResu
   return result
 }
 
-fn checkFieldTypes(item: MossNode, types: Map<Text, Bool>, result: CheckResult) -> CheckResult {
-  for fieldInfo in textSplit(item.value, ";") {
-    parts = textSplit(fieldInfo, ":")
-    fieldType = textTrim(listGet(parts, 1, ""))
-    if not textContains(fieldType, "|") {
-      for piece in textSplit(textReplace(textReplace(textReplace(fieldType, "<", " "), ">", " "), ",", " "), " ") {
-        clean = textTrim(piece)
-        if isTypeToken(clean) and not mapHas(types, clean) {
-          result = addError(result, item.name + " field uses unknown type " + clean)
-        }
+fn checkTypeText(owner: Text, typeText: Text, types: Map<Text, Bool>, result: CheckResult) -> CheckResult {
+  if not textContains(typeText, "|") {
+    for piece in textSplit(textReplace(textReplace(textReplace(typeText, "<", " "), ">", " "), ",", " "), " ") {
+      clean = textTrim(piece)
+      if isTypeToken(clean) and not mapHas(types, clean) {
+        result = addError(result, owner + " uses unknown type " + clean)
       }
     }
   }
 
   return result
+}
+
+fn checkFieldTypes(item: MossNode, types: Map<Text, Bool>, result: CheckResult) -> CheckResult {
+  for fieldInfo in textSplit(item.value, ";") {
+    parts = textSplit(fieldInfo, ":")
+    fieldType = textTrim(listGet(parts, 1, ""))
+    result = checkTypeText(item.name + " field", fieldType, types, result)
+  }
+
+  return result
+}
+
+fn returnTypeText(item: MossNode) -> Text {
+  if not textContains(item.value, "->") {
+    return ""
+  }
+
+  tail = textSplit(item.value, "->")
+  result = textTrim(listGet(tail, 1, ""))
+  if textContains(result, "uses") {
+    parts = textSplit(result, "uses")
+    result = textTrim(listGet(parts, 0, ""))
+  }
+  result = textReplace(result, "{", "")
+  return textTrim(result)
 }
 
 fn checkProgramNodes(nodes: List<MossNode>) -> CheckResult {
@@ -251,6 +272,8 @@ fn checkProgramNodesWithTypes(nodes: List<MossNode>, types: Map<Text, Bool>) -> 
     if item.kind == "Function" {
       if not textContains(item.value, "->") {
         result = addWarning(result, item.name + " has no explicit return type")
+      } else {
+        result = checkTypeText(item.name + " return", returnTypeText(item), types, result)
       }
       for effect in usesEffects(item) {
         if not mapHas(effects, effect) {
