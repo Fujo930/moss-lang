@@ -44,6 +44,28 @@ test "checker sketch accepts order example" {
   duplicateFieldCheck = checkProgramNodes(parseProgram(sketchTokens(duplicateFieldSource)).nodes)
   assert(len(duplicateFieldCheck.errors) == 1, "duplicate type field should fail")
 
+  unknownTypeSource = textJoin([
+    "type Person =\n",
+    "  name: MissingType\n",
+    "fn build() -> Text {\n",
+    "  return \"ok\"\n",
+    "}\n",
+  ])
+  unknownTypeCheck = checkProgramNodes(parseProgram(sketchTokens(unknownTypeSource)).nodes)
+  assert(len(unknownTypeCheck.errors) == 1, "unknown field type should fail")
+
+  knownTypeSource = textJoin([
+    "type Address =\n",
+    "  city: Text\n",
+    "type Person =\n",
+    "  address: Address\n",
+    "fn build() -> Text {\n",
+    "  return \"ok\"\n",
+    "}\n",
+  ])
+  knownTypeCheck = checkProgramNodes(parseProgram(sketchTokens(knownTypeSource)).nodes)
+  assert(len(knownTypeCheck.errors) == 0, "declared field type should pass")
+
   quiet = parseProgram(sketchTokens("let x = 1\n"))
   quietCheck = checkProgramNodes(quiet.nodes)
   assert(len(quietCheck.warnings) == 1, "missing callable should warn")
