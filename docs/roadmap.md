@@ -18,6 +18,7 @@ Implemented:
 - top-level file imports
 - `Option<T>` type contracts and safe list helpers
 - first Moss-written tokenizer sketch with structured token records
+- first Moss-written line parser sketch
 - effect checking for the built-in database capability
 - runtime type contracts
 - CLI commands: `check`, `run`, `tokens`, `ast`

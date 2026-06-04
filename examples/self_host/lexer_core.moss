@@ -1,0 +1,150 @@
+import "examples/self_host/token_tools.moss"
+
+rule isWhitespace(ch: Text) -> Bool =
+  ch == " " or ch == "\t" or ch == "\r"
+
+rule isDigit(ch: Text) -> Bool =
+  ch >= "0" and ch <= "9"
+
+rule isAlpha(ch: Text) -> Bool =
+  (ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z") or ch == "_"
+
+rule isAlphaNumeric(ch: Text) -> Bool =
+  isAlpha(ch) or isDigit(ch)
+
+rule isTwoCharSymbol(text: Text) -> Bool =
+  text == "->" or text == "==" or text == "!=" or text == ">=" or text == "<="
+
+fn escapedChar(ch: Text) -> Text {
+  if ch == "n" {
+    return "\n"
+  }
+  if ch == "t" {
+    return "\t"
+  }
+  if ch == "r" {
+    return "\r"
+  }
+  if ch == "\"" {
+    return "\""
+  }
+  if ch == "\\" {
+    return "\\"
+  }
+  return ch
+}
+
+fn sketchTokens(source: Text) -> List<MossToken> {
+  chars = textChars(source)
+  tokens = []
+  index = 0
+  line = 1
+  column = 1
+
+  while index < len(chars) {
+    ch = chars[index]
+
+    if ch == "\n" {
+      tokens = listPush(tokens, token("NEWLINE", "\n", line, column))
+      index = index + 1
+      line = line + 1
+      column = 1
+      continue
+    }
+
+    if isWhitespace(ch) {
+      index = index + 1
+      column = column + 1
+      continue
+    }
+
+    if ch == "#" {
+      while index < len(chars) and chars[index] != "\n" {
+        index = index + 1
+        column = column + 1
+      }
+      continue
+    }
+
+    if ch == "/" and listGet(chars, index + 1, "") == "/" {
+      while index < len(chars) and chars[index] != "\n" {
+        index = index + 1
+        column = column + 1
+      }
+      continue
+    }
+
+    startLine = line
+    startColumn = column
+
+    if isAlpha(ch) {
+      value = ""
+      while index < len(chars) and isAlphaNumeric(chars[index]) {
+        value = value + chars[index]
+        index = index + 1
+        column = column + 1
+      }
+      tokens = listPush(tokens, token("IDENT", value, startLine, startColumn))
+      continue
+    }
+
+    if isDigit(ch) {
+      value = ""
+      while index < len(chars) and isDigit(chars[index]) {
+        value = value + chars[index]
+        index = index + 1
+        column = column + 1
+      }
+      if index < len(chars) and chars[index] == "." and isDigit(listGet(chars, index + 1, "")) {
+        value = value + "."
+        index = index + 1
+        column = column + 1
+        while index < len(chars) and isDigit(chars[index]) {
+          value = value + chars[index]
+          index = index + 1
+          column = column + 1
+        }
+      }
+      tokens = listPush(tokens, token("NUMBER", value, startLine, startColumn))
+      continue
+    }
+
+    if ch == "\"" {
+      value = ""
+      index = index + 1
+      column = column + 1
+      while index < len(chars) and chars[index] != "\"" {
+        if chars[index] == "\\" and index + 1 < len(chars) {
+          value = value + escapedChar(chars[index + 1])
+          index = index + 2
+          column = column + 2
+          continue
+        }
+        value = value + chars[index]
+        index = index + 1
+        column = column + 1
+      }
+      if index < len(chars) {
+        index = index + 1
+        column = column + 1
+      }
+      tokens = listPush(tokens, token("STRING", value, startLine, startColumn))
+      continue
+    }
+
+    two = ch + listGet(chars, index + 1, "")
+    if isTwoCharSymbol(two) {
+      tokens = listPush(tokens, token("SYMBOL", two, startLine, startColumn))
+      index = index + 2
+      column = column + 2
+      continue
+    }
+
+    tokens = listPush(tokens, token("SYMBOL", ch, startLine, startColumn))
+    index = index + 1
+    column = column + 1
+  }
+
+  tokens = listPush(tokens, token("EOF", "", line, column))
+  return tokens
+}

@@ -279,3 +279,13 @@ types.
 
 `Result<Order, ShipError>` checks both branches: `Ok(...)` must contain an
 `Order`, and `Err(...)` must contain a value matching `ShipError`.
+
+## Self-Hosting Sketches
+
+The `examples/self_host` folder contains the first Moss-written pieces of a
+Moss frontend:
+
+- `token_tools.moss` defines structured token records
+- `lexer_core.moss` turns source text into tokens
+- `tokenizer_sketch.moss` runs the lexer against a Moss file
+- `parser_sketch.moss` consumes those tokens into simple line-oriented AST nodes

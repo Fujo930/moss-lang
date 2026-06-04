@@ -385,6 +385,14 @@ print(shout("moss"))
         self.assertIn("peek past end: EOF", output)
         self.assertEqual(results, [{"name": "tokenizer sketch reads moss source", "status": "pass", "message": ""}])
 
+    def test_parser_sketch_example_runs(self) -> None:
+        source = Path("examples/self_host/parser_sketch.moss").read_text(encoding="utf-8")
+        output: list[str] = []
+        results = Runtime(output.append, base_path=Path.cwd()).run_tests(parse_source(source))
+        self.assertIn("imports: 1", output)
+        self.assertIn("lets: 2", output)
+        self.assertEqual(results, [{"name": "parser sketch finds imports and lets", "status": "pass", "message": ""}])
+
 
 if __name__ == "__main__":
     unittest.main()
