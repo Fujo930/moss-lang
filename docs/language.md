@@ -3,6 +3,11 @@
 This document describes the syntax and semantics implemented by the current
 prototype.
 
+Moss is AI-designed and AI-built. Codex designed, implemented, debugged,
+documented, committed, and pushed the current prototype in collaboration with
+Fujo930. The current public version is `0.2.0`, a self-hosting preview rather
+than a finished self-hosted compiler.
+
 ## Design center
 
 Moss is for long-lived product software. The prototype keeps three ideas visible:
@@ -230,6 +235,8 @@ Core text helpers are available as builtins:
 - `textTrim(text)`
 - `textSlice(text, start, end)`
 - `textContains(text, needle)`
+- `textIndexOf(text, needle)`
+- `textReplace(text, old, new)`
 - `textStartsWith(text, prefix)`
 - `textEndsWith(text, suffix)`
 
@@ -332,3 +339,21 @@ Moss frontend:
   and summarizes declarations such as `effect`, `type`, `rule`, `fn`, and `test`
 - `checker_core.moss` performs the first Moss-written declaration checks
 - `checker_sketch.moss` runs those checks against a Moss file
+- `project_check.moss` checks the self-hosting Moss files as a small project
+
+Run the fast self-hosting path with:
+
+```powershell
+moss selfhost --quick
+```
+
+Run the full self-hosting project check with:
+
+```powershell
+moss selfhost
+```
+
+As of `0.2.0`, the Moss-written checker validates duplicate declarations,
+duplicate record fields, import shape, undeclared effects, parse errors, and
+simple type references in record fields, function signatures, and rule
+signatures. This is the start of self-hosting, not the end state.

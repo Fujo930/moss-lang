@@ -1,5 +1,9 @@
 # Moss roadmap
 
+Moss is an AI-designed and AI-built language prototype. Codex has designed,
+implemented, repaired, documented, committed, and pushed the current repository
+in collaboration with Fujo930.
+
 ## Version 0.1: executable sketch
 
 Implemented:
@@ -26,10 +30,28 @@ Implemented:
 - browser editor through `moss studio`
 - tests and examples
 
-## Version 0.2: static confidence
+## Version 0.2: self-hosting preview
+
+Implemented:
+
+- `moss selfhost --quick` for fast self-hosting smoke checks
+- `moss selfhost` for the full Moss-written self-host project check
+- Moss-written project checker with project-wide type-name collection
+- self-host checker coverage for duplicate declarations, duplicate record
+  fields, import paths, parse errors, undeclared effects, record field types,
+  function parameter and return types, and rule parameter and return types
+- text helpers needed by compiler code: `textIndexOf` and `textReplace`
+- release metadata for a public alpha package as `0.2.0`
+
+This version is public-ready as an alpha. It should be described as
+"self-hosting started" or "self-hosting preview", not "fully self-hosted".
+
+## Version 0.3: static confidence
 
 High-value next steps:
 
+- structured Moss AST nodes for expressions and statements
+- compare Moss-written frontend output against the Python host frontend
 - static type inference for local bindings
 - static field checks for records
 - exhaustive checks for union variants
@@ -37,7 +59,7 @@ High-value next steps:
 - formatter command
 - multiline REPL
 
-## Version 0.3: product engineering workflow
+## Version 0.4: product engineering workflow
 
 Make Moss feel like a language for real systems:
 
@@ -48,7 +70,7 @@ Make Moss feel like a language for real systems:
 - JSON and HTTP adapters
 - source maps for rule evaluation traces
 
-## Version 0.4: editor and playground
+## Version 0.5: editor and playground
 
 Developer experience:
 

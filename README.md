@@ -2,11 +2,20 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-42c4a3)
 ![Self-hosting: started](https://img.shields.io/badge/self--hosting-started-efb85c)
+![Version: 0.2.0](https://img.shields.io/badge/version-0.2.0-4f7edb)
+![Built by Codex](https://img.shields.io/badge/built%20by-Codex-222222)
 
-Moss is an experimental product-engineering language focused on readable domain
-logic, explicit effects, and long-lived code. This repository is a runnable
-prototype: it parses Moss source, checks declarations, and interprets a useful
-subset of the language.
+Moss is an experimental programming language for long-lived software projects
+where humans and AI agents work on the same codebase over time.
+
+This repository is intentionally AI-built: Moss was designed, implemented,
+debugged, documented, committed, and pushed by Codex in collaboration with
+Fujo930. The project is public as a record of that process and as a runnable
+language prototype.
+
+Version `0.2.0` is a self-hosting preview. Moss is not fully self-hosted yet,
+but Moss-written lexer, parser, checker, and project-check sketches already run
+against Moss source.
 
 ## Quick start
 
@@ -27,6 +36,15 @@ You can also run without installing:
 ```powershell
 python -m mosslang.cli run examples/order.moss
 ```
+
+To build local release artifacts:
+
+```powershell
+python -m pip install build
+python -m build
+```
+
+The package exposes a console command named `moss`.
 
 ## What works now
 
@@ -106,16 +124,31 @@ moss run <file.moss>
 moss test <file.moss>
 moss tokens <file.moss>
 moss ast <file.moss>
+moss selfhost
+moss selfhost --quick
 moss studio
 ```
 
 `moss studio` opens a local HTTP editor at `http://127.0.0.1:8765`.
 
+`moss selfhost --quick` runs the fast self-hosting sketches. `moss selfhost`
+also runs the slower Moss-written project check over `examples/self_host`.
+
 ## Project status
 
-This is version 0.1: a compact interpreter with real syntax and runtime
-semantics. The next useful steps are stronger static checks, richer diagnostics,
-and expanding the Moss-written lexer/parser/checker under `examples/self_host`.
+This is version `0.2.0`: a compact interpreter with real syntax, runtime
+semantics, a browser editor, and Moss-written self-hosting sketches.
+The repository is released under the MIT License.
+
+Suitable claims:
+
+- Moss is AI-designed and AI-built.
+- Moss can run useful example programs today.
+- Moss has begun self-hosting.
+- Moss is still alpha software and should not be described as fully self-hosted.
+
+The next useful steps are a structured Moss AST, richer diagnostics, a formatter,
+and comparing Moss-written frontend output against the Python host frontend.
 
 GitHub's language bar is powered by Linguist. `.moss` files are marked
 detectable in `.gitattributes`, but GitHub will only show `Moss` as a first-class
@@ -125,3 +158,5 @@ See `docs/language.md` for the current language surface,
 `docs/studio.md` for the browser editor,
 `docs/history.md` for a commit-by-commit feature guide, and
 `docs/roadmap.md` for the path from prototype to a serious implementation.
+See `docs/release.md` for the public `0.2.0` release notes and packaging
+checklist.

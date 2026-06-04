@@ -3,6 +3,11 @@
 This file explains the repository history in human terms. The Git commit
 messages stay short; this document gives future readers the memory behind them.
 
+Moss is AI-designed and AI-built. Codex designed, implemented, debugged,
+documented, committed, and pushed the current language prototype in
+collaboration with Fujo930. This history is intentionally part development log,
+part memory for future AI agents and human contributors.
+
 ## efeb3d1 Initial Moss language prototype
 
 Started the executable Moss prototype: a tokenizer, parser, AST, interpreter,
@@ -121,11 +126,35 @@ Split the Moss-written parser into a reusable `parser_core.moss` and a thin
 Why it matters: the self-hosting frontend now has a library shape. Future Moss
 checker and parser work can import the core instead of depending on a demo file.
 
+## 0.2.0 self-hosting preview
+
+Recent work moved Moss from "has sketches" to "can check its self-hosting
+folder as a project":
+
+- the self-host parser now captures top-level imports, effects, types, rules,
+  functions, tests, lets, record field names, and record field type text
+- the self-host checker now reports duplicate declarations, duplicate tests,
+  duplicate imports, duplicate effects, duplicate record fields, malformed
+  import paths, parse errors, undeclared effects, and unknown simple type
+  references
+- function and rule signatures are checked for unknown parameter and return
+  types
+- `moss selfhost --quick` runs the fast tokenizer/parser/checker sketches
+- `moss selfhost` also runs `project_check.moss`, which uses Moss code to check
+  the self-hosting Moss files with a project-wide type-name table
+- the self-host parser ignores braces inside string tokens when tracking block
+  depth
+- `textIndexOf` and `textReplace` were added so Moss compiler code can do less
+  awkward text processing
+
+Why it matters: Moss is not fully self-hosted, but the repository now contains a
+working loop where Moss code reads and checks Moss code. That is the first real
+self-hosting foothold.
+
 ## Current direction
 
 The next self-hosting milestones are:
 
 - parse real Moss expressions into structured AST nodes
-- build a Moss-written checker sketch over the parsed declarations
 - compare Moss-written frontend output against the Python host frontend
 - gradually replace host pieces only after the Moss version is tested

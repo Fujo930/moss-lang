@@ -3,6 +3,10 @@
 Moss Studio is a local browser editor backed by the same parser, checker, and
 runtime as the CLI.
 
+Like the rest of Moss, Studio was designed, implemented, debugged, documented,
+committed, and pushed by Codex in collaboration with Fujo930. It is part of the
+`0.2.0` alpha release, not a hosted product.
+
 Start it from the project folder:
 
 ```powershell
@@ -26,6 +30,8 @@ http://127.0.0.1:8765
 - shows output, diagnostics, AST, and tokens
 - opens browser-selected `.moss` files and downloads the current buffer
 - opens and saves workspace-relative paths inside the Moss repository
+- can open the self-hosting sketches so users can inspect Moss code that checks
+  Moss code
 
 ## Implementation
 
