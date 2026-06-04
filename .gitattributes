@@ -1,0 +1,2 @@
+*.moss linguist-language=Moss linguist-detectable=true
+examples/**/*.moss linguist-documentation=false
