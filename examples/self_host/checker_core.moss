@@ -234,6 +234,30 @@ fn returnTypeText(item: MossNode) -> Text {
   return textTrim(result)
 }
 
+fn checkParameterTypes(item: MossNode, types: Map<Text, Bool>, result: CheckResult) -> CheckResult {
+  openParen = "("
+  closeParen = ")"
+
+  if not textContains(item.value, openParen) {
+    return result
+  }
+
+  afterOpen = textSplit(item.value, openParen)
+  paramsAndTail = listGet(afterOpen, 1, "")
+  paramsParts = textSplit(paramsAndTail, closeParen)
+  params = listGet(paramsParts, 0, "")
+
+  for param in textSplit(params, ",") {
+    pieces = textSplit(param, ":")
+    if len(pieces) > 1 {
+      paramType = textTrim(listGet(pieces, 1, ""))
+      result = checkTypeText(item.name + " parameter", paramType, types, result)
+    }
+  }
+
+  return result
+}
+
 fn checkProgramNodes(nodes: List<MossNode>) -> CheckResult {
   return checkProgramNodesWithTypes(nodes, typeNames(nodes))
 }
@@ -270,6 +294,7 @@ fn checkProgramNodesWithTypes(nodes: List<MossNode>, types: Map<Text, Bool>) -> 
       }
     }
     if item.kind == "Function" {
+      result = checkParameterTypes(item, types, result)
       if not textContains(item.value, "->") {
         result = addWarning(result, item.name + " has no explicit return type")
       } else {

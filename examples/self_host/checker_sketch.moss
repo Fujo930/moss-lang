@@ -84,6 +84,24 @@ test "checker sketch accepts order example" {
   knownReturnCheck = checkProgramNodes(parseProgram(sketchTokens(knownReturnSource)).nodes)
   assert(len(knownReturnCheck.errors) == 0, "declared return type should pass")
 
+  unknownParamSource = textJoin([
+    "fn build(value: MissingParam) -> Text {\n",
+    "  return \"ok\"\n",
+    "}\n",
+  ])
+  unknownParamCheck = checkProgramNodes(parseProgram(sketchTokens(unknownParamSource)).nodes)
+  assert(len(unknownParamCheck.errors) == 1, "unknown parameter type should fail")
+
+  knownParamSource = textJoin([
+    "type Person =\n",
+    "  name: Text\n",
+    "fn build(value: Person) -> Text {\n",
+    "  return value.name\n",
+    "}\n",
+  ])
+  knownParamCheck = checkProgramNodes(parseProgram(sketchTokens(knownParamSource)).nodes)
+  assert(len(knownParamCheck.errors) == 0, "declared parameter type should pass")
+
   quiet = parseProgram(sketchTokens("let x = 1\n"))
   quietCheck = checkProgramNodes(quiet.nodes)
   assert(len(quietCheck.warnings) == 1, "missing callable should warn")
