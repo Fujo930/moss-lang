@@ -2,11 +2,11 @@ import "examples/self_host/checker_core.moss"
 
 effect FileSystem
 
-fn appendProjectError(result, path: Text, message: Text) {
+fn appendProjectError(result, path: Text, message: Text) -> Any {
   return result with errors = listPush(result.errors, path + ": " + message)
 }
 
-fn appendProjectWarning(result, path: Text, message: Text) {
+fn appendProjectWarning(result, path: Text, message: Text) -> Any {
   return result with warnings = listPush(result.warnings, path + ": " + message)
 }
 

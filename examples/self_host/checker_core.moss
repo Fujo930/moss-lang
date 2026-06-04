@@ -8,11 +8,11 @@ fn emptyCheckResult() -> CheckResult {
   return { warnings: [], errors: [] }
 }
 
-fn addWarning(result, message: Text) {
+fn addWarning(result, message: Text) -> Any {
   return result with warnings = listPush(result.warnings, message)
 }
 
-fn addError(result, message: Text) {
+fn addError(result, message: Text) -> Any {
   return result with errors = listPush(result.errors, message)
 }
 
