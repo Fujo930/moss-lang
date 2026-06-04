@@ -75,6 +75,16 @@ test "checker sketch accepts order example" {
   duplicateLetCheck = checkProgramNodes(parseProgram(sketchTokens(duplicateLetSource)).nodes)
   assert(len(duplicateLetCheck.errors) == 1, "duplicate top-level let should fail")
 
+  duplicateTestSource = ""
+  duplicateTestSource = duplicateTestSource + "test \"same\" {\n"
+  duplicateTestSource = duplicateTestSource + "  assert(true, \"ok\")\n"
+  duplicateTestSource = duplicateTestSource + "}\n"
+  duplicateTestSource = duplicateTestSource + "test \"same\" {\n"
+  duplicateTestSource = duplicateTestSource + "  assert(true, \"ok\")\n"
+  duplicateTestSource = duplicateTestSource + "}\n"
+  duplicateTestCheck = checkProgramNodes(parseProgram(sketchTokens(duplicateTestSource)).nodes)
+  assert(len(duplicateTestCheck.errors) == 1, "duplicate test should fail")
+
   duplicateImportSource = ""
   duplicateImportSource = duplicateImportSource + "import \"a.moss\"\n"
   duplicateImportSource = duplicateImportSource + "import \"a.moss\"\n"

@@ -173,6 +173,7 @@ fn checkProgramNodes(nodes: List<MossNode>) -> CheckResult {
   result = checkDuplicateKind(nodes, "Rule", result)
   result = checkDuplicateKind(nodes, "Function", result)
   result = checkDuplicateKind(nodes, "Let", result)
+  result = checkDuplicateKind(nodes, "Test", result)
   result = checkDuplicateImport(nodes, result)
   for effect in duplicateEffectNames(nodes) {
     result = addError(result, "duplicate Effect " + effect)
