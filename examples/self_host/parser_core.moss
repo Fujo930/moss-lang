@@ -27,10 +27,10 @@ fn currentToken(state: ParseState) -> MossToken {
 fn advance(state: ParseState) -> ParseState {
   item = currentToken(state)
   nextDepth = state.depth
-  if item.value == "{" {
+  if item.kind == "SYMBOL" and item.value == "{" {
     nextDepth = nextDepth + 1
   }
-  if item.value == "}" and nextDepth > 0 {
+  if item.kind == "SYMBOL" and item.value == "}" and nextDepth > 0 {
     nextDepth = nextDepth - 1
   }
   return state with index = state.index + 1, depth = nextDepth

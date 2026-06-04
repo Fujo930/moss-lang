@@ -46,4 +46,7 @@ test "parser sketch summarizes declarations" {
 
   unclosed = parseProgram(sketchTokens("fn build() -> Text {\n  return \"ok\"\n"))
   assert(len(unclosed.errors) == 1, "unclosed block should be reported")
+
+  stringBraces = parseProgram(sketchTokens("fn build() -> Text {\n  return \"{\"\n}\n"))
+  assert(len(stringBraces.errors) == 0, "string braces should not affect block depth")
 }
