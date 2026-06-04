@@ -115,6 +115,53 @@ for value in [1, 2, 3] {
 Loop bindings are scoped to the loop body. Assignments to outer variables update
 the outer binding, so accumulators work naturally.
 
+`while` loops support `break` and `continue`:
+
+```moss
+index = 0
+while index < len(chars) {
+  if chars[index] == ":" {
+    break
+  }
+  index = index + 1
+}
+```
+
+## Text
+
+Core text helpers are available as builtins:
+
+- `textChars(text)`
+- `textJoin(parts, separator)`
+- `textSplit(text, separator)`
+- `textTrim(text)`
+- `textSlice(text, start, end)`
+- `textContains(text, needle)`
+- `textStartsWith(text, prefix)`
+- `textEndsWith(text, suffix)`
+
+`textJoin(parts)` uses an empty separator.
+
+## File System
+
+Moss can read and write text files through the `FileSystem` effect:
+
+```moss
+effect FileSystem
+
+fn load(path: Text) -> Result<Text, Text> uses FileSystem {
+  return Ok(readText(path))
+}
+```
+
+Available builtins:
+
+- `readText(path)`
+- `writeText(path, text)`
+- `fileExists(path)`
+- `listFiles(path)`
+- `pathJoin(parts...)`
+
 ## Result flow
 
 `?` unwraps `Ok(value)`. If it sees `Err(error)` inside a function returning

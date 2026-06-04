@@ -12,6 +12,8 @@ Implemented:
 - `match` expressions
 - top-level `test` blocks and `moss test`
 - lists, indexing, `for` loops, `len`, `listPush`, and `range`
+- `while`, `break`, and `continue`
+- Text helpers and `FileSystem` effect builtins
 - effect checking for the built-in database capability
 - runtime type contracts
 - CLI commands: `check`, `run`, `tokens`, `ast`

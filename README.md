@@ -32,6 +32,11 @@ python -m mosslang.cli run examples/order.moss
 - `test "name" { ... }` blocks for language-level executable checks
 - records, record field access, and record updates
 - list literals, indexing, `for` loops, `len`, `listPush`, and `range`
+- `while`, `break`, and `continue`
+- Text helpers: `textChars`, `textJoin`, `textSplit`, `textTrim`, `textSlice`,
+  `textContains`, `textStartsWith`, and `textEndsWith`
+- `FileSystem` effect builtins: `readText`, `writeText`, `fileExists`, and
+  `listFiles`
 - nullary and payload variants such as `Paid` and `ShipError.NotReady(Pending)`
 - `match` expressions with wildcard and payload binding patterns
 - `Result` values with `Ok(...)`, `Err(...)`, and `?`

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, Callable
 
 from .errors import MossRuntimeError
@@ -19,7 +20,9 @@ from .nodes import (
     IndexAccess,
     LetStmt,
     Literal,
+    BreakStmt,
     BindingPattern,
+    ContinueStmt,
     LiteralPattern,
     ListLiteral,
     MatchExpr,
@@ -35,6 +38,7 @@ from .nodes import (
     TypeDecl,
     UnaryExpr,
     VariantPattern,
+    WhileStmt,
     WildcardPattern,
 )
 from .values import Money, Result, Variant, format_value
@@ -53,6 +57,14 @@ class EarlyErrSignal(Exception):
 class RequirementFailedSignal(Exception):
     def __init__(self, value: Any):
         self.value = value
+
+
+class BreakSignal(Exception):
+    pass
+
+
+class ContinueSignal(Exception):
+    pass
 
 
 class Environment:
@@ -144,6 +156,10 @@ class UserFunction:
                 result = Result(False, signal.value)
             else:
                 raise MossRuntimeError(f"require failed in {self.name}: {format_value(signal.value)}")
+        except BreakSignal as exc:
+            raise MossRuntimeError("break is only allowed inside loops") from exc
+        except ContinueSignal as exc:
+            raise MossRuntimeError("continue is only allowed inside loops") from exc
         finally:
             self.runtime.effect_stack.pop()
 
@@ -172,10 +188,23 @@ class Runtime:
         self.globals.define("len", BuiltinFunction("len", self.builtin_len))
         self.globals.define("listPush", BuiltinFunction("listPush", self.builtin_list_push))
         self.globals.define("range", BuiltinFunction("range", self.builtin_range))
+        self.globals.define("textChars", BuiltinFunction("textChars", self.builtin_text_chars))
+        self.globals.define("textJoin", BuiltinFunction("textJoin", self.builtin_text_join))
+        self.globals.define("textSplit", BuiltinFunction("textSplit", self.builtin_text_split))
+        self.globals.define("textTrim", BuiltinFunction("textTrim", self.builtin_text_trim))
+        self.globals.define("textSlice", BuiltinFunction("textSlice", self.builtin_text_slice))
+        self.globals.define("textContains", BuiltinFunction("textContains", self.builtin_text_contains))
+        self.globals.define("textStartsWith", BuiltinFunction("textStartsWith", self.builtin_text_starts_with))
+        self.globals.define("textEndsWith", BuiltinFunction("textEndsWith", self.builtin_text_ends_with))
+        self.globals.define("pathJoin", BuiltinFunction("pathJoin", self.builtin_path_join))
         self.globals.define("Ok", BuiltinFunction("Ok", lambda value=None: Result(True, value)))
         self.globals.define("Err", BuiltinFunction("Err", lambda value=None: Result(False, value)))
         self.globals.define("dbPut", BuiltinFunction("dbPut", self.builtin_db_put, effect="Database"))
         self.globals.define("dbGet", BuiltinFunction("dbGet", self.builtin_db_get, effect="Database"))
+        self.globals.define("readText", BuiltinFunction("readText", self.builtin_read_text, effect="FileSystem"))
+        self.globals.define("writeText", BuiltinFunction("writeText", self.builtin_write_text, effect="FileSystem"))
+        self.globals.define("fileExists", BuiltinFunction("fileExists", self.builtin_file_exists, effect="FileSystem"))
+        self.globals.define("listFiles", BuiltinFunction("listFiles", self.builtin_list_files, effect="FileSystem"))
 
     def run(self, program: Program) -> Environment:
         statements: list[Any] = []
@@ -202,6 +231,10 @@ class Runtime:
                 raise MossRuntimeError(f"top-level require failed: {format_value(signal.value)}")
             except EarlyErrSignal as signal:
                 raise MossRuntimeError(f"top-level '?' received Err({format_value(signal.value)})")
+            except BreakSignal as exc:
+                raise MossRuntimeError("break is only allowed inside loops") from exc
+            except ContinueSignal as exc:
+                raise MossRuntimeError("continue is only allowed inside loops") from exc
         return self.globals
 
     def run_tests(self, program: Program) -> list[dict[str, str]]:
@@ -218,6 +251,10 @@ class Runtime:
                 results.append({"name": test.name, "status": "fail", "message": f"require failed: {format_value(signal.value)}"})
             except EarlyErrSignal as signal:
                 results.append({"name": test.name, "status": "fail", "message": f"'?' received Err({format_value(signal.value)})"})
+            except BreakSignal:
+                results.append({"name": test.name, "status": "fail", "message": "break is only allowed inside loops"})
+            except ContinueSignal:
+                results.append({"name": test.name, "status": "fail", "message": "continue is only allowed inside loops"})
             else:
                 results.append({"name": test.name, "status": "pass", "message": ""})
         return results
@@ -252,8 +289,26 @@ class Runtime:
             for item in iterable:
                 loop_env = Environment(env)
                 loop_env.define(statement.name, item)
-                self.execute_block(statement.body, loop_env)
+                try:
+                    self.execute_block(statement.body, loop_env)
+                except ContinueSignal:
+                    continue
+                except BreakSignal:
+                    break
             return
+        if isinstance(statement, WhileStmt):
+            while truthy(self.evaluate(statement.condition, env)):
+                try:
+                    self.execute_block(statement.body, Environment(env))
+                except ContinueSignal:
+                    continue
+                except BreakSignal:
+                    break
+            return
+        if isinstance(statement, BreakStmt):
+            raise BreakSignal()
+        if isinstance(statement, ContinueStmt):
+            raise ContinueSignal()
         if isinstance(statement, ExprStmt):
             self.evaluate(statement.expr, env)
             return
@@ -432,12 +487,82 @@ class Runtime:
             end_value = decimal_to_int(end, "range end")
         return [Decimal(item) for item in range(start_value, end_value)]
 
+    def builtin_text_chars(self, text: Any) -> list[str]:
+        require_text(text, "textChars")
+        return list(text)
+
+    def builtin_text_join(self, values: Any, separator: Any = "") -> str:
+        if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+            raise MossRuntimeError("textJoin expects a List<Text>")
+        require_text(separator, "textJoin separator")
+        return separator.join(values)
+
+    def builtin_text_split(self, text: Any, separator: Any) -> list[str]:
+        require_text(text, "textSplit")
+        require_text(separator, "textSplit separator")
+        if separator == "":
+            return list(text)
+        return text.split(separator)
+
+    def builtin_text_trim(self, text: Any) -> str:
+        require_text(text, "textTrim")
+        return text.strip()
+
+    def builtin_text_slice(self, text: Any, start: Any, end: Any | None = None) -> str:
+        require_text(text, "textSlice")
+        start_value = decimal_to_int(start, "textSlice start")
+        end_value = None if end is None else decimal_to_int(end, "textSlice end")
+        return text[start_value:end_value]
+
+    def builtin_text_contains(self, text: Any, needle: Any) -> bool:
+        require_text(text, "textContains")
+        require_text(needle, "textContains needle")
+        return needle in text
+
+    def builtin_text_starts_with(self, text: Any, prefix: Any) -> bool:
+        require_text(text, "textStartsWith")
+        require_text(prefix, "textStartsWith prefix")
+        return text.startswith(prefix)
+
+    def builtin_text_ends_with(self, text: Any, suffix: Any) -> bool:
+        require_text(text, "textEndsWith")
+        require_text(suffix, "textEndsWith suffix")
+        return text.endswith(suffix)
+
+    def builtin_path_join(self, *parts: Any) -> str:
+        if not parts:
+            return ""
+        for part in parts:
+            require_text(part, "pathJoin")
+        return str(Path(parts[0]).joinpath(*parts[1:]))
+
     def builtin_db_put(self, key: Any, value: Any) -> Any:
         self.db[str(key)] = value
         return value
 
     def builtin_db_get(self, key: Any) -> Any:
         return self.db.get(str(key))
+
+    def builtin_read_text(self, path: Any) -> str:
+        require_text(path, "readText")
+        return Path(path).read_text(encoding="utf-8-sig")
+
+    def builtin_write_text(self, path: Any, text: Any) -> str:
+        require_text(path, "writeText path")
+        require_text(text, "writeText text")
+        Path(path).write_text(text, encoding="utf-8")
+        return path
+
+    def builtin_file_exists(self, path: Any) -> bool:
+        require_text(path, "fileExists")
+        return Path(path).exists()
+
+    def builtin_list_files(self, path: Any) -> list[str]:
+        require_text(path, "listFiles")
+        directory = Path(path)
+        if not directory.is_dir():
+            raise MossRuntimeError(f"listFiles expects a directory: {path}")
+        return sorted(str(item) for item in directory.iterdir())
 
     def require_type(self, value: Any, expected: str, context: str) -> None:
         if not self.value_matches_type(value, expected):
@@ -560,6 +685,11 @@ def decimal_to_int(value: Any, context: str) -> int:
     if value != integer:
         raise MossRuntimeError(f"{context} must be an integer Number")
     return integer
+
+
+def require_text(value: Any, context: str) -> None:
+    if not isinstance(value, str):
+        raise MossRuntimeError(f"{context} expects Text")
 
 
 def require_same_currency(left: Money, right: Money) -> None:

@@ -89,6 +89,22 @@ class ForStmt:
 
 
 @dataclass(frozen=True)
+class WhileStmt:
+    condition: Any
+    body: list[Any]
+
+
+@dataclass(frozen=True)
+class BreakStmt:
+    pass
+
+
+@dataclass(frozen=True)
+class ContinueStmt:
+    pass
+
+
+@dataclass(frozen=True)
 class ExprStmt:
     expr: Any
 

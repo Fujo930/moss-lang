@@ -17,7 +17,9 @@ from .nodes import (
     IndexAccess,
     LetStmt,
     Literal,
+    BreakStmt,
     BindingPattern,
+    ContinueStmt,
     LiteralPattern,
     ListLiteral,
     MatchCase,
@@ -35,13 +37,14 @@ from .nodes import (
     TypeDecl,
     UnaryExpr,
     VariantPattern,
+    WhileStmt,
     WildcardPattern,
 )
 from .tokens import Token, tokenize
 
 
 DECL_START = {"effect", "type", "rule", "fn", "test"}
-STMT_START = {"let", "return", "require", "if", "for"}
+STMT_START = {"let", "return", "require", "if", "for", "while", "break", "continue"}
 
 
 class Parser:
@@ -222,10 +225,17 @@ class Parser:
         if self.match_value("if"):
             condition = self.parse_expression()
             then_body = self.parse_block()
-            self.skip_newlines()
             else_body: list[object] = []
             if self.match_value("else"):
                 else_body = self.parse_block()
+                self.consume_statement_end()
+                return IfStmt(condition, then_body, else_body)
+            if self.match_kind("NEWLINE"):
+                self.skip_newlines()
+                if self.match_value("else"):
+                    else_body = self.parse_block()
+                    self.consume_statement_end()
+                return IfStmt(condition, then_body, else_body)
             self.consume_statement_end()
             return IfStmt(condition, then_body, else_body)
 
@@ -236,6 +246,20 @@ class Parser:
             body = self.parse_block()
             self.consume_statement_end()
             return ForStmt(name, iterable, body)
+
+        if self.match_value("while"):
+            condition = self.parse_expression()
+            body = self.parse_block()
+            self.consume_statement_end()
+            return WhileStmt(condition, body)
+
+        if self.match_value("break"):
+            self.consume_statement_end()
+            return BreakStmt()
+
+        if self.match_value("continue"):
+            self.consume_statement_end()
+            return ContinueStmt()
 
         if self.check_kind("IDENT") and self.peek_next().value == "=":
             name = self.advance().value
@@ -326,7 +350,11 @@ class Parser:
         return expr
 
     def parse_unary(self) -> object:
-        if self.match_value("not") or self.match_value("-"):
+        if self.check_kind("IDENT") and self.match_value("not"):
+            op = self.previous().value
+            right = self.parse_unary()
+            return UnaryExpr(op, right)
+        if self.check_kind("OP") and self.match_value("-"):
             op = self.previous().value
             right = self.parse_unary()
             return UnaryExpr(op, right)

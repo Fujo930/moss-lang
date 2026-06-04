@@ -16,6 +16,7 @@ from .nodes import (
     IfStmt,
     IndexAccess,
     LetStmt,
+    WhileStmt,
     ListLiteral,
     MatchExpr,
     Program,
@@ -39,6 +40,10 @@ class Diagnostic:
 BUILTIN_EFFECTS = {
     "dbPut": "Database",
     "dbGet": "Database",
+    "readText": "FileSystem",
+    "writeText": "FileSystem",
+    "fileExists": "FileSystem",
+    "listFiles": "FileSystem",
 }
 
 
@@ -100,6 +105,8 @@ def collect_call_names(nodes: list[Any]) -> list[str]:
             names.extend(collect_call_names(node.else_body))
         if isinstance(node, ForStmt):
             names.extend(collect_call_names(node.body))
+        if isinstance(node, WhileStmt):
+            names.extend(collect_call_names(node.body))
     return names
 
 
@@ -148,6 +155,8 @@ def collect_expr_calls(node: Any) -> list[str]:
         names.extend(collect_expr_calls(node.condition))
     elif isinstance(node, ForStmt):
         names.extend(collect_expr_calls(node.iterable))
+    elif isinstance(node, WhileStmt):
+        names.extend(collect_expr_calls(node.condition))
     return names
 
 

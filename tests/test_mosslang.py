@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+import tempfile
+from pathlib import Path
 
 from mosslang.checker import check_program
 from mosslang.errors import MossRuntimeError
@@ -219,6 +221,65 @@ countText(["ok", 2])
 """
         with self.assertRaisesRegex(MossRuntimeError, "expected List<Text>"):
             self.run_source(source)
+
+    def test_while_break_continue_and_text_helpers(self) -> None:
+        source = """
+fn takeBeforeColon(text: Text) -> Text {
+  chars = textChars(text)
+  index = 0
+  result = ""
+  while index < len(chars) {
+    char = chars[index]
+    index = index + 1
+    if char == "-" {
+      continue
+    }
+    if char == ":" {
+      break
+    }
+    result = result + char
+  }
+  return result
+}
+
+print(takeBeforeColon("mo-ss:language"))
+print(textJoin(textSplit("a,b,c", ","), "|"))
+print(textSlice("abcdef", 1, 4))
+"""
+        _, output = self.run_source(source)
+        self.assertEqual(output, ["moss", "a|b|c", "bcd"])
+
+    def test_filesystem_effect_and_builtins(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.moss"
+            path.write_text("one\ntwo\n", encoding="utf-8")
+            escaped_path = str(path).replace("\\", "\\\\")
+            source = f'''
+effect FileSystem
+
+fn load(path: Text) -> Result<Text, Text> uses FileSystem {{
+  return Ok(readText(path))
+}}
+
+let path = "{escaped_path}"
+print(textTrim(load(path)?))
+print(fileExists(path))
+'''
+            _, output = self.run_source(source)
+        self.assertEqual(output, ["one\ntwo", "true"])
+
+    def test_filesystem_effect_is_checked(self) -> None:
+        program = parse_source(
+            """
+effect FileSystem
+
+fn load(path: Text) -> Text {
+  return readText(path)
+}
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertTrue(any("does not declare uses FileSystem" in d.message for d in diagnostics))
 
 
 if __name__ == "__main__":

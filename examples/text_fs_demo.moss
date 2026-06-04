@@ -1,0 +1,49 @@
+effect FileSystem
+
+fn countCodeLines(path: Text) -> Result<Number, Text> uses FileSystem {
+  source = readText(path)
+  lines = textSplit(source, "\n")
+  count = 0
+
+  for line in lines {
+    trimmed = textTrim(line)
+    if trimmed == "" {
+      continue
+    }
+    if textStartsWith(trimmed, "#") {
+      continue
+    }
+    count = count + 1
+  }
+
+  return Ok(count)
+}
+
+fn takeBeforeColon(text: Text) -> Text {
+  chars = textChars(text)
+  index = 0
+  result = ""
+
+  while index < len(chars) {
+    char = chars[index]
+    if char == ":" {
+      break
+    }
+    result = result + char
+    index = index + 1
+  }
+
+  return result
+}
+
+let thisFile = pathJoin("examples", "text_fs_demo.moss")
+let codeLines = countCodeLines(thisFile)?
+print("code lines:", codeLines)
+print("prefix:", takeBeforeColon("moss:language"))
+print("has file:", fileExists(thisFile))
+
+test "text helpers and file reads" {
+  assert(codeLines > 20, "expected to read this source file")
+  assert(takeBeforeColon("moss:language") == "moss", "while loop should stop at colon")
+  assert(textJoin(["m", "o", "s", "s"]) == "moss", "textJoin should concatenate")
+}

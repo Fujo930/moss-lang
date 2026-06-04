@@ -27,6 +27,7 @@ EXAMPLES = {
     "Not ready result": "not_ready.moss",
     "Match expression": "match_demo.moss",
     "Lists and loops": "lists_demo.moss",
+    "Text and files": "text_fs_demo.moss",
 }
 
 
