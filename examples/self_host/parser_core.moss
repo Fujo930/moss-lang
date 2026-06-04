@@ -65,6 +65,14 @@ fn wordText(text: Text, word: Text) -> Text {
   return text + " " + word
 }
 
+fn fieldText(text: Text, field: Text, fieldType: Text) -> Text {
+  item = field + ":" + fieldType
+  if text == "" {
+    return item
+  }
+  return text + ";" + item
+}
+
 fn lineText(state: ParseState) -> Text {
   text = ""
   while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
@@ -102,8 +110,9 @@ fn typeFieldText(state: ParseState) -> Text {
     colon = textIndexOf(line, ":")
     if colon >= 0 {
       field = textTrim(textSlice(line, 0, colon))
+      fieldType = textTrim(textSlice(line, colon + 1))
       if field != "" {
-        fields = wordText(fields, field)
+        fields = fieldText(fields, field, fieldType)
       }
     }
     state = advanceToNextLine(state)

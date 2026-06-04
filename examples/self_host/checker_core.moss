@@ -76,8 +76,9 @@ fn duplicateTypeFields(item: MossNode) -> List<Text> {
   seen = mapNew()
   duplicates = []
 
-  for name in textSplit(item.value, " ") {
-    clean = textTrim(name)
+  for fieldInfo in textSplit(item.value, ";") {
+    parts = textSplit(fieldInfo, ":")
+    clean = textTrim(listGet(parts, 0, ""))
     if isNameToken(clean) {
       if mapHas(seen, clean) {
         duplicates = listPush(duplicates, clean)

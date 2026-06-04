@@ -39,7 +39,7 @@ test "parser sketch summarizes declarations" {
   typeParsed = parseProgram(sketchTokens(typeSource))
   firstType = listGet(typeParsed.nodes, 0, node("Missing", "", ""))
   assert(firstType.kind == "Type", "first declaration should be a type")
-  assert(firstType.value == "name age", "type fields should be captured")
+  assert(firstType.value == "name:Text;age:Number", "type fields should include types")
 
   extraClose = parseProgram(sketchTokens("}\n"))
   assert(len(extraClose.errors) == 1, "extra closing brace should be reported")
