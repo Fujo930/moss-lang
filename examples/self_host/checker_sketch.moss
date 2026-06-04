@@ -54,4 +54,22 @@ test "checker sketch accepts order example" {
   duplicateEffectSource = duplicateEffectSource + "effect FileSystem, Database\n"
   duplicateEffectCheck = checkProgramNodes(parseProgram(sketchTokens(duplicateEffectSource)).nodes)
   assert(len(duplicateEffectCheck.errors) == 1, "duplicate effect should fail")
+
+  duplicateLetSource = ""
+  duplicateLetSource = duplicateLetSource + "fn work() -> Text {\n"
+  duplicateLetSource = duplicateLetSource + "  return \"ok\"\n"
+  duplicateLetSource = duplicateLetSource + "}\n"
+  duplicateLetSource = duplicateLetSource + "let value = 1\n"
+  duplicateLetSource = duplicateLetSource + "let value = 2\n"
+  duplicateLetCheck = checkProgramNodes(parseProgram(sketchTokens(duplicateLetSource)).nodes)
+  assert(len(duplicateLetCheck.errors) == 1, "duplicate top-level let should fail")
+
+  duplicateImportSource = ""
+  duplicateImportSource = duplicateImportSource + "import \"a.moss\"\n"
+  duplicateImportSource = duplicateImportSource + "import \"a.moss\"\n"
+  duplicateImportSource = duplicateImportSource + "fn work() -> Text {\n"
+  duplicateImportSource = duplicateImportSource + "  return \"ok\"\n"
+  duplicateImportSource = duplicateImportSource + "}\n"
+  duplicateImportCheck = checkProgramNodes(parseProgram(sketchTokens(duplicateImportSource)).nodes)
+  assert(len(duplicateImportCheck.errors) == 1, "duplicate import should fail")
 }
