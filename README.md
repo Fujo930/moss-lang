@@ -47,9 +47,10 @@ python -m mosslang.cli run examples/order.moss
   `listFiles`
 - top-level `import "path.moss"` declarations
 - self-hosting sketches with structured token records, reusable lexer/parser
-  cores, and a line-oriented parser that summarizes Moss declarations:
+  cores, a line-oriented parser, and a first checker sketch:
   `examples/self_host/tokenizer_sketch.moss` and
-  `examples/self_host/parser_sketch.moss`
+  `examples/self_host/parser_sketch.moss` and
+  `examples/self_host/checker_sketch.moss`
 - nullary and payload variants such as `Paid` and `ShipError.NotReady(Pending)`
 - `match` expressions with wildcard and payload binding patterns
 - `Result` values with `Ok(...)`, `Err(...)`, and `?`

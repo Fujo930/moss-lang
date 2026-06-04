@@ -32,6 +32,7 @@ EXAMPLES = {
     "Imports": "import_demo.moss",
     "Tokenizer sketch": "self_host/tokenizer_sketch.moss",
     "Parser sketch": "self_host/parser_sketch.moss",
+    "Checker sketch": "self_host/checker_sketch.moss",
 }
 
 

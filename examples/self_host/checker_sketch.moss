@@ -1,0 +1,35 @@
+import "examples/self_host/checker_core.moss"
+
+effect FileSystem
+
+fn analyzeFile(path: Text) -> Result<CheckResult, Text> uses FileSystem {
+  source = readText(path)
+  parsed = parseProgram(sketchTokens(source))
+  return Ok(checkProgramNodes(parsed.nodes))
+}
+
+let target = "examples/order.moss"
+let checked = analyzeFile(target)?
+
+print("checked:", target)
+print("warnings:", len(checked.warnings))
+print("errors:", len(checked.errors))
+
+test "checker sketch accepts order example" {
+  assert(len(checked.warnings) == 0, "order example should not warn")
+  assert(len(checked.errors) == 0, "order example should not fail")
+
+  duplicateSource = ""
+  duplicateSource = duplicateSource + "type Order = Paid\n"
+  duplicateSource = duplicateSource + "type Order = Pending\n"
+  duplicateSource = duplicateSource + "fn work() -> Text {\n"
+  duplicateSource = duplicateSource + "  return \"ok\"\n"
+  duplicateSource = duplicateSource + "}\n"
+  duplicate = parseProgram(sketchTokens(duplicateSource))
+  duplicateCheck = checkProgramNodes(duplicate.nodes)
+  assert(len(duplicateCheck.errors) == 1, "duplicate type should be reported")
+
+  quiet = parseProgram(sketchTokens("let x = 1\n"))
+  quietCheck = checkProgramNodes(quiet.nodes)
+  assert(len(quietCheck.warnings) == 1, "missing callable should warn")
+}

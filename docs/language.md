@@ -313,3 +313,5 @@ Moss frontend:
 - `parser_core.moss` consumes those tokens into simple line-oriented AST nodes
 - `parser_sketch.moss` runs the parser against a Moss file
   and summarizes declarations such as `effect`, `type`, `rule`, `fn`, and `test`
+- `checker_core.moss` performs the first Moss-written declaration checks
+- `checker_sketch.moss` runs those checks against a Moss file
