@@ -41,7 +41,8 @@ python -m mosslang.cli run examples/order.moss
 - `FileSystem` effect builtins: `readText`, `writeText`, `fileExists`, and
   `listFiles`
 - top-level `import "path.moss"` declarations
-- self-hosting sketches with structured token records and a line-oriented parser:
+- self-hosting sketches with structured token records, a reusable lexer core,
+  and a line-oriented parser that summarizes Moss declarations:
   `examples/self_host/tokenizer_sketch.moss` and
   `examples/self_host/parser_sketch.moss`
 - nullary and payload variants such as `Paid` and `ShipError.NotReady(Pending)`

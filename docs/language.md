@@ -289,3 +289,4 @@ Moss frontend:
 - `lexer_core.moss` turns source text into tokens
 - `tokenizer_sketch.moss` runs the lexer against a Moss file
 - `parser_sketch.moss` consumes those tokens into simple line-oriented AST nodes
+  and summarizes declarations such as `effect`, `type`, `rule`, `fn`, and `test`

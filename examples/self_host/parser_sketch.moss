@@ -71,6 +71,34 @@ fn parseImport(state: ParseState) -> ParseState {
   return addNode(state, node("Import", "", path.value))
 }
 
+fn parseEffect(state: ParseState) -> ParseState {
+  state = advance(state)
+  names = ""
+
+  while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
+    item = currentToken(state)
+    if item.value != "," {
+      names = tokenText(names, item)
+    }
+    state = advance(state)
+  }
+
+  return addNode(state, node("Effect", "", names))
+}
+
+fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
+  state = advance(state)
+  name = currentToken(state)
+
+  if name.kind != "IDENT" and name.kind != "STRING" {
+    state = addError(state, "expected name after declaration")
+    return advanceToNextLine(state)
+  }
+
+  state = advanceToNextLine(state)
+  return addNode(state, node(kind, name.value, ""))
+}
+
 fn parseLet(state: ParseState) -> ParseState {
   state = advance(state)
   name = currentToken(state)
@@ -117,6 +145,26 @@ fn parseStatement(state: ParseState) -> ParseState {
     return parseImport(state)
   }
 
+  if item.kind == "IDENT" and item.value == "effect" {
+    return parseEffect(state)
+  }
+
+  if item.kind == "IDENT" and item.value == "type" {
+    return parseNamedLine(state, "Type")
+  }
+
+  if item.kind == "IDENT" and item.value == "rule" {
+    return parseNamedLine(state, "Rule")
+  }
+
+  if item.kind == "IDENT" and item.value == "fn" {
+    return parseNamedLine(state, "Function")
+  }
+
+  if item.kind == "IDENT" and item.value == "test" {
+    return parseNamedLine(state, "Test")
+  }
+
   if item.kind == "IDENT" and item.value == "let" {
     return parseLet(state)
   }
@@ -151,17 +199,25 @@ fn countNodes(nodes: List<MossNode>, kind: Text) -> Number {
   return count
 }
 
-let target = "examples/import_demo.moss"
+let target = "examples/order.moss"
 let parsed = parseFile(target)?
 
 print("parsed:", target)
 print("nodes:", len(parsed.nodes))
-print("imports:", countNodes(parsed.nodes, "Import"))
+print("effects:", countNodes(parsed.nodes, "Effect"))
+print("types:", countNodes(parsed.nodes, "Type"))
+print("rules:", countNodes(parsed.nodes, "Rule"))
+print("functions:", countNodes(parsed.nodes, "Function"))
 print("lets:", countNodes(parsed.nodes, "Let"))
+print("tests:", countNodes(parsed.nodes, "Test"))
 print("errors:", len(parsed.errors))
 
-test "parser sketch finds imports and lets" {
-  assert(countNodes(parsed.nodes, "Import") == 1, "expected one import")
+test "parser sketch summarizes declarations" {
+  assert(countNodes(parsed.nodes, "Effect") == 1, "expected one effect")
+  assert(countNodes(parsed.nodes, "Type") == 2, "expected two types")
+  assert(countNodes(parsed.nodes, "Rule") == 1, "expected one rule")
+  assert(countNodes(parsed.nodes, "Function") == 1, "expected one function")
   assert(countNodes(parsed.nodes, "Let") == 2, "expected two let statements")
+  assert(countNodes(parsed.nodes, "Test") == 1, "expected one test")
   assert(len(parsed.errors) == 0, "line parser should avoid errors")
 }
