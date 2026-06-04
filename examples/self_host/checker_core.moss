@@ -120,6 +120,7 @@ fn typeNames(nodes: List<MossNode>) -> Map<Text, Bool> {
   names = mapPut(names, "Map", true)
   names = mapPut(names, "Option", true)
   names = mapPut(names, "Result", true)
+  names = mapPut(names, "MossToken", true)
 
   for item in nodes {
     if item.kind == "Type" {
