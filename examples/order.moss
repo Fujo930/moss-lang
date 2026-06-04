@@ -1,0 +1,26 @@
+effect Database
+
+type Order =
+  id: Text
+  status: Pending | Paid | Shipped | Cancelled
+  total: Money
+
+type ShipError = NotReady | Missing
+
+rule canShip(order: Order) -> Bool =
+  order.status == Paid and order.total > 0.usd
+
+fn ship(order: Order) -> Result<Order, ShipError> uses Database {
+  require canShip(order)
+    else ShipError.NotReady(order.status)
+
+  updated = order with status = Shipped
+  dbPut(order.id, updated)
+
+  return Ok(updated)
+}
+
+let order = { id: "A-100", status: Paid, total: 42.usd }
+let shipped = ship(order)?
+print("status:", shipped.status)
+print("stored:", dbGet("A-100").status)

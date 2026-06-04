@@ -1,0 +1,556 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Any, Callable
+
+from .errors import MossRuntimeError
+from .nodes import (
+    AssignStmt,
+    BinaryExpr,
+    CallExpr,
+    EffectDecl,
+    ExprStmt,
+    FieldAccess,
+    FunctionDecl,
+    Identifier,
+    IfStmt,
+    LetStmt,
+    Literal,
+    BindingPattern,
+    LiteralPattern,
+    MatchExpr,
+    NumberLiteral,
+    Program,
+    RecordLiteral,
+    RecordUpdate,
+    RequireStmt,
+    ReturnStmt,
+    RuleDecl,
+    TryExpr,
+    TypeDecl,
+    UnaryExpr,
+    VariantPattern,
+    WildcardPattern,
+)
+from .values import Money, Result, Variant, format_value
+
+
+class ReturnSignal(Exception):
+    def __init__(self, value: Any):
+        self.value = value
+
+
+class EarlyErrSignal(Exception):
+    def __init__(self, value: Any):
+        self.value = value
+
+
+class RequirementFailedSignal(Exception):
+    def __init__(self, value: Any):
+        self.value = value
+
+
+class Environment:
+    def __init__(self, parent: Environment | None = None):
+        self.parent = parent
+        self.values: dict[str, Any] = {}
+
+    def define(self, name: str, value: Any) -> None:
+        self.values[name] = value
+
+    def assign(self, name: str, value: Any) -> None:
+        if name in self.values:
+            self.values[name] = value
+            return
+        if self.parent is not None and self.parent.contains(name):
+            self.parent.assign(name, value)
+            return
+        self.values[name] = value
+
+    def contains(self, name: str) -> bool:
+        return name in self.values or (self.parent is not None and self.parent.contains(name))
+
+    def get(self, name: str) -> Any:
+        if name in self.values:
+            return self.values[name]
+        if self.parent is not None:
+            return self.parent.get(name)
+        if name and name[0].isupper():
+            return Variant(name)
+        raise MossRuntimeError(f"undefined name '{name}'")
+
+
+@dataclass(frozen=True)
+class BuiltinFunction:
+    name: str
+    fn: Callable[..., Any]
+    effect: str | None = None
+
+
+@dataclass(frozen=True)
+class UserFunction:
+    decl: FunctionDecl | RuleDecl
+    runtime: Runtime
+    closure: Environment
+    is_rule: bool = False
+
+    @property
+    def name(self) -> str:
+        return self.decl.name
+
+    @property
+    def uses(self) -> list[str]:
+        if isinstance(self.decl, FunctionDecl):
+            return self.decl.uses
+        return []
+
+    @property
+    def return_type(self) -> str | None:
+        return self.decl.return_type
+
+    def call(self, args: list[Any]) -> Any:
+        if len(args) != len(self.decl.params):
+            raise MossRuntimeError(f"{self.name} expected {len(self.decl.params)} args, got {len(args)}")
+
+        self.runtime.ensure_call_allowed(self)
+        local = Environment(self.closure)
+        for param, arg in zip(self.decl.params, args):
+            if param.type_name is not None:
+                self.runtime.require_type(arg, param.type_name, f"argument '{param.name}' for {self.name}")
+            local.define(param.name, arg)
+
+        self.runtime.effect_stack.append(set(self.uses))
+        result: Any = None
+        try:
+            if isinstance(self.decl, RuleDecl):
+                result = self.runtime.evaluate(self.decl.expr, local)
+            else:
+                try:
+                    self.runtime.execute_block(self.decl.body, local)
+                except ReturnSignal as signal:
+                    result = signal.value
+        except EarlyErrSignal as signal:
+            if self.returns_result():
+                result = Result(False, signal.value)
+            else:
+                raise MossRuntimeError(f"{self.name} used '?' on Err({format_value(signal.value)})")
+        except RequirementFailedSignal as signal:
+            if self.returns_result():
+                result = Result(False, signal.value)
+            else:
+                raise MossRuntimeError(f"require failed in {self.name}: {format_value(signal.value)}")
+        finally:
+            self.runtime.effect_stack.pop()
+
+        if self.return_type is not None:
+            self.runtime.require_type(result, self.return_type, f"return value for {self.name}")
+        return result
+
+    def returns_result(self) -> bool:
+        return self.return_type is not None and self.return_type.startswith("Result")
+
+
+class Runtime:
+    def __init__(self, output: Callable[[str], None] | None = None):
+        self.effects: set[str] = set()
+        self.types: dict[str, TypeDecl] = {}
+        self.globals = Environment()
+        self.db: dict[str, Any] = {}
+        self.output = output or print
+        self.effect_stack: list[set[str]] = []
+        self.install_builtins()
+
+    def install_builtins(self) -> None:
+        self.globals.define("print", BuiltinFunction("print", self.builtin_print))
+        self.globals.define("assert", BuiltinFunction("assert", self.builtin_assert))
+        self.globals.define("Ok", BuiltinFunction("Ok", lambda value=None: Result(True, value)))
+        self.globals.define("Err", BuiltinFunction("Err", lambda value=None: Result(False, value)))
+        self.globals.define("dbPut", BuiltinFunction("dbPut", self.builtin_db_put, effect="Database"))
+        self.globals.define("dbGet", BuiltinFunction("dbGet", self.builtin_db_get, effect="Database"))
+
+    def run(self, program: Program) -> Environment:
+        statements: list[Any] = []
+        for item in program.items:
+            if isinstance(item, EffectDecl):
+                self.effects.update(item.names)
+            elif isinstance(item, TypeDecl):
+                self.types[item.name] = item
+            elif isinstance(item, RuleDecl):
+                self.globals.define(item.name, UserFunction(item, self, self.globals, is_rule=True))
+            elif isinstance(item, FunctionDecl):
+                self.globals.define(item.name, UserFunction(item, self, self.globals))
+            else:
+                statements.append(item)
+
+        for statement in statements:
+            try:
+                self.execute(statement, self.globals)
+            except ReturnSignal:
+                raise MossRuntimeError("return is only allowed inside functions")
+            except RequirementFailedSignal as signal:
+                raise MossRuntimeError(f"top-level require failed: {format_value(signal.value)}")
+            except EarlyErrSignal as signal:
+                raise MossRuntimeError(f"top-level '?' received Err({format_value(signal.value)})")
+        return self.globals
+
+    def execute_block(self, statements: list[Any], env: Environment) -> None:
+        for statement in statements:
+            self.execute(statement, env)
+
+    def execute(self, statement: Any, env: Environment) -> None:
+        if isinstance(statement, LetStmt):
+            env.define(statement.name, self.evaluate(statement.expr, env))
+            return
+        if isinstance(statement, AssignStmt):
+            env.assign(statement.name, self.evaluate(statement.expr, env))
+            return
+        if isinstance(statement, ReturnStmt):
+            raise ReturnSignal(self.evaluate(statement.expr, env))
+        if isinstance(statement, RequireStmt):
+            if not truthy(self.evaluate(statement.condition, env)):
+                raise RequirementFailedSignal(self.evaluate(statement.else_expr, env))
+            return
+        if isinstance(statement, IfStmt):
+            if truthy(self.evaluate(statement.condition, env)):
+                self.execute_block(statement.then_body, Environment(env))
+            else:
+                self.execute_block(statement.else_body, Environment(env))
+            return
+        if isinstance(statement, ExprStmt):
+            self.evaluate(statement.expr, env)
+            return
+        raise MossRuntimeError(f"cannot execute {type(statement).__name__}")
+
+    def evaluate(self, expr: Any, env: Environment) -> Any:
+        if isinstance(expr, Literal):
+            return expr.value
+        if isinstance(expr, NumberLiteral):
+            return expr.value
+        if isinstance(expr, Identifier):
+            return env.get(expr.name)
+        if isinstance(expr, RecordLiteral):
+            return {key: self.evaluate(value, env) for key, value in expr.fields.items()}
+        if isinstance(expr, RecordUpdate):
+            base = self.evaluate(expr.base, env)
+            if not isinstance(base, dict):
+                raise MossRuntimeError("record update target must be a record")
+            updated = dict(base)
+            for key, value in expr.updates.items():
+                updated[key] = self.evaluate(value, env)
+            return updated
+        if isinstance(expr, UnaryExpr):
+            right = self.evaluate(expr.right, env)
+            if expr.op == "not":
+                return not truthy(right)
+            if expr.op == "-":
+                return -right
+            raise MossRuntimeError(f"unknown unary operator {expr.op}")
+        if isinstance(expr, BinaryExpr):
+            return self.evaluate_binary(expr, env)
+        if isinstance(expr, FieldAccess):
+            target = self.evaluate(expr.target, env)
+            return self.get_field(target, expr.field)
+        if isinstance(expr, CallExpr):
+            callee = self.evaluate(expr.callee, env)
+            args = [self.evaluate(arg, env) for arg in expr.args]
+            return self.call(callee, args)
+        if isinstance(expr, TryExpr):
+            value = self.evaluate(expr.expr, env)
+            if not isinstance(value, Result):
+                raise MossRuntimeError("'?' can only be used with Result values")
+            if value.ok:
+                return value.value
+            raise EarlyErrSignal(value.value)
+        if isinstance(expr, MatchExpr):
+            return self.evaluate_match(expr, env)
+        raise MossRuntimeError(f"cannot evaluate {type(expr).__name__}")
+
+    def evaluate_match(self, expr: MatchExpr, env: Environment) -> Any:
+        subject = self.evaluate(expr.subject, env)
+        for case in expr.cases:
+            bindings = match_pattern(case.pattern, subject)
+            if bindings is None:
+                continue
+            case_env = Environment(env)
+            for name, value in bindings.items():
+                case_env.define(name, value)
+            return self.evaluate(case.expr, case_env)
+        raise MossRuntimeError(f"match did not cover value {format_value(subject)}")
+
+    def evaluate_binary(self, expr: BinaryExpr, env: Environment) -> Any:
+        if expr.op == "and":
+            left = self.evaluate(expr.left, env)
+            if not truthy(left):
+                return False
+            return truthy(self.evaluate(expr.right, env))
+        if expr.op == "or":
+            left = self.evaluate(expr.left, env)
+            if truthy(left):
+                return True
+            return truthy(self.evaluate(expr.right, env))
+
+        left = self.evaluate(expr.left, env)
+        right = self.evaluate(expr.right, env)
+
+        if expr.op == "==":
+            return left == right
+        if expr.op == "!=":
+            return left != right
+        if expr.op == "+":
+            return add_values(left, right)
+        if expr.op == "-":
+            return subtract_values(left, right)
+        if expr.op == "*":
+            return multiply_values(left, right)
+        if expr.op == "/":
+            return divide_values(left, right)
+        if expr.op in {">", ">=", "<", "<="}:
+            return compare_values(left, right, expr.op)
+        raise MossRuntimeError(f"unknown binary operator {expr.op}")
+
+    def get_field(self, target: Any, field: str) -> Any:
+        if isinstance(target, Decimal):
+            return Money(target, field)
+        if isinstance(target, dict):
+            if field not in target:
+                raise MossRuntimeError(f"record has no field '{field}'")
+            return target[field]
+        if isinstance(target, Variant) and not target.payload:
+            return Variant(f"{target.name}.{field}")
+        if isinstance(target, Result):
+            if field == "ok":
+                return target.ok
+            if field == "value":
+                return target.value
+        raise MossRuntimeError(f"value {format_value(target)} has no field '{field}'")
+
+    def call(self, callee: Any, args: list[Any]) -> Any:
+        if isinstance(callee, BuiltinFunction):
+            self.ensure_effect_allowed(callee.effect, callee.name)
+            return callee.fn(*args)
+        if isinstance(callee, UserFunction):
+            return callee.call(args)
+        if isinstance(callee, Variant):
+            return Variant(callee.name, tuple(args))
+        raise MossRuntimeError(f"{format_value(callee)} is not callable")
+
+    def ensure_call_allowed(self, callee: UserFunction) -> None:
+        if not self.effect_stack:
+            return
+        allowed = self.effect_stack[-1]
+        missing = [effect for effect in callee.uses if effect not in allowed]
+        if missing:
+            joined = ", ".join(missing)
+            raise MossRuntimeError(f"calling {callee.name} requires missing effect(s): {joined}")
+
+    def ensure_effect_allowed(self, effect: str | None, callee: str) -> None:
+        if effect is None or not self.effect_stack:
+            return
+        if effect not in self.effect_stack[-1]:
+            raise MossRuntimeError(f"{callee} requires effect {effect}; add 'uses {effect}' to this function")
+
+    def builtin_print(self, *values: Any) -> None:
+        self.output(" ".join(format_value(value) for value in values))
+
+    def builtin_assert(self, condition: Any, message: Any = "assertion failed") -> None:
+        if not truthy(condition):
+            raise MossRuntimeError(format_value(message))
+
+    def builtin_db_put(self, key: Any, value: Any) -> Any:
+        self.db[str(key)] = value
+        return value
+
+    def builtin_db_get(self, key: Any) -> Any:
+        return self.db.get(str(key))
+
+    def require_type(self, value: Any, expected: str, context: str) -> None:
+        if not self.value_matches_type(value, expected):
+            actual = describe_value_type(value)
+            raise MossRuntimeError(f"type mismatch for {context}: expected {expected}, got {actual}")
+
+    def value_matches_type(self, value: Any, expected: str) -> bool:
+        expected = expected.strip()
+        if expected in {"Any", "Unknown"}:
+            return True
+        if "|" in expected:
+            return any(self.value_matches_type(value, part.strip()) for part in split_top_level(expected, "|"))
+        if expected == "Text":
+            return isinstance(value, str)
+        if expected == "Bool":
+            return isinstance(value, bool)
+        if expected == "Number":
+            return isinstance(value, Decimal)
+        if expected == "Money":
+            return isinstance(value, Money)
+        if expected == "Null":
+            return value is None
+        generic = parse_generic(expected)
+        if generic is not None:
+            name, args = generic
+            if name == "Result" and len(args) == 2:
+                if not isinstance(value, Result):
+                    return False
+                ok_type, err_type = args
+                return self.value_matches_type(value.value, ok_type if value.ok else err_type)
+            return True
+
+        declared = self.types.get(expected)
+        if declared is not None:
+            if declared.alias is not None:
+                if isinstance(value, Variant) and value.name.startswith(expected + "."):
+                    suffix = value.name[len(expected) + 1 :]
+                    return self.value_matches_type(Variant(suffix, value.payload), declared.alias)
+                return self.value_matches_type(value, declared.alias)
+            if not isinstance(value, dict):
+                return False
+            for field, field_type in declared.fields.items():
+                if field not in value or not self.value_matches_type(value[field], field_type):
+                    return False
+            return True
+
+        if isinstance(value, Variant):
+            return value.name == expected or value.name.endswith("." + expected) or value.name.startswith(expected + ".")
+        return True
+
+
+def truthy(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (Decimal, int, float)):
+        return value != 0
+    if isinstance(value, Result):
+        return value.ok
+    return True
+
+
+def add_values(left: Any, right: Any) -> Any:
+    if isinstance(left, Money) and isinstance(right, Money):
+        require_same_currency(left, right)
+        return Money(left.amount + right.amount, left.currency)
+    if isinstance(left, str) or isinstance(right, str):
+        return format_value(left) + format_value(right)
+    return left + right
+
+
+def subtract_values(left: Any, right: Any) -> Any:
+    if isinstance(left, Money) and isinstance(right, Money):
+        require_same_currency(left, right)
+        return Money(left.amount - right.amount, left.currency)
+    return left - right
+
+
+def multiply_values(left: Any, right: Any) -> Any:
+    if isinstance(left, Money) and isinstance(right, Decimal):
+        return Money(left.amount * right, left.currency)
+    if isinstance(right, Money) and isinstance(left, Decimal):
+        return Money(right.amount * left, right.currency)
+    return left * right
+
+
+def divide_values(left: Any, right: Any) -> Any:
+    if isinstance(left, Money) and isinstance(right, Decimal):
+        return Money(left.amount / right, left.currency)
+    return left / right
+
+
+def compare_values(left: Any, right: Any, op: str) -> bool:
+    if isinstance(left, Money) and isinstance(right, Money):
+        require_same_currency(left, right)
+        left_value: Any = left.amount
+        right_value: Any = right.amount
+    else:
+        left_value = left
+        right_value = right
+
+    if op == ">":
+        return left_value > right_value
+    if op == ">=":
+        return left_value >= right_value
+    if op == "<":
+        return left_value < right_value
+    if op == "<=":
+        return left_value <= right_value
+    raise MossRuntimeError(f"unknown comparison operator {op}")
+
+
+def require_same_currency(left: Money, right: Money) -> None:
+    if left.currency != right.currency:
+        raise MossRuntimeError(f"currency mismatch: {left.currency} vs {right.currency}")
+
+
+def match_pattern(pattern: Any, value: Any) -> dict[str, Any] | None:
+    if isinstance(pattern, WildcardPattern):
+        return {}
+    if isinstance(pattern, BindingPattern):
+        return {pattern.name: value}
+    if isinstance(pattern, LiteralPattern):
+        return {} if value == pattern.value else None
+    if isinstance(pattern, VariantPattern):
+        if isinstance(value, Result) and pattern.name in {"Ok", "Err"}:
+            if (pattern.name == "Ok") != value.ok or len(pattern.payload) != 1:
+                return None
+            return match_pattern(pattern.payload[0], value.value)
+        if not isinstance(value, Variant):
+            return None
+        if value.name != pattern.name and not value.name.endswith("." + pattern.name):
+            return None
+        if len(pattern.payload) != len(value.payload):
+            return None
+        bindings: dict[str, Any] = {}
+        for child_pattern, child_value in zip(pattern.payload, value.payload):
+            child_bindings = match_pattern(child_pattern, child_value)
+            if child_bindings is None:
+                return None
+            for name, bound_value in child_bindings.items():
+                if name in bindings and bindings[name] != bound_value:
+                    return None
+                bindings[name] = bound_value
+        return bindings
+    raise MossRuntimeError(f"unknown match pattern {type(pattern).__name__}")
+
+
+def describe_value_type(value: Any) -> str:
+    if isinstance(value, str):
+        return "Text"
+    if isinstance(value, bool):
+        return "Bool"
+    if isinstance(value, Decimal):
+        return "Number"
+    if isinstance(value, Money):
+        return "Money"
+    if isinstance(value, Result):
+        return "Result"
+    if isinstance(value, Variant):
+        return value.name
+    if isinstance(value, dict):
+        return "record"
+    if value is None:
+        return "Null"
+    return type(value).__name__
+
+
+def parse_generic(type_text: str) -> tuple[str, list[str]] | None:
+    if "<" not in type_text or not type_text.endswith(">"):
+        return None
+    name, rest = type_text.split("<", 1)
+    args_text = rest[:-1]
+    return name.strip(), [part.strip() for part in split_top_level(args_text, ",")]
+
+
+def split_top_level(text: str, separator: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    for index, char in enumerate(text):
+        if char == "<":
+            depth += 1
+        elif char == ">" and depth > 0:
+            depth -= 1
+        elif char == separator and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+    parts.append(text[start:])
+    return parts

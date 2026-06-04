@@ -1,0 +1,31 @@
+type Order =
+  id: Text
+  status: Pending | Paid | Shipped | Cancelled
+  total: Money
+
+type ShipError = NotReady | Missing
+
+rule canShip(order: Order) -> Bool =
+  match order.status {
+    Paid -> order.total > 0.usd
+    _ -> false
+  }
+
+rule explain(result) =
+  match result {
+    Ok(order) -> "shipped " + order.id
+    Err(ShipError.NotReady(status)) -> "not ready: " + status
+    _ -> "unknown"
+  }
+
+fn ship(order: Order) -> Result<Order, ShipError> {
+  require canShip(order)
+    else ShipError.NotReady(order.status)
+
+  return Ok(order with status = Shipped)
+}
+
+let draft = { id: "A-300", status: Pending, total: 42.usd }
+let paid = { id: "A-301", status: Paid, total: 42.usd }
+print(explain(ship(draft)))
+print(explain(ship(paid)))

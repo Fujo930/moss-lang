@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Moss Studio</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="mark">M</span>
+          <span>Moss Studio</span>
+        </div>
+        <div class="toolbar">
+          <select id="exampleSelect" title="Examples"></select>
+          <button id="newButton" title="New file">New</button>
+          <button id="openButton" title="Open file">Open</button>
+          <button id="saveButton" title="Download file">Save</button>
+          <button id="checkButton" title="Check">Check</button>
+          <button id="runButton" class="primary" title="Run">Run</button>
+          <input id="fileInput" type="file" accept=".moss,text/plain" hidden />
+        </div>
+      </header>
+
+      <section class="workspace">
+        <div class="editorPane">
+          <div class="paneHead">
+            <span id="fileName">scratch.moss</span>
+            <span id="cursorStatus">Ln 1, Col 1</span>
+          </div>
+          <div class="editorWrap">
+            <pre id="lineNumbers" aria-hidden="true">1</pre>
+            <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+          </div>
+          <div class="statusbar">
+            <span id="health">Ready</span>
+            <span id="summary">0 effects · 0 types · 0 callables</span>
+          </div>
+        </div>
+
+        <aside class="sidePane">
+          <nav class="tabs" aria-label="Result views">
+            <button class="tab active" data-tab="output">Output</button>
+            <button class="tab" data-tab="diagnostics">Diagnostics</button>
+            <button class="tab" data-tab="ast">AST</button>
+            <button class="tab" data-tab="tokens">Tokens</button>
+          </nav>
+          <section id="outputPanel" class="panel active">
+            <pre id="output"></pre>
+          </section>
+          <section id="diagnosticsPanel" class="panel">
+            <div id="diagnostics"></div>
+          </section>
+          <section id="astPanel" class="panel">
+            <pre id="ast"></pre>
+          </section>
+          <section id="tokensPanel" class="panel">
+            <div id="tokens"></div>
+          </section>
+        </aside>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,20 @@
+[project]
+name = "mosslang"
+version = "0.1.0"
+description = "A small executable prototype of the Moss programming language."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Codex" }]
+
+[project.scripts]
+moss = "mosslang.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mosslang = ["studio_assets/*"]
