@@ -13,7 +13,7 @@ Implemented:
 - top-level `test` blocks and `moss test`
 - lists, indexing, `for` loops, `len`, `listPush`, and `range`
 - `Map<K, V>` and map helper builtins
-- `while`, `break`, and `continue`
+- `while`, `break`, `continue`, and `else if`
 - Text helpers and `FileSystem` effect builtins
 - top-level file imports
 - `Option<T>` type contracts and safe list helpers

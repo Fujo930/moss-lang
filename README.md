@@ -31,6 +31,7 @@ python -m mosslang.cli run examples/order.moss
 - `fn` declarations with optional `uses EffectName`
 - `test "name" { ... }` blocks for language-level executable checks
 - records, record field access, and record updates
+- `if`, `else if`, and `else` blocks
 - list literals, indexing, `for` loops, `len`, `listPush`, `listGet`,
   `listSet`, and `range`
 - `Map<K, V>` through `mapNew`, `mapPut`, `mapGet`, `mapHas`, `mapKeys`,

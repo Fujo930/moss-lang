@@ -136,6 +136,22 @@ Supported helpers:
 
 `Map<K, V>` can be used in signatures and runtime type contracts.
 
+## Branching
+
+`if`, `else if`, and `else` use block bodies:
+
+```moss
+fn classify(value: Number) -> Text {
+  if value < 0 {
+    return "negative"
+  } else if value == 0 {
+    return "zero"
+  } else {
+    return "positive"
+  }
+}
+```
+
 ## Optional Values
 
 `null` is falsey and can be checked directly:

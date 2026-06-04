@@ -293,6 +293,38 @@ print(textSlice("abcdef", 1, 4))
         _, output = self.run_source(source)
         self.assertEqual(output, ["moss", "a|b|c", "bcd"])
 
+    def test_else_if_chains(self) -> None:
+        source = """
+fn classify(value: Number) -> Text {
+  if value < 0 {
+    return "negative"
+  } else if value == 0 {
+    return "zero"
+  } else {
+    return "positive"
+  }
+}
+
+fn classifyText(value: Text) -> Text {
+  if value == "a" {
+    return "alpha"
+  }
+  else if value == "b" {
+    return "beta"
+  }
+  else {
+    return "other"
+  }
+}
+
+print(classify(-1))
+print(classify(0))
+print(classify(3))
+print(classifyText("b"))
+"""
+        _, output = self.run_source(source)
+        self.assertEqual(output, ["negative", "zero", "positive", "beta"])
+
     def test_filesystem_effect_and_builtins(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "sample.moss"

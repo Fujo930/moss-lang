@@ -234,21 +234,7 @@ class Parser:
             return RequireStmt(condition, else_expr)
 
         if self.match_value("if"):
-            condition = self.parse_expression()
-            then_body = self.parse_block()
-            else_body: list[object] = []
-            if self.match_value("else"):
-                else_body = self.parse_block()
-                self.consume_statement_end()
-                return IfStmt(condition, then_body, else_body)
-            if self.match_kind("NEWLINE"):
-                self.skip_newlines()
-                if self.match_value("else"):
-                    else_body = self.parse_block()
-                    self.consume_statement_end()
-                return IfStmt(condition, then_body, else_body)
-            self.consume_statement_end()
-            return IfStmt(condition, then_body, else_body)
+            return self.parse_if_after_keyword()
 
         if self.match_value("for"):
             name = self.expect_ident()
@@ -282,6 +268,38 @@ class Parser:
         expr = self.parse_expression()
         self.consume_statement_end()
         return ExprStmt(expr)
+
+    def parse_if_after_keyword(self) -> IfStmt:
+        condition = self.parse_expression()
+        then_body = self.parse_block()
+        else_body: list[object] = []
+        else_consumed_end = False
+
+        parsed_else = self.parse_optional_else_body()
+        if parsed_else is not None:
+            else_body, else_consumed_end = parsed_else
+
+        if not else_consumed_end:
+            self.consume_statement_end()
+        return IfStmt(condition, then_body, else_body)
+
+    def parse_optional_else_body(self) -> tuple[list[object], bool] | None:
+        if self.match_value("else"):
+            return self.parse_else_body()
+
+        if self.check_kind("NEWLINE"):
+            saved = self.current
+            self.skip_newlines()
+            if self.match_value("else"):
+                return self.parse_else_body()
+            self.current = saved
+
+        return None
+
+    def parse_else_body(self) -> tuple[list[object], bool]:
+        if self.match_value("if"):
+            return [self.parse_if_after_keyword()], True
+        return self.parse_block(), False
 
     def parse_expression(self) -> object:
         return self.parse_update()
