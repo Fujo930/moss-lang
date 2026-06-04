@@ -32,4 +32,25 @@ test "checker sketch accepts order example" {
   quiet = parseProgram(sketchTokens("let x = 1\n"))
   quietCheck = checkProgramNodes(quiet.nodes)
   assert(len(quietCheck.warnings) == 1, "missing callable should warn")
+
+  usesSource = ""
+  usesSource = usesSource + "effect Database\n"
+  usesSource = usesSource + "fn save() -> Text uses Database {\n"
+  usesSource = usesSource + "  return \"ok\"\n"
+  usesSource = usesSource + "}\n"
+  usesCheck = checkProgramNodes(parseProgram(sketchTokens(usesSource)).nodes)
+  assert(len(usesCheck.errors) == 0, "declared effect should pass")
+
+  missingEffectSource = ""
+  missingEffectSource = missingEffectSource + "fn save() -> Text uses MissingEffect {\n"
+  missingEffectSource = missingEffectSource + "  return \"ok\"\n"
+  missingEffectSource = missingEffectSource + "}\n"
+  missingEffectCheck = checkProgramNodes(parseProgram(sketchTokens(missingEffectSource)).nodes)
+  assert(len(missingEffectCheck.errors) == 1, "undeclared effect should fail")
+
+  duplicateEffectSource = ""
+  duplicateEffectSource = duplicateEffectSource + "effect Database\n"
+  duplicateEffectSource = duplicateEffectSource + "effect FileSystem, Database\n"
+  duplicateEffectCheck = checkProgramNodes(parseProgram(sketchTokens(duplicateEffectSource)).nodes)
+  assert(len(duplicateEffectCheck.errors) == 1, "duplicate effect should fail")
 }

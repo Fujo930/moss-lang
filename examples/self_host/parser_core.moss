@@ -49,6 +49,15 @@ fn tokenText(text: Text, item: MossToken) -> Text {
   return text + " " + item.value
 }
 
+fn lineText(state: ParseState) -> Text {
+  text = ""
+  while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
+    text = tokenText(text, currentToken(state))
+    state = advance(state)
+  }
+  return text
+}
+
 fn advanceToNextLine(state: ParseState) -> ParseState {
   while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
     state = advance(state)
@@ -93,8 +102,10 @@ fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
     return advanceToNextLine(state)
   }
 
+  state = advance(state)
+  value = lineText(state)
   state = advanceToNextLine(state)
-  return addNode(state, node(kind, name.value, ""))
+  return addNode(state, node(kind, name.value, value))
 }
 
 fn parseLet(state: ParseState) -> ParseState {
