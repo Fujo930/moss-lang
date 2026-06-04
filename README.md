@@ -104,9 +104,10 @@ moss studio
 ## Project status
 
 This is version 0.1: a compact interpreter with real syntax and runtime
-semantics. The next useful steps are a static type checker, module imports, and
-a browser playground.
+semantics. The next useful steps are stronger static checks, richer diagnostics,
+and expanding the Moss-written lexer/parser/checker under `examples/self_host`.
 
 See `docs/language.md` for the current language surface,
-`docs/studio.md` for the browser editor, and
+`docs/studio.md` for the browser editor,
+`docs/history.md` for a commit-by-commit feature guide, and
 `docs/roadmap.md` for the path from prototype to a serious implementation.
