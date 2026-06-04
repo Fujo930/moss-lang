@@ -53,6 +53,9 @@ python -m mosslang.cli run examples/order.moss
   `examples/self_host/tokenizer_sketch.moss` and
   `examples/self_host/parser_sketch.moss` and
   `examples/self_host/checker_sketch.moss`
+- `moss selfhost`, which runs the tokenizer/parser/checker sketches plus
+  `examples/self_host/project_check.moss`; the project check parses and checks
+  the self-hosting Moss files with Moss code
 - nullary and payload variants such as `Paid` and `ShipError.NotReady(Pending)`
 - `match` expressions with wildcard and payload binding patterns
 - `Result` values with `Ok(...)`, `Err(...)`, and `?`
