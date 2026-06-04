@@ -12,6 +12,7 @@ Implemented:
 - `match` expressions
 - top-level `test` blocks and `moss test`
 - lists, indexing, `for` loops, `len`, `listPush`, and `range`
+- `Map<K, V>` and map helper builtins
 - `while`, `break`, and `continue`
 - Text helpers and `FileSystem` effect builtins
 - effect checking for the built-in database capability

@@ -188,6 +188,13 @@ class Runtime:
         self.globals.define("len", BuiltinFunction("len", self.builtin_len))
         self.globals.define("listPush", BuiltinFunction("listPush", self.builtin_list_push))
         self.globals.define("range", BuiltinFunction("range", self.builtin_range))
+        self.globals.define("mapNew", BuiltinFunction("mapNew", self.builtin_map_new))
+        self.globals.define("mapPut", BuiltinFunction("mapPut", self.builtin_map_put))
+        self.globals.define("mapGet", BuiltinFunction("mapGet", self.builtin_map_get))
+        self.globals.define("mapHas", BuiltinFunction("mapHas", self.builtin_map_has))
+        self.globals.define("mapKeys", BuiltinFunction("mapKeys", self.builtin_map_keys))
+        self.globals.define("mapValues", BuiltinFunction("mapValues", self.builtin_map_values))
+        self.globals.define("mapRemove", BuiltinFunction("mapRemove", self.builtin_map_remove))
         self.globals.define("textChars", BuiltinFunction("textChars", self.builtin_text_chars))
         self.globals.define("textJoin", BuiltinFunction("textJoin", self.builtin_text_join))
         self.globals.define("textSplit", BuiltinFunction("textSplit", self.builtin_text_split))
@@ -487,6 +494,41 @@ class Runtime:
             end_value = decimal_to_int(end, "range end")
         return [Decimal(item) for item in range(start_value, end_value)]
 
+    def builtin_map_new(self) -> dict[Any, Any]:
+        return {}
+
+    def builtin_map_put(self, mapping: Any, key: Any, value: Any) -> dict[Any, Any]:
+        require_map(mapping, "mapPut")
+        require_hashable(key, "mapPut key")
+        updated = dict(mapping)
+        updated[key] = value
+        return updated
+
+    def builtin_map_get(self, mapping: Any, key: Any, default: Any = None) -> Any:
+        require_map(mapping, "mapGet")
+        require_hashable(key, "mapGet key")
+        return mapping.get(key, default)
+
+    def builtin_map_has(self, mapping: Any, key: Any) -> bool:
+        require_map(mapping, "mapHas")
+        require_hashable(key, "mapHas key")
+        return key in mapping
+
+    def builtin_map_keys(self, mapping: Any) -> list[Any]:
+        require_map(mapping, "mapKeys")
+        return list(mapping.keys())
+
+    def builtin_map_values(self, mapping: Any) -> list[Any]:
+        require_map(mapping, "mapValues")
+        return list(mapping.values())
+
+    def builtin_map_remove(self, mapping: Any, key: Any) -> dict[Any, Any]:
+        require_map(mapping, "mapRemove")
+        require_hashable(key, "mapRemove key")
+        updated = dict(mapping)
+        updated.pop(key, None)
+        return updated
+
     def builtin_text_chars(self, text: Any) -> list[str]:
         require_text(text, "textChars")
         return list(text)
@@ -595,6 +637,11 @@ class Runtime:
                 return self.value_matches_type(value.value, ok_type if value.ok else err_type)
             if name == "List" and len(args) == 1:
                 return isinstance(value, list) and all(self.value_matches_type(item, args[0]) for item in value)
+            if name == "Map" and len(args) == 2:
+                return isinstance(value, dict) and all(
+                    self.value_matches_type(key, args[0]) and self.value_matches_type(item, args[1])
+                    for key, item in value.items()
+                )
             return True
 
         declared = self.types.get(expected)
@@ -690,6 +737,18 @@ def decimal_to_int(value: Any, context: str) -> int:
 def require_text(value: Any, context: str) -> None:
     if not isinstance(value, str):
         raise MossRuntimeError(f"{context} expects Text")
+
+
+def require_map(value: Any, context: str) -> None:
+    if not isinstance(value, dict):
+        raise MossRuntimeError(f"{context} expects Map")
+
+
+def require_hashable(value: Any, context: str) -> None:
+    try:
+        hash(value)
+    except TypeError as exc:
+        raise MossRuntimeError(f"{context} must be hashable") from exc
 
 
 def require_same_currency(left: Money, right: Money) -> None:

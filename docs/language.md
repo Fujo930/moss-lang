@@ -101,6 +101,28 @@ fn count(items: List<Text>) -> Number {
 }
 ```
 
+## Maps
+
+Maps are available through builtins:
+
+```moss
+counts = mapNew()
+counts = mapPut(counts, "moss", 2)
+print(mapGet(counts, "moss", 0))
+```
+
+Supported helpers:
+
+- `mapNew()`
+- `mapPut(map, key, value)`
+- `mapGet(map, key, default)`
+- `mapHas(map, key)`
+- `mapKeys(map)`
+- `mapValues(map)`
+- `mapRemove(map, key)`
+
+`Map<K, V>` can be used in signatures and runtime type contracts.
+
 ## Loops
 
 `for` loops iterate over lists:

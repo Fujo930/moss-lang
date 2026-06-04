@@ -28,6 +28,7 @@ EXAMPLES = {
     "Match expression": "match_demo.moss",
     "Lists and loops": "lists_demo.moss",
     "Text and files": "text_fs_demo.moss",
+    "Maps": "map_demo.moss",
 }
 
 

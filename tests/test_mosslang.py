@@ -281,6 +281,36 @@ fn load(path: Text) -> Text {
         diagnostics = check_program(program)
         self.assertTrue(any("does not declare uses FileSystem" in d.message for d in diagnostics))
 
+    def test_map_builtins_and_type_contract(self) -> None:
+        source = """
+fn wordCounts(words: List<Text>) -> Map<Text, Number> {
+  counts = mapNew()
+  for word in words {
+    counts = mapPut(counts, word, mapGet(counts, word, 0) + 1)
+  }
+  return counts
+}
+
+let counts = wordCounts(["moss", "writes", "moss"])
+print(mapGet(counts, "moss"))
+print(mapHas(counts, "writes"))
+print(len(mapKeys(counts)))
+"""
+        _, output = self.run_source(source)
+        self.assertEqual(output, ["2", "true", "2"])
+
+    def test_map_type_contract_is_checked(self) -> None:
+        source = """
+fn accept(counts: Map<Text, Number>) -> Number {
+  return len(counts)
+}
+
+bad = mapPut(mapNew(), "moss", "two")
+accept(bad)
+"""
+        with self.assertRaisesRegex(MossRuntimeError, "expected Map<Text, Number>"):
+            self.run_source(source)
+
 
 if __name__ == "__main__":
     unittest.main()

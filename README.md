@@ -32,6 +32,8 @@ python -m mosslang.cli run examples/order.moss
 - `test "name" { ... }` blocks for language-level executable checks
 - records, record field access, and record updates
 - list literals, indexing, `for` loops, `len`, `listPush`, and `range`
+- `Map<K, V>` through `mapNew`, `mapPut`, `mapGet`, `mapHas`, `mapKeys`,
+  `mapValues`, and `mapRemove`
 - `while`, `break`, and `continue`
 - Text helpers: `textChars`, `textJoin`, `textSplit`, `textTrim`, `textSlice`,
   `textContains`, `textStartsWith`, and `textEndsWith`

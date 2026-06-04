@@ -1,0 +1,23 @@
+fn wordCounts(words: List<Text>) -> Map<Text, Number> {
+  counts = mapNew()
+
+  for word in words {
+    current = mapGet(counts, word, 0)
+    counts = mapPut(counts, word, current + 1)
+  }
+
+  return counts
+}
+
+let words = ["moss", "writes", "moss", "soon"]
+let counts = wordCounts(words)
+
+print("moss:", mapGet(counts, "moss"))
+print("has soon:", mapHas(counts, "soon"))
+print("keys:", mapKeys(counts))
+
+test "map stores counts" {
+  assert(mapGet(counts, "moss") == 2, "moss count")
+  assert(mapHas(counts, "writes"), "writes should exist")
+  assert(len(mapKeys(counts)) == 3, "unique word count")
+}
