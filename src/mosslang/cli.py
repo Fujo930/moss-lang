@@ -20,6 +20,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd = sub.add_parser(command)
         cmd.add_argument("file", type=Path)
 
+    sub.add_parser("selfhost")
+
     studio_cmd = sub.add_parser("studio")
     studio_cmd.add_argument("--host", default="127.0.0.1")
     studio_cmd.add_argument("--port", type=int, default=8765)
@@ -32,6 +34,9 @@ def main(argv: list[str] | None = None) -> int:
 
             run_studio(args.host, args.port)
             return 0
+
+        if args.command == "selfhost":
+            return run_selfhost_checks()
 
         source = args.file.read_text(encoding="utf-8")
         if args.command == "tokens":
@@ -97,6 +102,39 @@ def summarize(program):
         "callables": sum(1 for item in program.items if item.__class__.__name__ in {"RuleDecl", "FunctionDecl"}),
         "tests": sum(1 for item in program.items if item.__class__.__name__ == "TestDecl"),
     }
+
+
+def run_selfhost_checks() -> int:
+    paths = [
+        Path("examples/self_host/tokenizer_sketch.moss"),
+        Path("examples/self_host/parser_sketch.moss"),
+        Path("examples/self_host/checker_sketch.moss"),
+    ]
+    failed = 0
+
+    for path in paths:
+        source = path.read_text(encoding="utf-8")
+        program = parse_source(source)
+        diagnostics = check_program(program)
+        errors = [d for d in diagnostics if d.level == "error"]
+        if errors:
+            failed = failed + 1
+            for diagnostic in diagnostics:
+                print(f"{path}: {diagnostic.level}: {diagnostic.message}")
+            continue
+
+        runtime = Runtime(base_path=Path.cwd())
+        results = runtime.run_tests(program)
+        test_failures = [r for r in results if r["status"] == "fail"]
+        if test_failures:
+            failed = failed + 1
+            for result in test_failures:
+                detail = f": {result['message']}" if result["message"] else ""
+                print(f"FAIL {path} {result['name']}{detail}")
+        else:
+            print(f"PASS {path} ({len(results)} test(s))")
+
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

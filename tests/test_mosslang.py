@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import unittest
 import tempfile
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 from mosslang.checker import check_program
+from mosslang.cli import main as cli_main
 from mosslang.errors import MossRuntimeError
 from mosslang.parser import parse_source
 from mosslang.runtime import Runtime
@@ -18,6 +21,16 @@ class MossLanguageTests(unittest.TestCase):
         runtime = Runtime(output.append)
         runtime.run(parse_source(source))
         return runtime, output
+
+    def test_cli_selfhost_runs_sketches(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            code = cli_main(["selfhost"])
+        self.assertEqual(code, 0)
+        text = output.getvalue()
+        self.assertIn("PASS examples\\self_host\\tokenizer_sketch.moss", text.replace("/", "\\"))
+        self.assertIn("PASS examples\\self_host\\parser_sketch.moss", text.replace("/", "\\"))
+        self.assertIn("PASS examples\\self_host\\checker_sketch.moss", text.replace("/", "\\"))
 
     def test_order_example_ships_and_stores(self) -> None:
         source = """

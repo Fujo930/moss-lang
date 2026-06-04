@@ -17,6 +17,7 @@ python -m pip install -e .
 moss check examples/order.moss
 moss run examples/order.moss
 moss test examples/order.moss
+moss selfhost
 moss studio
 ```
 
@@ -42,7 +43,8 @@ python -m mosslang.cli run examples/order.moss
   `mapValues`, and `mapRemove`
 - `while`, `break`, and `continue`
 - Text helpers: `textChars`, `textJoin`, `textSplit`, `textTrim`, `textSlice`,
-  `textContains`, `textStartsWith`, and `textEndsWith`
+  `textContains`, `textIndexOf`, `textReplace`, `textStartsWith`, and
+  `textEndsWith`
 - `FileSystem` effect builtins: `readText`, `writeText`, `fileExists`, and
   `listFiles`
 - top-level `import "path.moss"` declarations
