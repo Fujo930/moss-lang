@@ -211,6 +211,7 @@ class Runtime:
         self.globals.define("textSlice", BuiltinFunction("textSlice", self.builtin_text_slice))
         self.globals.define("textContains", BuiltinFunction("textContains", self.builtin_text_contains))
         self.globals.define("textIndexOf", BuiltinFunction("textIndexOf", self.builtin_text_index_of))
+        self.globals.define("textReplace", BuiltinFunction("textReplace", self.builtin_text_replace))
         self.globals.define("textStartsWith", BuiltinFunction("textStartsWith", self.builtin_text_starts_with))
         self.globals.define("textEndsWith", BuiltinFunction("textEndsWith", self.builtin_text_ends_with))
         self.globals.define("pathJoin", BuiltinFunction("pathJoin", self.builtin_path_join))
@@ -647,6 +648,12 @@ class Runtime:
         require_text(text, "textIndexOf")
         require_text(needle, "textIndexOf needle")
         return Decimal(text.find(needle))
+
+    def builtin_text_replace(self, text: Any, old: Any, new: Any) -> str:
+        require_text(text, "textReplace")
+        require_text(old, "textReplace old")
+        require_text(new, "textReplace new")
+        return text.replace(old, new)
 
     def builtin_text_starts_with(self, text: Any, prefix: Any) -> bool:
         require_text(text, "textStartsWith")

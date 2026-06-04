@@ -371,9 +371,10 @@ print(textJoin(textSplit("a,b,c", ","), "|"))
 print(textSlice("abcdef", 1, 4))
 print(textIndexOf("moss language", "lang"))
 print(textIndexOf("moss language", "missing"))
+print(textReplace("moss-lang-moss", "moss", "M"))
 """
         _, output = self.run_source(source)
-        self.assertEqual(output, ["moss", "a|b|c", "bcd", "5", "-1"])
+        self.assertEqual(output, ["moss", "a|b|c", "bcd", "5", "-1", "M-lang-M"])
 
     def test_else_if_chains(self) -> None:
         source = """
