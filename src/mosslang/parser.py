@@ -14,6 +14,7 @@ from .nodes import (
     FunctionDecl,
     Identifier,
     IfStmt,
+    ImportDecl,
     IndexAccess,
     LetStmt,
     Literal,
@@ -43,7 +44,7 @@ from .nodes import (
 from .tokens import Token, tokenize
 
 
-DECL_START = {"effect", "type", "rule", "fn", "test"}
+DECL_START = {"effect", "type", "rule", "fn", "test", "import"}
 STMT_START = {"let", "return", "require", "if", "for", "while", "break", "continue"}
 
 
@@ -58,6 +59,8 @@ class Parser:
         while not self.check_kind("EOF"):
             if self.check_value("effect"):
                 items.append(self.parse_effect_decl())
+            elif self.check_value("import"):
+                items.append(self.parse_import_decl())
             elif self.check_value("type"):
                 items.append(self.parse_type_decl())
             elif self.check_value("rule"):
@@ -78,6 +81,14 @@ class Parser:
             names.append(self.expect_ident())
         self.consume_statement_end()
         return EffectDecl(names)
+
+    def parse_import_decl(self) -> ImportDecl:
+        self.expect_value("import")
+        if not self.match_kind("STRING"):
+            raise self.error("expected import path string")
+        path = self.previous().value
+        self.consume_statement_end()
+        return ImportDecl(path)
 
     def parse_type_decl(self) -> TypeDecl:
         self.expect_value("type")

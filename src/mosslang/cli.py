@@ -65,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
                 for diagnostic in diagnostics:
                     print(f"{diagnostic.level}: {diagnostic.message}", file=sys.stderr)
                 return 1
-            runtime = Runtime()
+            runtime = Runtime(base_path=args.file.parent)
             if args.command == "run":
                 runtime.run(program)
             else:
@@ -92,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
 def summarize(program):
     return {
         "effects": sum(1 for item in program.items if item.__class__.__name__ == "EffectDecl"),
+        "imports": sum(1 for item in program.items if item.__class__.__name__ == "ImportDecl"),
         "types": sum(1 for item in program.items if item.__class__.__name__ == "TypeDecl"),
         "callables": sum(1 for item in program.items if item.__class__.__name__ in {"RuleDecl", "FunctionDecl"}),
         "tests": sum(1 for item in program.items if item.__class__.__name__ == "TestDecl"),

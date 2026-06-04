@@ -17,6 +17,7 @@ from .nodes import (
     FunctionDecl,
     Identifier,
     IfStmt,
+    ImportDecl,
     IndexAccess,
     LetStmt,
     Literal,
@@ -172,13 +173,15 @@ class UserFunction:
 
 
 class Runtime:
-    def __init__(self, output: Callable[[str], None] | None = None):
+    def __init__(self, output: Callable[[str], None] | None = None, base_path: str | Path | None = None):
         self.effects: set[str] = set()
         self.types: dict[str, TypeDecl] = {}
         self.globals = Environment()
         self.db: dict[str, Any] = {}
         self.output = output or print
         self.effect_stack: list[set[str]] = []
+        self.base_path = Path(base_path) if base_path is not None else Path.cwd()
+        self.imported_paths: set[Path] = set()
         self.install_builtins()
         self.tests: list[TestDecl] = []
 
@@ -216,7 +219,9 @@ class Runtime:
     def run(self, program: Program) -> Environment:
         statements: list[Any] = []
         for item in program.items:
-            if isinstance(item, EffectDecl):
+            if isinstance(item, ImportDecl):
+                self.run_import(item.path)
+            elif isinstance(item, EffectDecl):
                 self.effects.update(item.names)
             elif isinstance(item, TypeDecl):
                 self.types[item.name] = item
@@ -243,6 +248,30 @@ class Runtime:
             except ContinueSignal as exc:
                 raise MossRuntimeError("continue is only allowed inside loops") from exc
         return self.globals
+
+    def run_import(self, import_path: str) -> None:
+        from .parser import parse_source
+
+        resolved = self.resolve_import_path(import_path)
+        if resolved in self.imported_paths:
+            return
+        self.imported_paths.add(resolved)
+        source = resolved.read_text(encoding="utf-8-sig")
+        imported_program = parse_source(source)
+        previous_base = self.base_path
+        self.base_path = resolved.parent
+        try:
+            self.run(imported_program)
+        finally:
+            self.base_path = previous_base
+
+    def resolve_import_path(self, import_path: str) -> Path:
+        path = Path(import_path)
+        candidates = [path] if path.is_absolute() else [self.base_path / path, Path.cwd() / path]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate.resolve()
+        raise MossRuntimeError(f"import not found: {import_path}")
 
     def run_tests(self, program: Program) -> list[dict[str, str]]:
         self.run(program)

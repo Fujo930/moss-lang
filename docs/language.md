@@ -19,6 +19,15 @@ Effects name capabilities that a function can use:
 effect Database, Network
 ```
 
+Imports load another Moss file before the current file continues:
+
+```moss
+import "examples/modules/word_tools.moss"
+```
+
+Relative imports are resolved from the importing file's directory first, then
+from the current working directory.
+
 Record types describe domain objects:
 
 ```moss

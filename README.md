@@ -39,6 +39,7 @@ python -m mosslang.cli run examples/order.moss
   `textContains`, `textStartsWith`, and `textEndsWith`
 - `FileSystem` effect builtins: `readText`, `writeText`, `fileExists`, and
   `listFiles`
+- top-level `import "path.moss"` declarations
 - nullary and payload variants such as `Paid` and `ShipError.NotReady(Pending)`
 - `match` expressions with wildcard and payload binding patterns
 - `Result` values with `Ok(...)`, `Err(...)`, and `?`

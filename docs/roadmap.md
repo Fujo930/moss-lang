@@ -15,6 +15,7 @@ Implemented:
 - `Map<K, V>` and map helper builtins
 - `while`, `break`, and `continue`
 - Text helpers and `FileSystem` effect builtins
+- top-level file imports
 - effect checking for the built-in database capability
 - runtime type contracts
 - CLI commands: `check`, `run`, `tokens`, `ast`

@@ -1,0 +1,12 @@
+import "examples/modules/word_tools.moss"
+
+let words = normalizeWords("moss writes moss")
+let counts = countWords(words)
+
+print(words)
+print("moss:", mapGet(counts, "moss"))
+
+test "imports word tools" {
+  assert(len(words) == 3, "normalizeWords should split words")
+  assert(mapGet(counts, "moss") == 2, "imported countWords should count")
+}

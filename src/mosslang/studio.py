@@ -29,6 +29,7 @@ EXAMPLES = {
     "Lists and loops": "lists_demo.moss",
     "Text and files": "text_fs_demo.moss",
     "Maps": "map_demo.moss",
+    "Imports": "import_demo.moss",
 }
 
 
@@ -86,6 +87,7 @@ def diagnostic_to_json(diagnostic: Diagnostic) -> dict[str, str]:
 def summarize_program(program: Any) -> dict[str, int]:
     return {
         "effects": sum(1 for item in program.items if item.__class__.__name__ == "EffectDecl"),
+        "imports": sum(1 for item in program.items if item.__class__.__name__ == "ImportDecl"),
         "types": sum(1 for item in program.items if item.__class__.__name__ == "TypeDecl"),
         "callables": sum(1 for item in program.items if item.__class__.__name__ in {"RuleDecl", "FunctionDecl"}),
         "tests": sum(1 for item in program.items if item.__class__.__name__ == "TestDecl"),

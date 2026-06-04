@@ -154,7 +154,7 @@ print(explain(ship(Paid)))
         result = analyze_source('print("hello studio")', execute=True)
         self.assertTrue(result["ok"])
         self.assertEqual(result["output"], ["hello studio"])
-        self.assertEqual(result["summary"], {"effects": 0, "types": 0, "callables": 0, "tests": 0})
+        self.assertEqual(result["summary"], {"effects": 0, "imports": 0, "types": 0, "callables": 0, "tests": 0})
 
     def test_language_test_blocks_run_after_setup(self) -> None:
         source = """
@@ -310,6 +310,28 @@ accept(bad)
 """
         with self.assertRaisesRegex(MossRuntimeError, "expected Map<Text, Number>"):
             self.run_source(source)
+
+    def test_imports_load_moss_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "words.moss").write_text(
+                """
+fn shout(text: Text) -> Text {
+  return text + "!"
+}
+""",
+                encoding="utf-8",
+            )
+            program = parse_source(
+                """
+import "words.moss"
+
+print(shout("moss"))
+"""
+            )
+            output: list[str] = []
+            Runtime(output.append, base_path=root).run(program)
+        self.assertEqual(output, ["moss!"])
 
 
 if __name__ == "__main__":

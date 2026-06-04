@@ -1,0 +1,24 @@
+fn normalizeWords(text: Text) -> List<Text> {
+  rawWords = textSplit(textTrim(text), " ")
+  words = []
+
+  for word in rawWords {
+    cleaned = textTrim(word)
+    if cleaned == "" {
+      continue
+    }
+    words = listPush(words, cleaned)
+  }
+
+  return words
+}
+
+fn countWords(words: List<Text>) -> Map<Text, Number> {
+  counts = mapNew()
+
+  for word in words {
+    counts = mapPut(counts, word, mapGet(counts, word, 0) + 1)
+  }
+
+  return counts
+}

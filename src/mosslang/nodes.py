@@ -22,6 +22,11 @@ class EffectDecl:
 
 
 @dataclass(frozen=True)
+class ImportDecl:
+    path: str
+
+
+@dataclass(frozen=True)
 class TypeDecl:
     name: str
     fields: dict[str, str]
