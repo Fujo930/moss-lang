@@ -24,7 +24,8 @@ http://127.0.0.1:8765
 - runs the program on demand
 - runs top-level `test` blocks
 - shows output, diagnostics, AST, and tokens
-- opens local `.moss` files and downloads the current buffer
+- opens browser-selected `.moss` files and downloads the current buffer
+- opens and saves workspace-relative paths inside the Moss repository
 
 ## Implementation
 
@@ -37,6 +38,10 @@ The API surface is intentionally small:
 - `POST /api/check`
 - `POST /api/run`
 - `POST /api/test`
+- `POST /api/file/read`
+- `POST /api/file/write`
 
 Each API accepts or returns plain JSON so a future desktop app, VS Code panel,
 or hosted playground can reuse the same backend shape.
+
+File read/write requests are constrained to the repository workspace.

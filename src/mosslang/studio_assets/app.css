@@ -27,12 +27,14 @@ body {
 }
 
 button,
+input,
 select,
 textarea {
   font: inherit;
 }
 
 button,
+input,
 select {
   height: 34px;
   border: 1px solid var(--line);
@@ -110,6 +112,11 @@ button.primary {
 .toolbar select {
   width: 180px;
   padding: 0 8px;
+}
+
+.pathInput {
+  width: min(280px, 28vw);
+  padding: 0 10px;
 }
 
 .workspace {
@@ -311,7 +318,8 @@ pre {
     width: 100%;
   }
 
-  .toolbar select {
+  .toolbar select,
+  .pathInput {
     width: 100%;
   }
 

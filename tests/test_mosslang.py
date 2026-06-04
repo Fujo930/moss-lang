@@ -8,7 +8,7 @@ from mosslang.checker import check_program
 from mosslang.errors import MossRuntimeError
 from mosslang.parser import parse_source
 from mosslang.runtime import Runtime
-from mosslang.studio import analyze_source
+from mosslang.studio import analyze_source, resolve_workspace_path, workspace_root
 from mosslang.values import Result, Variant
 
 
@@ -172,6 +172,13 @@ print(explain(ship(Paid)))
         self.assertEqual(result["output"], ["hello studio"])
         self.assertEqual(result["summary"], {"effects": 0, "imports": 0, "types": 0, "callables": 0, "tests": 0})
 
+    def test_studio_workspace_paths_stay_inside_repo(self) -> None:
+        root = workspace_root().resolve()
+        path = resolve_workspace_path("examples/order.moss")
+        self.assertEqual(path.relative_to(root).as_posix(), "examples/order.moss")
+        with self.assertRaisesRegex(ValueError, "inside the Moss workspace"):
+            resolve_workspace_path("../outside.moss")
+
     def test_language_test_blocks_run_after_setup(self) -> None:
         source = """
 fn ship(order) -> Result<Order, ShipError> {
@@ -203,6 +210,29 @@ test "truth" {
         )
         self.assertTrue(result["ok"])
         self.assertEqual(result["output"], ["PASS truth", "1/1 tests passed"])
+
+    def test_studio_run_uses_file_path_for_imports(self) -> None:
+        with tempfile.TemporaryDirectory(dir=workspace_root()) as directory:
+            root = Path(directory)
+            (root / "helper.moss").write_text(
+                """
+fn shout(text: Text) -> Text {
+  return text + "!"
+}
+""",
+                encoding="utf-8",
+            )
+            result = analyze_source(
+                """
+import "helper.moss"
+
+print(shout("moss"))
+""",
+                execute=True,
+                path=str(root / "main.moss"),
+            )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["output"], ["moss!"])
 
     def test_lists_for_loops_and_indexing(self) -> None:
         source = """

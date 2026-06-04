@@ -8,6 +8,7 @@ const health = document.querySelector("#health");
 const summary = document.querySelector("#summary");
 const cursorStatus = document.querySelector("#cursorStatus");
 const fileName = document.querySelector("#fileName");
+const pathInput = document.querySelector("#pathInput");
 const fileInput = document.querySelector("#fileInput");
 const exampleSelect = document.querySelector("#exampleSelect");
 
@@ -61,6 +62,7 @@ function init() {
   editor.value = saved || fallbackSource;
   currentName = localStorage.getItem("moss.fileName") || currentName;
   fileName.textContent = currentName;
+  pathInput.value = currentName;
   bindEvents();
   loadExamples();
   updateEditorChrome();
@@ -91,7 +93,7 @@ function bindEvents() {
     }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
       event.preventDefault();
-      downloadSource();
+      saveWorkspacePath();
     }
   });
 
@@ -99,8 +101,14 @@ function bindEvents() {
   document.querySelector("#testButton").addEventListener("click", testSource);
   document.querySelector("#checkButton").addEventListener("click", checkSource);
   document.querySelector("#newButton").addEventListener("click", newFile);
+  document.querySelector("#loadPathButton").addEventListener("click", loadWorkspacePath);
+  document.querySelector("#savePathButton").addEventListener("click", saveWorkspacePath);
   document.querySelector("#openButton").addEventListener("click", () => fileInput.click());
   document.querySelector("#saveButton").addEventListener("click", downloadSource);
+  pathInput.addEventListener("change", () => {
+    currentName = pathInput.value.trim() || "scratch.moss";
+    persistFile();
+  });
   fileInput.addEventListener("change", openFile);
   exampleSelect.addEventListener("change", loadSelectedExample);
 
@@ -185,6 +193,7 @@ function downloadSource() {
 
 function persistFile() {
   fileName.textContent = currentName;
+  pathInput.value = currentName;
   localStorage.setItem("moss.fileName", currentName);
   localStorage.setItem("moss.source", editor.value);
 }
@@ -221,7 +230,7 @@ function scheduleCheck() {
 async function checkSource() {
   setBusy("Checking");
   try {
-    renderResult(await fetchJson("/api/check", { source: editor.value }));
+    renderResult(await fetchJson("/api/check", { source: editor.value, path: currentName }));
   } catch (error) {
     renderFailure(error);
   }
@@ -231,7 +240,7 @@ async function runSource() {
   setBusy("Running");
   activateTab("output");
   try {
-    renderResult(await fetchJson("/api/run", { source: editor.value }));
+    renderResult(await fetchJson("/api/run", { source: editor.value, path: currentName }));
   } catch (error) {
     renderFailure(error);
   }
@@ -241,7 +250,39 @@ async function testSource() {
   setBusy("Testing");
   activateTab("output");
   try {
-    renderResult(await fetchJson("/api/test", { source: editor.value }));
+    renderResult(await fetchJson("/api/test", { source: editor.value, path: currentName }));
+  } catch (error) {
+    renderFailure(error);
+  }
+}
+
+async function loadWorkspacePath() {
+  const path = pathInput.value.trim();
+  if (!path) {
+    return;
+  }
+  setBusy("Opening");
+  try {
+    const result = await fetchJson("/api/file/read", { path });
+    editor.value = result.source || "";
+    currentName = result.path || path;
+    persistFile();
+    updateEditorChrome();
+    checkSource();
+  } catch (error) {
+    renderFailure(error);
+  }
+}
+
+async function saveWorkspacePath() {
+  const path = pathInput.value.trim() || currentName;
+  setBusy("Saving");
+  try {
+    const result = await fetchJson("/api/file/write", { path, source: editor.value });
+    currentName = result.path || path;
+    persistFile();
+    health.textContent = "Saved";
+    health.className = "okText";
   } catch (error) {
     renderFailure(error);
   }
@@ -267,7 +308,7 @@ function renderResult(result) {
   const hasErrors = result.diagnostics.some(item => item.level === "error");
   health.textContent = result.ok && !hasErrors ? "OK" : "Issue";
   health.className = result.ok && !hasErrors ? "okText" : "errorText";
-  summary.textContent = `${result.summary.effects} effects · ${result.summary.types} types · ${result.summary.callables} callables · ${result.summary.tests || 0} tests`;
+  summary.textContent = `${result.summary.effects} effects | ${result.summary.types} types | ${result.summary.callables} callables | ${result.summary.tests || 0} tests`;
   output.textContent = result.output.length ? result.output.join("\n") : "";
   ast.textContent = result.ast || "";
   renderDiagnostics(result.diagnostics, result.ok);

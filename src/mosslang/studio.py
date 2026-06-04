@@ -35,7 +35,13 @@ EXAMPLES = {
 }
 
 
-def analyze_source(source: str, *, execute: bool, test: bool = False) -> dict[str, Any]:
+def analyze_source(
+    source: str,
+    *,
+    execute: bool,
+    test: bool = False,
+    path: str | None = None,
+) -> dict[str, Any]:
     output: list[str] = []
     response: dict[str, Any] = {
         "ok": False,
@@ -62,7 +68,7 @@ def analyze_source(source: str, *, execute: bool, test: bool = False) -> dict[st
             return response
 
         if execute:
-            runtime = Runtime(output.append)
+            runtime = Runtime(output.append, base_path=analysis_base_path(path))
             if test:
                 results = runtime.run_tests(program)
                 for result in results:
@@ -94,6 +100,40 @@ def summarize_program(program: Any) -> dict[str, int]:
         "callables": sum(1 for item in program.items if item.__class__.__name__ in {"RuleDecl", "FunctionDecl"}),
         "tests": sum(1 for item in program.items if item.__class__.__name__ == "TestDecl"),
     }
+
+
+def workspace_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def resolve_workspace_path(path_text: str) -> Path:
+    if not path_text.strip():
+        raise ValueError("path is required")
+    if "\0" in path_text:
+        raise ValueError("path cannot contain null bytes")
+
+    root = workspace_root().resolve()
+    path = Path(path_text)
+    candidate = path if path.is_absolute() else root / path
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("path must stay inside the Moss workspace") from exc
+    return resolved
+
+
+def workspace_relative_path(path: Path) -> str:
+    return path.resolve().relative_to(workspace_root().resolve()).as_posix()
+
+
+def analysis_base_path(path_text: str | None) -> Path:
+    if path_text is None or not path_text.strip():
+        return Path.cwd()
+    try:
+        return resolve_workspace_path(path_text).parent
+    except ValueError:
+        return Path.cwd()
 
 
 def asset_bytes(name: str) -> bytes:
@@ -136,17 +176,47 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
                 self.send_json({"ok": False, "diagnostics": [{"level": "error", "message": "invalid JSON"}]}, status=400)
                 return
 
+            if self.path == "/api/file/read":
+                self.handle_file_read(payload)
+                return
+            if self.path == "/api/file/write":
+                self.handle_file_write(payload)
+                return
+
             source = str(payload.get("source", ""))
+            path = str(payload.get("path", ""))
             if self.path == "/api/check":
                 self.send_json(analyze_source(source, execute=False))
                 return
             if self.path == "/api/run":
-                self.send_json(analyze_source(source, execute=True))
+                self.send_json(analyze_source(source, execute=True, path=path))
                 return
             if self.path == "/api/test":
-                self.send_json(analyze_source(source, execute=True, test=True))
+                self.send_json(analyze_source(source, execute=True, test=True, path=path))
                 return
             self.send_error(HTTPStatus.NOT_FOUND)
+
+        def handle_file_read(self, payload: dict[str, Any]) -> None:
+            try:
+                path = resolve_workspace_path(str(payload.get("path", "")))
+                if not path.is_file():
+                    self.send_json({"ok": False, "message": "file not found"}, status=404)
+                    return
+                self.send_json(
+                    {"ok": True, "path": workspace_relative_path(path), "source": path.read_text(encoding="utf-8-sig")}
+                )
+            except (OSError, ValueError) as exc:
+                self.send_json({"ok": False, "message": str(exc)}, status=400)
+
+        def handle_file_write(self, payload: dict[str, Any]) -> None:
+            try:
+                path = resolve_workspace_path(str(payload.get("path", "")))
+                source = str(payload.get("source", ""))
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(source, encoding="utf-8")
+                self.send_json({"ok": True, "path": workspace_relative_path(path)})
+            except (OSError, ValueError) as exc:
+                self.send_json({"ok": False, "message": str(exc)}, status=400)
 
         def send_asset(self, name: str) -> None:
             data = asset_bytes(name)
