@@ -16,6 +16,7 @@ Implemented:
 - `while`, `break`, and `continue`
 - Text helpers and `FileSystem` effect builtins
 - top-level file imports
+- first Moss-written tokenizer sketch
 - effect checking for the built-in database capability
 - runtime type contracts
 - CLI commands: `check`, `run`, `tokens`, `ast`

@@ -333,6 +333,13 @@ print(shout("moss"))
             Runtime(output.append, base_path=root).run(program)
         self.assertEqual(output, ["moss!"])
 
+    def test_tokenizer_sketch_example_runs(self) -> None:
+        source = Path("examples/self_host/tokenizer_sketch.moss").read_text(encoding="utf-8")
+        output: list[str] = []
+        results = Runtime(output.append, base_path=Path.cwd()).run_tests(parse_source(source))
+        self.assertIn("first: ident:import", output)
+        self.assertEqual(results, [{"name": "tokenizer sketch reads moss source", "status": "pass", "message": ""}])
+
 
 if __name__ == "__main__":
     unittest.main()

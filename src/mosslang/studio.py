@@ -30,6 +30,7 @@ EXAMPLES = {
     "Text and files": "text_fs_demo.moss",
     "Maps": "map_demo.moss",
     "Imports": "import_demo.moss",
+    "Tokenizer sketch": "self_host/tokenizer_sketch.moss",
 }
 
 
