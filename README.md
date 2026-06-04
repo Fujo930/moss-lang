@@ -1,5 +1,8 @@
 # Moss language prototype
 
+![Language: Moss](https://img.shields.io/badge/language-Moss-42c4a3)
+![Self-hosting: started](https://img.shields.io/badge/self--hosting-started-efb85c)
+
 Moss is an experimental product-engineering language focused on readable domain
 logic, explicit effects, and long-lived code. This repository is a runnable
 prototype: it parses Moss source, checks declarations, and interprets a useful
@@ -106,6 +109,10 @@ moss studio
 This is version 0.1: a compact interpreter with real syntax and runtime
 semantics. The next useful steps are stronger static checks, richer diagnostics,
 and expanding the Moss-written lexer/parser/checker under `examples/self_host`.
+
+GitHub's language bar is powered by Linguist. `.moss` files are marked
+detectable in `.gitattributes`, but GitHub will only show `Moss` as a first-class
+language after Moss is accepted into the upstream Linguist language list.
 
 See `docs/language.md` for the current language surface,
 `docs/studio.md` for the browser editor,
