@@ -5,7 +5,7 @@ effect FileSystem
 fn analyzeFile(path: Text) -> Result<CheckResult, Text> uses FileSystem {
   source = readText(path)
   parsed = parseProgram(sketchTokens(source))
-  return Ok(checkProgramNodes(parsed.nodes))
+  return Ok(checkParseState(parsed))
 }
 
 let target = "examples/order.moss"
@@ -29,6 +29,9 @@ test "checker sketch accepts order example" {
   duplicate = parseProgram(sketchTokens(duplicateSource))
   duplicateCheck = checkProgramNodes(duplicate.nodes)
   assert(len(duplicateCheck.errors) == 1, "duplicate type should be reported")
+
+  parseErrorCheck = checkParseState(parseProgram(sketchTokens("}\n")))
+  assert(len(parseErrorCheck.errors) == 1, "parse errors should become check errors")
 
   duplicateFieldSource = textJoin([
     "type Person =\n",

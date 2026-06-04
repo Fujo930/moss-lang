@@ -8,11 +8,11 @@ fn emptyCheckResult() -> CheckResult {
   return { warnings: [], errors: [] }
 }
 
-fn addWarning(result: CheckResult, message: Text) -> CheckResult {
+fn addWarning(result, message: Text) {
   return result with warnings = listPush(result.warnings, message)
 }
 
-fn addError(result: CheckResult, message: Text) -> CheckResult {
+fn addError(result, message: Text) {
   return result with errors = listPush(result.errors, message)
 }
 
@@ -200,6 +200,16 @@ fn checkProgramNodes(nodes: List<MossNode>) -> CheckResult {
         }
       }
     }
+  }
+
+  return result
+}
+
+fn checkParseState(state: ParseState) -> CheckResult {
+  result = checkProgramNodes(state.nodes)
+
+  for error in state.errors {
+    result = result with errors = listPush(result.errors, "parse: " + error)
   }
 
   return result
