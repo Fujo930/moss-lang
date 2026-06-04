@@ -73,6 +73,15 @@ test "checker sketch accepts order example" {
   duplicateImportCheck = checkProgramNodes(parseProgram(sketchTokens(duplicateImportSource)).nodes)
   assert(len(duplicateImportCheck.errors) == 1, "duplicate import should fail")
 
+  distinctImportSource = ""
+  distinctImportSource = distinctImportSource + "import \"a.moss\"\n"
+  distinctImportSource = distinctImportSource + "import \"b.moss\"\n"
+  distinctImportSource = distinctImportSource + "fn work() -> Text {\n"
+  distinctImportSource = distinctImportSource + "  return \"ok\"\n"
+  distinctImportSource = distinctImportSource + "}\n"
+  distinctImportCheck = checkProgramNodes(parseProgram(sketchTokens(distinctImportSource)).nodes)
+  assert(len(distinctImportCheck.errors) == 0, "distinct imports should pass")
+
   implicitReturnSource = ""
   implicitReturnSource = implicitReturnSource + "fn work() {\n"
   implicitReturnSource = implicitReturnSource + "  return \"ok\"\n"

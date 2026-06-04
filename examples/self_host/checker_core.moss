@@ -33,6 +33,23 @@ fn duplicateNames(nodes: List<MossNode>, kind: Text) -> List<Text> {
   return duplicates
 }
 
+fn duplicateValues(nodes: List<MossNode>, kind: Text) -> List<Text> {
+  seen = mapNew()
+  duplicates = []
+
+  for item in nodes {
+    if item.kind == kind {
+      if mapHas(seen, item.value) {
+        duplicates = listPush(duplicates, item.value)
+      } else {
+        seen = mapPut(seen, item.value, true)
+      }
+    }
+  }
+
+  return duplicates
+}
+
 fn duplicateEffectNames(nodes: List<MossNode>) -> List<Text> {
   seen = mapNew()
   duplicates = []
@@ -115,6 +132,16 @@ fn checkDuplicateKind(nodes: List<MossNode>, kind: Text, result: CheckResult) ->
   return result
 }
 
+fn checkDuplicateImport(nodes: List<MossNode>, result: CheckResult) -> CheckResult {
+  duplicates = duplicateValues(nodes, "Import")
+
+  for path in duplicates {
+    result = addError(result, "duplicate Import " + path)
+  }
+
+  return result
+}
+
 fn checkProgramNodes(nodes: List<MossNode>) -> CheckResult {
   result = emptyCheckResult()
   counts = countByKind(nodes)
@@ -128,7 +155,7 @@ fn checkProgramNodes(nodes: List<MossNode>) -> CheckResult {
   result = checkDuplicateKind(nodes, "Rule", result)
   result = checkDuplicateKind(nodes, "Function", result)
   result = checkDuplicateKind(nodes, "Let", result)
-  result = checkDuplicateKind(nodes, "Import", result)
+  result = checkDuplicateImport(nodes, result)
   for effect in duplicateEffectNames(nodes) {
     result = addError(result, "duplicate Effect " + effect)
   }
