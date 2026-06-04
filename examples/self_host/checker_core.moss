@@ -161,6 +161,11 @@ fn checkProgramNodes(nodes: List<MossNode>) -> CheckResult {
   }
 
   for item in nodes {
+    if item.kind == "Import" {
+      if not textEndsWith(item.value, ".moss") {
+        result = addWarning(result, "import does not end with .moss: " + item.value)
+      }
+    }
     if item.kind == "Function" {
       if not textContains(item.value, "->") {
         result = addWarning(result, item.name + " has no explicit return type")

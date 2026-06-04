@@ -82,6 +82,14 @@ test "checker sketch accepts order example" {
   distinctImportCheck = checkProgramNodes(parseProgram(sketchTokens(distinctImportSource)).nodes)
   assert(len(distinctImportCheck.errors) == 0, "distinct imports should pass")
 
+  oddImportSource = ""
+  oddImportSource = oddImportSource + "import \"helpers\"\n"
+  oddImportSource = oddImportSource + "fn work() -> Text {\n"
+  oddImportSource = oddImportSource + "  return \"ok\"\n"
+  oddImportSource = oddImportSource + "}\n"
+  oddImportCheck = checkProgramNodes(parseProgram(sketchTokens(oddImportSource)).nodes)
+  assert(len(oddImportCheck.warnings) == 1, "extensionless import should warn")
+
   implicitReturnSource = ""
   implicitReturnSource = implicitReturnSource + "fn work() {\n"
   implicitReturnSource = implicitReturnSource + "  return \"ok\"\n"
