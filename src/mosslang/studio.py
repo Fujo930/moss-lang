@@ -26,6 +26,7 @@ EXAMPLES = {
     "Order workflow": "order.moss",
     "Not ready result": "not_ready.moss",
     "Match expression": "match_demo.moss",
+    "Lists and loops": "lists_demo.moss",
 }
 
 

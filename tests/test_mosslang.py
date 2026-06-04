@@ -186,6 +186,40 @@ test "truth" {
         self.assertTrue(result["ok"])
         self.assertEqual(result["output"], ["PASS truth", "1/1 tests passed"])
 
+    def test_lists_for_loops_and_indexing(self) -> None:
+        source = """
+fn joinWords(words: List<Text>) -> Text {
+  result = ""
+  for word in words {
+    result = result + word
+  }
+  return result
+}
+
+let letters = ["m", "o", "s", "s"]
+let built = []
+for value in range(1, 4) {
+  built = listPush(built, value)
+}
+
+print(joinWords(letters))
+print(letters[1])
+print(len(built))
+"""
+        _, output = self.run_source(source)
+        self.assertEqual(output, ["moss", "o", "3"])
+
+    def test_list_type_contract_is_checked(self) -> None:
+        source = """
+fn countText(words: List<Text>) -> Number {
+  return len(words)
+}
+
+countText(["ok", 2])
+"""
+        with self.assertRaisesRegex(MossRuntimeError, "expected List<Text>"):
+            self.run_source(source)
+
 
 if __name__ == "__main__":
     unittest.main()

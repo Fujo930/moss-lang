@@ -10,13 +10,16 @@ from .nodes import (
     EffectDecl,
     ExprStmt,
     FieldAccess,
+    ForStmt,
     FunctionDecl,
     Identifier,
     IfStmt,
+    IndexAccess,
     LetStmt,
     Literal,
     BindingPattern,
     LiteralPattern,
+    ListLiteral,
     MatchCase,
     MatchExpr,
     NumberLiteral,
@@ -38,7 +41,7 @@ from .tokens import Token, tokenize
 
 
 DECL_START = {"effect", "type", "rule", "fn", "test"}
-STMT_START = {"let", "return", "require", "if"}
+STMT_START = {"let", "return", "require", "if", "for"}
 
 
 class Parser:
@@ -226,6 +229,14 @@ class Parser:
             self.consume_statement_end()
             return IfStmt(condition, then_body, else_body)
 
+        if self.match_value("for"):
+            name = self.expect_ident()
+            self.expect_value("in")
+            iterable = self.parse_expression()
+            body = self.parse_block()
+            self.consume_statement_end()
+            return ForStmt(name, iterable, body)
+
         if self.check_kind("IDENT") and self.peek_next().value == "=":
             name = self.advance().value
             self.expect_value("=")
@@ -343,6 +354,12 @@ class Parser:
                 expr = FieldAccess(expr, field)
                 continue
 
+            if self.match_value("["):
+                index = self.parse_expression()
+                self.expect_value("]")
+                expr = IndexAccess(expr, index)
+                continue
+
             if self.match_value("?"):
                 expr = TryExpr(expr)
                 continue
@@ -388,6 +405,19 @@ class Parser:
                     continue
                 self.skip_newlines()
             return RecordLiteral(fields)
+
+        if self.match_value("["):
+            items: list[object] = []
+            self.skip_newlines()
+            if not self.check_value("]"):
+                while True:
+                    items.append(self.parse_expression())
+                    if self.match_value(","):
+                        self.skip_newlines()
+                        continue
+                    break
+            self.expect_value("]")
+            return ListLiteral(items)
 
         raise self.error("expected expression")
 

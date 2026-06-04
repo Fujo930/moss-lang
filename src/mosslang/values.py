@@ -41,6 +41,8 @@ def format_value(value: Any) -> str:
         return "true" if value else "false"
     if value is None:
         return "null"
+    if isinstance(value, list):
+        return "[" + ", ".join(format_value(item) for item in value) + "]"
     if isinstance(value, dict):
         fields = ", ".join(f"{key}: {format_value(item)}" for key, item in value.items())
         return "{" + fields + "}"

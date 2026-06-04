@@ -73,6 +73,7 @@ The prototype supports:
 - `Number`: decimal numbers
 - `Money`: `42.usd`, `9.99.eur`
 - `Null`: `null`
+- lists: `[1, 2, 3]`
 - records: `{ id: "A-100", status: Paid }`
 - variants: `Paid`, `ShipError.NotReady(Pending)`
 - results: `Ok(value)`, `Err(value)`
@@ -82,6 +83,37 @@ Record update creates a copy:
 ```moss
 let shipped = order with status = Shipped
 ```
+
+Lists support indexing and a few core builtins:
+
+```moss
+let names = ["token", "parser", "checker"]
+print(names[1])
+print(len(names))
+print(range(1, 4))
+```
+
+`List<T>` can be used in function signatures:
+
+```moss
+fn count(items: List<Text>) -> Number {
+  return len(items)
+}
+```
+
+## Loops
+
+`for` loops iterate over lists:
+
+```moss
+let total = 0
+for value in [1, 2, 3] {
+  total = total + value
+}
+```
+
+Loop bindings are scoped to the loop body. Assignments to outer variables update
+the outer binding, so accumulators work naturally.
 
 ## Result flow
 

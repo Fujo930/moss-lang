@@ -82,6 +82,13 @@ class IfStmt:
 
 
 @dataclass(frozen=True)
+class ForStmt:
+    name: str
+    iterable: Any
+    body: list[Any]
+
+
+@dataclass(frozen=True)
 class ExprStmt:
     expr: Any
 
@@ -104,6 +111,11 @@ class Identifier:
 @dataclass(frozen=True)
 class RecordLiteral:
     fields: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ListLiteral:
+    items: list[Any]
 
 
 @dataclass(frozen=True)
@@ -135,6 +147,12 @@ class CallExpr:
 class FieldAccess:
     target: Any
     field: str
+
+
+@dataclass(frozen=True)
+class IndexAccess:
+    target: Any
+    index: Any
 
 
 @dataclass(frozen=True)

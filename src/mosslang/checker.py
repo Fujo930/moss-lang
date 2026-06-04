@@ -10,10 +10,13 @@ from .nodes import (
     AssignStmt,
     ExprStmt,
     FieldAccess,
+    ForStmt,
     FunctionDecl,
     Identifier,
     IfStmt,
+    IndexAccess,
     LetStmt,
+    ListLiteral,
     MatchExpr,
     Program,
     RecordLiteral,
@@ -95,6 +98,8 @@ def collect_call_names(nodes: list[Any]) -> list[str]:
         if isinstance(node, IfStmt):
             names.extend(collect_call_names(node.then_body))
             names.extend(collect_call_names(node.else_body))
+        if isinstance(node, ForStmt):
+            names.extend(collect_call_names(node.body))
     return names
 
 
@@ -120,12 +125,18 @@ def collect_expr_calls(node: Any) -> list[str]:
         names.extend(collect_expr_calls(node.right))
     elif isinstance(node, FieldAccess):
         names.extend(collect_expr_calls(node.target))
+    elif isinstance(node, IndexAccess):
+        names.extend(collect_expr_calls(node.target))
+        names.extend(collect_expr_calls(node.index))
     elif isinstance(node, TryExpr):
         names.extend(collect_expr_calls(node.expr))
     elif isinstance(node, MatchExpr):
         names.extend(collect_expr_calls(node.subject))
         for case in node.cases:
             names.extend(collect_expr_calls(case.expr))
+    elif isinstance(node, ListLiteral):
+        for item in node.items:
+            names.extend(collect_expr_calls(item))
     elif isinstance(node, RecordLiteral):
         for value in node.fields.values():
             names.extend(collect_expr_calls(value))
@@ -135,6 +146,8 @@ def collect_expr_calls(node: Any) -> list[str]:
             names.extend(collect_expr_calls(value))
     elif isinstance(node, IfStmt):
         names.extend(collect_expr_calls(node.condition))
+    elif isinstance(node, ForStmt):
+        names.extend(collect_expr_calls(node.iterable))
     return names
 
 

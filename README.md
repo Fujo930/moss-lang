@@ -31,12 +31,14 @@ python -m mosslang.cli run examples/order.moss
 - `fn` declarations with optional `uses EffectName`
 - `test "name" { ... }` blocks for language-level executable checks
 - records, record field access, and record updates
+- list literals, indexing, `for` loops, `len`, `listPush`, and `range`
 - nullary and payload variants such as `Paid` and `ShipError.NotReady(Pending)`
 - `match` expressions with wildcard and payload binding patterns
 - `Result` values with `Ok(...)`, `Err(...)`, and `?`
 - `require condition else value`, which returns `Err(value)` from `Result`
   functions
 - runtime type contracts for function arguments and return values
+- `List<T>` runtime type contracts
 - a tiny in-memory database through `dbPut` and `dbGet`, guarded by the
   `Database` effect inside functions
 

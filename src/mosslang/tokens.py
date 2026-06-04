@@ -33,6 +33,8 @@ SINGLE_CHAR_TOKENS = {
     ")": "PUNCT",
     "{": "PUNCT",
     "}": "PUNCT",
+    "[": "PUNCT",
+    "]": "PUNCT",
     ",": "PUNCT",
     ":": "PUNCT",
     ";": "PUNCT",
@@ -61,7 +63,7 @@ def tokenize(source: str) -> list[Token]:
     while i < len(source):
         ch = source[i]
 
-        if ch in " \t\r":
+        if ch in " \t\r\ufeff":
             i += 1
             column += 1
             continue

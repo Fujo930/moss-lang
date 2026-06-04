@@ -12,13 +12,16 @@ from .nodes import (
     EffectDecl,
     ExprStmt,
     FieldAccess,
+    ForStmt,
     FunctionDecl,
     Identifier,
     IfStmt,
+    IndexAccess,
     LetStmt,
     Literal,
     BindingPattern,
     LiteralPattern,
+    ListLiteral,
     MatchExpr,
     NumberLiteral,
     Program,
@@ -166,6 +169,9 @@ class Runtime:
     def install_builtins(self) -> None:
         self.globals.define("print", BuiltinFunction("print", self.builtin_print))
         self.globals.define("assert", BuiltinFunction("assert", self.builtin_assert))
+        self.globals.define("len", BuiltinFunction("len", self.builtin_len))
+        self.globals.define("listPush", BuiltinFunction("listPush", self.builtin_list_push))
+        self.globals.define("range", BuiltinFunction("range", self.builtin_range))
         self.globals.define("Ok", BuiltinFunction("Ok", lambda value=None: Result(True, value)))
         self.globals.define("Err", BuiltinFunction("Err", lambda value=None: Result(False, value)))
         self.globals.define("dbPut", BuiltinFunction("dbPut", self.builtin_db_put, effect="Database"))
@@ -239,6 +245,15 @@ class Runtime:
             else:
                 self.execute_block(statement.else_body, Environment(env))
             return
+        if isinstance(statement, ForStmt):
+            iterable = self.evaluate(statement.iterable, env)
+            if not isinstance(iterable, list):
+                raise MossRuntimeError("for loop target must be a List")
+            for item in iterable:
+                loop_env = Environment(env)
+                loop_env.define(statement.name, item)
+                self.execute_block(statement.body, loop_env)
+            return
         if isinstance(statement, ExprStmt):
             self.evaluate(statement.expr, env)
             return
@@ -253,6 +268,8 @@ class Runtime:
             return env.get(expr.name)
         if isinstance(expr, RecordLiteral):
             return {key: self.evaluate(value, env) for key, value in expr.fields.items()}
+        if isinstance(expr, ListLiteral):
+            return [self.evaluate(item, env) for item in expr.items]
         if isinstance(expr, RecordUpdate):
             base = self.evaluate(expr.base, env)
             if not isinstance(base, dict):
@@ -273,6 +290,10 @@ class Runtime:
         if isinstance(expr, FieldAccess):
             target = self.evaluate(expr.target, env)
             return self.get_field(target, expr.field)
+        if isinstance(expr, IndexAccess):
+            target = self.evaluate(expr.target, env)
+            index = self.evaluate(expr.index, env)
+            return self.get_index(target, index)
         if isinstance(expr, CallExpr):
             callee = self.evaluate(expr.callee, env)
             args = [self.evaluate(arg, env) for arg in expr.args]
@@ -347,6 +368,19 @@ class Runtime:
                 return target.value
         raise MossRuntimeError(f"value {format_value(target)} has no field '{field}'")
 
+    def get_index(self, target: Any, index: Any) -> Any:
+        if not isinstance(index, Decimal):
+            raise MossRuntimeError("index must be a Number")
+        numeric_index = int(index)
+        if index != numeric_index:
+            raise MossRuntimeError("index must be an integer Number")
+        try:
+            if isinstance(target, (list, str)):
+                return target[numeric_index]
+        except IndexError as exc:
+            raise MossRuntimeError(f"index out of range: {numeric_index}") from exc
+        raise MossRuntimeError("index target must be a List or Text")
+
     def call(self, callee: Any, args: list[Any]) -> Any:
         if isinstance(callee, BuiltinFunction):
             self.ensure_effect_allowed(callee.effect, callee.name)
@@ -378,6 +412,25 @@ class Runtime:
     def builtin_assert(self, condition: Any, message: Any = "assertion failed") -> None:
         if not truthy(condition):
             raise MossRuntimeError(format_value(message))
+
+    def builtin_len(self, value: Any) -> Decimal:
+        if not isinstance(value, (list, str, dict)):
+            raise MossRuntimeError("len expects a List, Text, or record")
+        return Decimal(len(value))
+
+    def builtin_list_push(self, values: Any, value: Any) -> Any:
+        if not isinstance(values, list):
+            raise MossRuntimeError("listPush expects a List")
+        return [*values, value]
+
+    def builtin_range(self, start: Any, end: Any | None = None) -> list[Decimal]:
+        if end is None:
+            start_value = 0
+            end_value = decimal_to_int(start, "range end")
+        else:
+            start_value = decimal_to_int(start, "range start")
+            end_value = decimal_to_int(end, "range end")
+        return [Decimal(item) for item in range(start_value, end_value)]
 
     def builtin_db_put(self, key: Any, value: Any) -> Any:
         self.db[str(key)] = value
@@ -415,6 +468,8 @@ class Runtime:
                     return False
                 ok_type, err_type = args
                 return self.value_matches_type(value.value, ok_type if value.ok else err_type)
+            if name == "List" and len(args) == 1:
+                return isinstance(value, list) and all(self.value_matches_type(item, args[0]) for item in value)
             return True
 
         declared = self.types.get(expected)
@@ -496,6 +551,15 @@ def compare_values(left: Any, right: Any, op: str) -> bool:
     if op == "<=":
         return left_value <= right_value
     raise MossRuntimeError(f"unknown comparison operator {op}")
+
+
+def decimal_to_int(value: Any, context: str) -> int:
+    if not isinstance(value, Decimal):
+        raise MossRuntimeError(f"{context} must be a Number")
+    integer = int(value)
+    if value != integer:
+        raise MossRuntimeError(f"{context} must be an integer Number")
+    return integer
 
 
 def require_same_currency(left: Money, right: Money) -> None:

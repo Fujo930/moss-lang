@@ -1,0 +1,29 @@
+fn joinWords(words: List<Text>) -> Text {
+  result = ""
+  for word in words {
+    result = result + word
+  }
+  return result
+}
+
+fn collectNumbers() -> List<Number> {
+  values = []
+  for value in range(1, 5) {
+    values = listPush(values, value)
+  }
+  return values
+}
+
+let letters = ["m", "o", "s", "s"]
+let numbers = collectNumbers()
+
+print(joinWords(letters))
+print(letters[1])
+print(len(letters))
+print(numbers)
+
+test "list loops and indexing" {
+  assert(joinWords(letters) == "moss", "joinWords should concatenate")
+  assert(letters[1] == "o", "index should return second item")
+  assert(len(numbers) == 4, "range should produce four numbers")
+}
