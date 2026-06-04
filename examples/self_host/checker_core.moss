@@ -143,7 +143,7 @@ rule isNameToken(text: Text) -> Bool =
   text != "" and text != "," and text != "{" and text != "}" and text != "(" and text != ")"
 
 rule isTypeToken(text: Text) -> Bool =
-  isNameToken(text) and text != ":" and text != ";" and text != "|" and text != "<" and text != ">" and text != "."
+  isNameToken(text) and text != ":" and text != ";" and text != "|" and text != "<" and text != ">" and text != "." and text != "="
 
 fn usesEffects(item: MossNode) -> List<Text> {
   if not textContains(item.value, "uses") {
@@ -231,6 +231,7 @@ fn returnTypeText(item: MossNode) -> Text {
     result = textTrim(listGet(parts, 0, ""))
   }
   result = textReplace(result, "{", "")
+  result = textReplace(result, "=", "")
   return textTrim(result)
 }
 
@@ -304,6 +305,12 @@ fn checkProgramNodesWithTypes(nodes: List<MossNode>, types: Map<Text, Bool>) -> 
         if not mapHas(effects, effect) {
           result = addError(result, item.name + " uses undeclared effect " + effect)
         }
+      }
+    }
+    if item.kind == "Rule" {
+      result = checkParameterTypes(item, types, result)
+      if textContains(item.value, "->") {
+        result = checkTypeText(item.name + " return", returnTypeText(item), types, result)
       }
     }
   }

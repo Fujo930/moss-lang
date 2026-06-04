@@ -102,6 +102,13 @@ test "checker sketch accepts order example" {
   knownParamCheck = checkProgramNodes(parseProgram(sketchTokens(knownParamSource)).nodes)
   assert(len(knownParamCheck.errors) == 0, "declared parameter type should pass")
 
+  unknownRuleTypeSource = textJoin([
+    "rule ready(value: MissingRuleParam) -> MissingRuleReturn =\n",
+    "  true\n",
+  ])
+  unknownRuleTypeCheck = checkProgramNodes(parseProgram(sketchTokens(unknownRuleTypeSource)).nodes)
+  assert(len(unknownRuleTypeCheck.errors) == 2, "unknown rule parameter and return types should fail")
+
   quiet = parseProgram(sketchTokens("let x = 1\n"))
   quietCheck = checkProgramNodes(quiet.nodes)
   assert(len(quietCheck.warnings) == 1, "missing callable should warn")
