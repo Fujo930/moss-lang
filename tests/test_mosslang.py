@@ -285,6 +285,26 @@ print(maybeWord(words, 5))
         _, output = self.run_source(source)
         self.assertEqual(output, ["parser", "null"])
 
+    def test_list_slice_concat_insert_and_remove(self) -> None:
+        source = """
+let values = [1, 2, 4]
+let inserted = listInsert(values, 2, 3)
+let removed = listRemove(inserted, 0)
+let sliced = listSlice(inserted, 1, 3)
+let joined = listConcat(sliced, [9])
+
+print(inserted)
+print(removed)
+print(sliced)
+print(joined)
+"""
+        _, output = self.run_source(source)
+        self.assertEqual(output, ["[1, 2, 3, 4]", "[2, 3, 4]", "[2, 3]", "[2, 3, 9]"])
+
+    def test_list_insert_bounds_are_checked(self) -> None:
+        with self.assertRaisesRegex(MossRuntimeError, "listInsert index out of range"):
+            self.run_source("listInsert([1], 3, 2)")
+
     def test_option_type_contract_is_checked(self) -> None:
         source = """
 fn acceptMaybeText(value: Option<Text>) -> Option<Text> {

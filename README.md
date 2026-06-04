@@ -33,7 +33,8 @@ python -m mosslang.cli run examples/order.moss
 - records, record field access, and record updates
 - `if`, `else if`, and `else` blocks
 - list literals, indexing, `for` loops, `len`, `listPush`, `listGet`,
-  `listSet`, and `range`
+  `listSet`, `listSlice`, `listConcat`, `listInsert`, `listRemove`, and
+  `range`
 - `Map<K, V>` through `mapNew`, `mapPut`, `mapGet`, `mapHas`, `mapKeys`,
   `mapValues`, and `mapRemove`
 - `while`, `break`, and `continue`

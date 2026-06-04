@@ -11,7 +11,7 @@ Implemented:
 - `Result`, `?`, and `require`
 - `match` expressions
 - top-level `test` blocks and `moss test`
-- lists, indexing, `for` loops, `len`, `listPush`, and `range`
+- lists, indexing, `for` loops, and list helper builtins
 - `Map<K, V>` and map helper builtins
 - `while`, `break`, `continue`, and `else if`
 - Text helpers and `FileSystem` effect builtins

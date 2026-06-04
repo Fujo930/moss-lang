@@ -192,6 +192,10 @@ class Runtime:
         self.globals.define("listPush", BuiltinFunction("listPush", self.builtin_list_push))
         self.globals.define("listGet", BuiltinFunction("listGet", self.builtin_list_get))
         self.globals.define("listSet", BuiltinFunction("listSet", self.builtin_list_set))
+        self.globals.define("listSlice", BuiltinFunction("listSlice", self.builtin_list_slice))
+        self.globals.define("listConcat", BuiltinFunction("listConcat", self.builtin_list_concat))
+        self.globals.define("listInsert", BuiltinFunction("listInsert", self.builtin_list_insert))
+        self.globals.define("listRemove", BuiltinFunction("listRemove", self.builtin_list_remove))
         self.globals.define("range", BuiltinFunction("range", self.builtin_range))
         self.globals.define("mapNew", BuiltinFunction("mapNew", self.builtin_map_new))
         self.globals.define("mapPut", BuiltinFunction("mapPut", self.builtin_map_put))
@@ -533,6 +537,34 @@ class Runtime:
         updated = list(values)
         updated[numeric_index] = value
         return updated
+
+    def builtin_list_slice(self, values: Any, start: Any, end: Any | None = None) -> Any:
+        if not isinstance(values, list):
+            raise MossRuntimeError("listSlice expects a List")
+        start_value = decimal_to_int(start, "listSlice start")
+        end_value = None if end is None else decimal_to_int(end, "listSlice end")
+        return values[start_value:end_value]
+
+    def builtin_list_concat(self, left: Any, right: Any) -> Any:
+        if not isinstance(left, list) or not isinstance(right, list):
+            raise MossRuntimeError("listConcat expects two Lists")
+        return [*left, *right]
+
+    def builtin_list_insert(self, values: Any, index: Any, value: Any) -> Any:
+        if not isinstance(values, list):
+            raise MossRuntimeError("listInsert expects a List")
+        numeric_index = decimal_to_int(index, "listInsert index")
+        if numeric_index < 0 or numeric_index > len(values):
+            raise MossRuntimeError(f"listInsert index out of range: {numeric_index}")
+        return [*values[:numeric_index], value, *values[numeric_index:]]
+
+    def builtin_list_remove(self, values: Any, index: Any) -> Any:
+        if not isinstance(values, list):
+            raise MossRuntimeError("listRemove expects a List")
+        numeric_index = decimal_to_int(index, "listRemove index")
+        if numeric_index < 0 or numeric_index >= len(values):
+            raise MossRuntimeError(f"listRemove index out of range: {numeric_index}")
+        return [*values[:numeric_index], *values[numeric_index + 1 :]]
 
     def builtin_range(self, start: Any, end: Any | None = None) -> list[Decimal]:
         if end is None:

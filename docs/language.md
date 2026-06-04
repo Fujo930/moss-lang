@@ -111,8 +111,14 @@ fn count(items: List<Text>) -> Number {
 }
 ```
 
-`listGet(list, index, default)` returns `default` when the index is out of
-range. `listSet(list, index, value)` returns a new list with that item replaced.
+List helpers return new lists rather than mutating the original list:
+
+- `listGet(list, index, default)` returns `default` when the index is out of range
+- `listSet(list, index, value)`
+- `listSlice(list, start, end)`
+- `listConcat(left, right)`
+- `listInsert(list, index, value)`
+- `listRemove(list, index)`
 
 ## Maps
 
