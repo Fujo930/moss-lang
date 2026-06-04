@@ -105,7 +105,7 @@ def tokenize(source: str) -> list[Token]:
                     if i + 1 >= len(source):
                         raise MossSyntaxError("unterminated string escape", SourceLocation(line, column))
                     escaped = source[i + 1]
-                    mapping = {"n": "\n", "t": "\t", '"': '"', "\\": "\\"}
+                    mapping = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\"}
                     value_chars.append(mapping.get(escaped, escaped))
                     i += 2
                     column += 2

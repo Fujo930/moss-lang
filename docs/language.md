@@ -98,6 +98,7 @@ Lists support indexing and a few core builtins:
 ```moss
 let names = ["token", "parser", "checker"]
 print(names[1])
+print(listGet(names, 10, "missing"))
 print(len(names))
 print(range(1, 4))
 ```
@@ -109,6 +110,9 @@ fn count(items: List<Text>) -> Number {
   return len(items)
 }
 ```
+
+`listGet(list, index, default)` returns `default` when the index is out of
+range. `listSet(list, index, value)` returns a new list with that item replaced.
 
 ## Maps
 
@@ -131,6 +135,25 @@ Supported helpers:
 - `mapRemove(map, key)`
 
 `Map<K, V>` can be used in signatures and runtime type contracts.
+
+## Optional Values
+
+`null` is falsey and can be checked directly:
+
+```moss
+item = listGet(tokens, index, null)
+if item == null {
+  return "EOF"
+}
+```
+
+`Option<T>` means either `T` or `null` in function signatures:
+
+```moss
+fn tokenAt(tokens: List<MossToken>, index: Number) -> Option<MossToken> {
+  return listGet(tokens, index, null)
+}
+```
 
 ## Loops
 

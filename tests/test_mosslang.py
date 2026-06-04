@@ -113,6 +113,22 @@ print(err)
         )
         self.assertEqual(output, ["ShipError.NotReady(Pending)"])
 
+    def test_string_escape_sequences(self) -> None:
+        runtime, _ = self.run_source(
+            """
+let newline = "\\n"
+let tab = "\\t"
+let carriage = "\\r"
+let quote = "\\""
+let slash = "\\\\"
+"""
+        )
+        self.assertEqual(runtime.globals.get("newline"), "\n")
+        self.assertEqual(runtime.globals.get("tab"), "\t")
+        self.assertEqual(runtime.globals.get("carriage"), "\r")
+        self.assertEqual(runtime.globals.get("quote"), '"')
+        self.assertEqual(runtime.globals.get("slash"), "\\")
+
     def test_record_parameter_type_is_checked(self) -> None:
         source = """
 type Order =
@@ -220,6 +236,34 @@ fn countText(words: List<Text>) -> Number {
 countText(["ok", 2])
 """
         with self.assertRaisesRegex(MossRuntimeError, "expected List<Text>"):
+            self.run_source(source)
+
+    def test_list_get_set_and_option_contract(self) -> None:
+        source = """
+fn maybeWord(words: List<Text>, index: Number) -> Option<Text> {
+  return listGet(words, index, null)
+}
+
+fn replaceSecond(words: List<Text>) -> List<Text> {
+  return listSet(words, 1, "parser")
+}
+
+let words = replaceSecond(["moss", "token"])
+print(words[1])
+print(maybeWord(words, 5))
+"""
+        _, output = self.run_source(source)
+        self.assertEqual(output, ["parser", "null"])
+
+    def test_option_type_contract_is_checked(self) -> None:
+        source = """
+fn acceptMaybeText(value: Option<Text>) -> Option<Text> {
+  return value
+}
+
+acceptMaybeText(42)
+"""
+        with self.assertRaisesRegex(MossRuntimeError, "expected Option<Text>"):
             self.run_source(source)
 
     def test_while_break_continue_and_text_helpers(self) -> None:
@@ -337,7 +381,8 @@ print(shout("moss"))
         source = Path("examples/self_host/tokenizer_sketch.moss").read_text(encoding="utf-8")
         output: list[str] = []
         results = Runtime(output.append, base_path=Path.cwd()).run_tests(parse_source(source))
-        self.assertIn("first: ident:import", output)
+        self.assertIn("first: IDENT:import", output)
+        self.assertIn("peek past end: EOF", output)
         self.assertEqual(results, [{"name": "tokenizer sketch reads moss source", "status": "pass", "message": ""}])
 
 

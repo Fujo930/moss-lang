@@ -31,7 +31,8 @@ python -m mosslang.cli run examples/order.moss
 - `fn` declarations with optional `uses EffectName`
 - `test "name" { ... }` blocks for language-level executable checks
 - records, record field access, and record updates
-- list literals, indexing, `for` loops, `len`, `listPush`, and `range`
+- list literals, indexing, `for` loops, `len`, `listPush`, `listGet`,
+  `listSet`, and `range`
 - `Map<K, V>` through `mapNew`, `mapPut`, `mapGet`, `mapHas`, `mapKeys`,
   `mapValues`, and `mapRemove`
 - `while`, `break`, and `continue`
@@ -40,14 +41,15 @@ python -m mosslang.cli run examples/order.moss
 - `FileSystem` effect builtins: `readText`, `writeText`, `fileExists`, and
   `listFiles`
 - top-level `import "path.moss"` declarations
-- a first self-hosting sketch: `examples/self_host/tokenizer_sketch.moss`
+- a first self-hosting tokenizer sketch with structured token records:
+  `examples/self_host/tokenizer_sketch.moss`
 - nullary and payload variants such as `Paid` and `ShipError.NotReady(Pending)`
 - `match` expressions with wildcard and payload binding patterns
 - `Result` values with `Ok(...)`, `Err(...)`, and `?`
 - `require condition else value`, which returns `Err(value)` from `Result`
   functions
 - runtime type contracts for function arguments and return values
-- `List<T>` runtime type contracts
+- `List<T>`, `Map<K, V>`, and `Option<T>` runtime type contracts
 - a tiny in-memory database through `dbPut` and `dbGet`, guarded by the
   `Database` effect inside functions
 

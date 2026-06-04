@@ -190,6 +190,8 @@ class Runtime:
         self.globals.define("assert", BuiltinFunction("assert", self.builtin_assert))
         self.globals.define("len", BuiltinFunction("len", self.builtin_len))
         self.globals.define("listPush", BuiltinFunction("listPush", self.builtin_list_push))
+        self.globals.define("listGet", BuiltinFunction("listGet", self.builtin_list_get))
+        self.globals.define("listSet", BuiltinFunction("listSet", self.builtin_list_set))
         self.globals.define("range", BuiltinFunction("range", self.builtin_range))
         self.globals.define("mapNew", BuiltinFunction("mapNew", self.builtin_map_new))
         self.globals.define("mapPut", BuiltinFunction("mapPut", self.builtin_map_put))
@@ -514,6 +516,24 @@ class Runtime:
             raise MossRuntimeError("listPush expects a List")
         return [*values, value]
 
+    def builtin_list_get(self, values: Any, index: Any, default: Any = None) -> Any:
+        if not isinstance(values, list):
+            raise MossRuntimeError("listGet expects a List")
+        numeric_index = decimal_to_int(index, "listGet index")
+        if numeric_index < 0 or numeric_index >= len(values):
+            return default
+        return values[numeric_index]
+
+    def builtin_list_set(self, values: Any, index: Any, value: Any) -> Any:
+        if not isinstance(values, list):
+            raise MossRuntimeError("listSet expects a List")
+        numeric_index = decimal_to_int(index, "listSet index")
+        if numeric_index < 0 or numeric_index >= len(values):
+            raise MossRuntimeError(f"listSet index out of range: {numeric_index}")
+        updated = list(values)
+        updated[numeric_index] = value
+        return updated
+
     def builtin_range(self, start: Any, end: Any | None = None) -> list[Decimal]:
         if end is None:
             start_value = 0
@@ -666,6 +686,8 @@ class Runtime:
                 return self.value_matches_type(value.value, ok_type if value.ok else err_type)
             if name == "List" and len(args) == 1:
                 return isinstance(value, list) and all(self.value_matches_type(item, args[0]) for item in value)
+            if name == "Option" and len(args) == 1:
+                return value is None or self.value_matches_type(value, args[0])
             if name == "Map" and len(args) == 2:
                 return isinstance(value, dict) and all(
                     self.value_matches_type(key, args[0]) and self.value_matches_type(item, args[1])
