@@ -1,0 +1,47 @@
+import "examples/self_host/checker_core.moss"
+
+effect FileSystem
+
+fn appendProjectError(result, path: Text, message: Text) {
+  return result with errors = listPush(result.errors, path + ": " + message)
+}
+
+fn appendProjectWarning(result, path: Text, message: Text) {
+  return result with warnings = listPush(result.warnings, path + ": " + message)
+}
+
+fn checkSelfHostFile(path: Text) -> Result<CheckResult, Text> uses FileSystem {
+  source = readText(path)
+  parsed = parseProgram(sketchTokens(source))
+  return Ok(checkParseState(parsed))
+}
+
+fn checkSelfHostDirectory(path: Text) -> Result<CheckResult, Text> uses FileSystem {
+  result = emptyCheckResult()
+
+  for file in listFiles(path) {
+    if textEndsWith(file, ".moss") {
+      checked = checkSelfHostFile(file)?
+      for warning in checked.warnings {
+        result = appendProjectWarning(result, file, warning)
+      }
+      for error in checked.errors {
+        result = appendProjectError(result, file, error)
+      }
+    }
+  }
+
+  return Ok(result)
+}
+
+let checked = checkSelfHostDirectory("examples/self_host")?
+
+print("self-host files warnings:", len(checked.warnings))
+print("self-host files errors:", len(checked.errors))
+for error in checked.errors {
+  print("self-host error:", error)
+}
+
+test "self-host project files check cleanly" {
+  assert(len(checked.errors) == 0, "self-host project should have no checker errors")
+}

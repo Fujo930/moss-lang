@@ -31,6 +31,7 @@ class MossLanguageTests(unittest.TestCase):
         self.assertIn("PASS examples\\self_host\\tokenizer_sketch.moss", text.replace("/", "\\"))
         self.assertIn("PASS examples\\self_host\\parser_sketch.moss", text.replace("/", "\\"))
         self.assertIn("PASS examples\\self_host\\checker_sketch.moss", text.replace("/", "\\"))
+        self.assertIn("PASS examples\\self_host\\project_check.moss", text.replace("/", "\\"))
 
     def test_order_example_ships_and_stores(self) -> None:
         source = """

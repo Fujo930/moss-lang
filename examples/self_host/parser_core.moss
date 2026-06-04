@@ -239,7 +239,7 @@ fn parseProgram(tokens: List<MossToken>) -> ParseState {
 
   while currentToken(state).kind != "EOF" {
     if state.depth == 0 {
-      if currentToken(state).value == "}" {
+      if currentToken(state).value == "}" and len(state.nodes) == 0 {
         state = addError(state, "unexpected }")
         state = advance(state)
       } else {

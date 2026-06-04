@@ -109,6 +109,7 @@ def run_selfhost_checks() -> int:
         Path("examples/self_host/tokenizer_sketch.moss"),
         Path("examples/self_host/parser_sketch.moss"),
         Path("examples/self_host/checker_sketch.moss"),
+        Path("examples/self_host/project_check.moss"),
     ]
     failed = 0
 
