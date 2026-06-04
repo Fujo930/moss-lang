@@ -53,8 +53,8 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             summary = summarize(program)
             print(
-                f"ok: {summary['effects']} effect block(s), {summary['types']} type(s), "
-                f"{summary['callables']} callable(s), {summary['tests']} test(s)"
+                f"ok: {summary['effects']} effect block(s), {summary['imports']} import(s), "
+                f"{summary['types']} type(s), {summary['callables']} callable(s), {summary['tests']} test(s)"
             )
             return 0
 

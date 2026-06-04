@@ -49,7 +49,7 @@ def analyze_source(
         "output": output,
         "tokens": [],
         "ast": "",
-        "summary": {"effects": 0, "types": 0, "callables": 0, "tests": 0},
+        "summary": {"effects": 0, "imports": 0, "types": 0, "callables": 0, "tests": 0},
     }
 
     try:

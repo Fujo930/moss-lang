@@ -160,7 +160,7 @@ function newFile() {
     diagnostics: [],
     ast: "",
     tokens: [],
-    summary: { effects: 0, types: 0, callables: 0, tests: 0 },
+    summary: { effects: 0, imports: 0, types: 0, callables: 0, tests: 0 },
   });
 }
 
@@ -308,7 +308,7 @@ function renderResult(result) {
   const hasErrors = result.diagnostics.some(item => item.level === "error");
   health.textContent = result.ok && !hasErrors ? "OK" : "Issue";
   health.className = result.ok && !hasErrors ? "okText" : "errorText";
-  summary.textContent = `${result.summary.effects} effects | ${result.summary.types} types | ${result.summary.callables} callables | ${result.summary.tests || 0} tests`;
+  summary.textContent = `${result.summary.effects} effects | ${result.summary.imports || 0} imports | ${result.summary.types} types | ${result.summary.callables} callables | ${result.summary.tests || 0} tests`;
   output.textContent = result.output.length ? result.output.join("\n") : "";
   ast.textContent = result.ast || "";
   renderDiagnostics(result.diagnostics, result.ok);
