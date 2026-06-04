@@ -19,12 +19,13 @@ test "checker sketch accepts order example" {
   assert(len(checked.warnings) == 0, "order example should not warn")
   assert(len(checked.errors) == 0, "order example should not fail")
 
-  duplicateSource = ""
-  duplicateSource = duplicateSource + "type Order = Paid\n"
-  duplicateSource = duplicateSource + "type Order = Pending\n"
-  duplicateSource = duplicateSource + "fn work() -> Text {\n"
-  duplicateSource = duplicateSource + "  return \"ok\"\n"
-  duplicateSource = duplicateSource + "}\n"
+  duplicateSource = textJoin([
+    "type Order = Paid\n",
+    "type Order = Pending\n",
+    "fn work() -> Text {\n",
+    "  return \"ok\"\n",
+    "}\n",
+  ])
   duplicate = parseProgram(sketchTokens(duplicateSource))
   duplicateCheck = checkProgramNodes(duplicate.nodes)
   assert(len(duplicateCheck.errors) == 1, "duplicate type should be reported")

@@ -257,6 +257,36 @@ print(len(built))
         _, output = self.run_source(source)
         self.assertEqual(output, ["moss", "o", "3"])
 
+    def test_trailing_commas_in_multiline_constructs(self) -> None:
+        source = """
+fn pair(
+  left: Text,
+  right: Text,
+) -> Text {
+  return left + right
+}
+
+let values = [
+  "m",
+  "o",
+]
+let record = {
+  name: pair(
+    values[0],
+    values[1],
+  ),
+  count: len(values),
+}
+let updated = record with {
+  count: 3,
+}
+
+print(updated.name)
+print(updated.count)
+"""
+        _, output = self.run_source(source)
+        self.assertEqual(output, ["mo", "3"])
+
     def test_list_type_contract_is_checked(self) -> None:
         source = """
 fn countText(words: List<Text>) -> Number {

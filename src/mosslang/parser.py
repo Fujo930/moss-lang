@@ -172,6 +172,9 @@ class Parser:
             params.append(Param(name, type_name))
             if self.match_value(","):
                 self.skip_newlines()
+                if self.check_value(")"):
+                    self.advance()
+                    return params
                 continue
             self.expect_value(")")
             return params
@@ -317,6 +320,8 @@ class Parser:
                     updates[field] = self.parse_expression()
                     if self.match_value(","):
                         self.skip_newlines()
+                        if self.match_value("}"):
+                            return RecordUpdate(expr, updates)
                     else:
                         self.skip_newlines()
             else:
@@ -400,6 +405,8 @@ class Parser:
                         args.append(self.parse_expression())
                         if self.match_value(","):
                             self.skip_newlines()
+                            if self.check_value(")"):
+                                break
                             continue
                         break
                 self.expect_value(")")
@@ -459,6 +466,8 @@ class Parser:
                 fields[field] = self.parse_expression()
                 if self.match_value(","):
                     self.skip_newlines()
+                    if self.match_value("}"):
+                        return RecordLiteral(fields)
                     continue
                 self.skip_newlines()
             return RecordLiteral(fields)
@@ -471,6 +480,8 @@ class Parser:
                     items.append(self.parse_expression())
                     if self.match_value(","):
                         self.skip_newlines()
+                        if self.check_value("]"):
+                            break
                         continue
                     break
             self.expect_value("]")

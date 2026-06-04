@@ -111,6 +111,23 @@ fn count(items: List<Text>) -> Number {
 }
 ```
 
+Multiline lists, records, calls, function parameters, and record updates may
+use trailing commas. This keeps generated code and edited diffs stable:
+
+```moss
+fn join(
+  left: Text,
+  right: Text,
+) -> Text {
+  return left + right
+}
+
+let node = {
+  kind: "Function",
+  name: "ship",
+}
+```
+
 List helpers return new lists rather than mutating the original list:
 
 - `listGet(list, index, default)` returns `default` when the index is out of range
