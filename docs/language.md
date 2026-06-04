@@ -310,5 +310,6 @@ Moss frontend:
 - `token_tools.moss` defines structured token records
 - `lexer_core.moss` turns source text into tokens
 - `tokenizer_sketch.moss` runs the lexer against a Moss file
-- `parser_sketch.moss` consumes those tokens into simple line-oriented AST nodes
+- `parser_core.moss` consumes those tokens into simple line-oriented AST nodes
+- `parser_sketch.moss` runs the parser against a Moss file
   and summarizes declarations such as `effect`, `type`, `rule`, `fn`, and `test`

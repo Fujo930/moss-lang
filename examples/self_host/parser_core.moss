@@ -1,0 +1,193 @@
+import "examples/self_host/lexer_core.moss"
+
+type MossNode =
+  kind: Text
+  name: Text
+  value: Text
+
+type ParseState =
+  tokens: List<MossToken>
+  index: Number
+  nodes: List<MossNode>
+  errors: List<Text>
+
+fn node(kind: Text, name: Text, value: Text) -> MossNode {
+  return { kind: kind, name: name, value: value }
+}
+
+fn parserState(tokens: List<MossToken>) -> ParseState {
+  return { tokens: tokens, index: 0, nodes: [], errors: [] }
+}
+
+fn currentToken(state: ParseState) -> MossToken {
+  return listGet(state.tokens, state.index, token("EOF", "", 0, 0))
+}
+
+fn advance(state: ParseState) -> ParseState {
+  return state with index = state.index + 1
+}
+
+fn addNode(state: ParseState, item: MossNode) -> ParseState {
+  return state with nodes = listPush(state.nodes, item)
+}
+
+fn addError(state: ParseState, message: Text) -> ParseState {
+  return state with errors = listPush(state.errors, message)
+}
+
+fn skipNewlines(state: ParseState) -> ParseState {
+  while currentToken(state).kind == "NEWLINE" {
+    state = advance(state)
+  }
+  return state
+}
+
+fn tokenText(text: Text, item: MossToken) -> Text {
+  if text == "" {
+    return item.value
+  }
+  return text + " " + item.value
+}
+
+fn advanceToNextLine(state: ParseState) -> ParseState {
+  while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
+    state = advance(state)
+  }
+  return state
+}
+
+fn parseImport(state: ParseState) -> ParseState {
+  state = advance(state)
+  path = currentToken(state)
+
+  if path.kind != "STRING" {
+    state = addError(state, "expected import path after import")
+    return advanceToNextLine(state)
+  }
+
+  state = advance(state)
+  return addNode(state, node("Import", "", path.value))
+}
+
+fn parseEffect(state: ParseState) -> ParseState {
+  state = advance(state)
+  names = ""
+
+  while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
+    item = currentToken(state)
+    if item.value != "," {
+      names = tokenText(names, item)
+    }
+    state = advance(state)
+  }
+
+  return addNode(state, node("Effect", "", names))
+}
+
+fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
+  state = advance(state)
+  name = currentToken(state)
+
+  if name.kind != "IDENT" and name.kind != "STRING" {
+    state = addError(state, "expected name after declaration")
+    return advanceToNextLine(state)
+  }
+
+  state = advanceToNextLine(state)
+  return addNode(state, node(kind, name.value, ""))
+}
+
+fn parseLet(state: ParseState) -> ParseState {
+  state = advance(state)
+  name = currentToken(state)
+
+  if name.kind != "IDENT" {
+    state = addError(state, "expected name after let")
+    return advanceToNextLine(state)
+  }
+
+  state = advance(state)
+  equals = currentToken(state)
+
+  if equals.value != "=" {
+    state = addError(state, "expected = after let name")
+    return advanceToNextLine(state)
+  }
+
+  state = advance(state)
+  expr = ""
+  while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
+    expr = tokenText(expr, currentToken(state))
+    state = advance(state)
+  }
+
+  return addNode(state, node("Let", name.value, expr))
+}
+
+fn parseExprLine(state: ParseState) -> ParseState {
+  expr = ""
+  while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
+    expr = tokenText(expr, currentToken(state))
+    state = advance(state)
+  }
+  if expr == "" {
+    return state
+  }
+  return addNode(state, node("Expr", "", expr))
+}
+
+fn parseStatement(state: ParseState) -> ParseState {
+  item = currentToken(state)
+
+  if item.kind == "IDENT" and item.value == "import" {
+    return parseImport(state)
+  }
+
+  if item.kind == "IDENT" and item.value == "effect" {
+    return parseEffect(state)
+  }
+
+  if item.kind == "IDENT" and item.value == "type" {
+    return parseNamedLine(state, "Type")
+  }
+
+  if item.kind == "IDENT" and item.value == "rule" {
+    return parseNamedLine(state, "Rule")
+  }
+
+  if item.kind == "IDENT" and item.value == "fn" {
+    return parseNamedLine(state, "Function")
+  }
+
+  if item.kind == "IDENT" and item.value == "test" {
+    return parseNamedLine(state, "Test")
+  }
+
+  if item.kind == "IDENT" and item.value == "let" {
+    return parseLet(state)
+  }
+
+  return parseExprLine(state)
+}
+
+fn parseProgram(tokens: List<MossToken>) -> ParseState {
+  state = parserState(tokens)
+  state = skipNewlines(state)
+
+  while currentToken(state).kind != "EOF" {
+    state = parseStatement(state)
+    state = skipNewlines(state)
+  }
+
+  return state
+}
+
+fn countNodes(nodes: List<MossNode>, kind: Text) -> Number {
+  count = 0
+  for item in nodes {
+    if item.kind == kind {
+      count = count + 1
+    }
+  }
+  return count
+}
