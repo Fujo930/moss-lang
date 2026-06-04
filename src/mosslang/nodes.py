@@ -46,6 +46,12 @@ class FunctionDecl:
 
 
 @dataclass(frozen=True)
+class TestDecl:
+    name: str
+    body: list[Any]
+
+
+@dataclass(frozen=True)
 class LetStmt:
     name: str
     expr: Any

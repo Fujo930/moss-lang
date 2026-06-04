@@ -152,7 +152,39 @@ print(explain(ship(Paid)))
         result = analyze_source('print("hello studio")', execute=True)
         self.assertTrue(result["ok"])
         self.assertEqual(result["output"], ["hello studio"])
-        self.assertEqual(result["summary"], {"effects": 0, "types": 0, "callables": 0})
+        self.assertEqual(result["summary"], {"effects": 0, "types": 0, "callables": 0, "tests": 0})
+
+    def test_language_test_blocks_run_after_setup(self) -> None:
+        source = """
+fn ship(order) -> Result<Order, ShipError> {
+  require order.status == Paid
+    else ShipError.NotReady(order.status)
+  return Ok(order with status = Shipped)
+}
+
+let order = { id: "A-500", status: Paid }
+
+test "ships paid order" {
+  shipped = ship(order)?
+  assert(shipped.status == Shipped, "expected shipped")
+}
+"""
+        runtime = Runtime()
+        results = runtime.run_tests(parse_source(source))
+        self.assertEqual(results, [{"name": "ships paid order", "status": "pass", "message": ""}])
+
+    def test_studio_analysis_runs_tests(self) -> None:
+        result = analyze_source(
+            """
+test "truth" {
+  assert(true, "truth should pass")
+}
+""",
+            execute=True,
+            test=True,
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["output"], ["PASS truth", "1/1 tests passed"])
 
 
 if __name__ == "__main__":

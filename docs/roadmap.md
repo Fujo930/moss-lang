@@ -10,6 +10,7 @@ Implemented:
 - variants and namespaced variants
 - `Result`, `?`, and `require`
 - `match` expressions
+- top-level `test` blocks and `moss test`
 - effect checking for the built-in database capability
 - runtime type contracts
 - CLI commands: `check`, `run`, `tokens`, `ast`

@@ -49,6 +49,11 @@ let shipped = ship(order)?
 print("status:", shipped.status)
 print("label:", statusLabel(shipped.status))
 print("stored:", dbGet("A-100").status)
+
+test "ships paid orders" {
+  result = ship(order)?
+  assert(result.status == Shipped, "paid order should ship")
+}
 `;
 
 function init() {
@@ -91,6 +96,7 @@ function bindEvents() {
   });
 
   document.querySelector("#runButton").addEventListener("click", runSource);
+  document.querySelector("#testButton").addEventListener("click", testSource);
   document.querySelector("#checkButton").addEventListener("click", checkSource);
   document.querySelector("#newButton").addEventListener("click", newFile);
   document.querySelector("#openButton").addEventListener("click", () => fileInput.click());
@@ -146,7 +152,7 @@ function newFile() {
     diagnostics: [],
     ast: "",
     tokens: [],
-    summary: { effects: 0, types: 0, callables: 0 },
+    summary: { effects: 0, types: 0, callables: 0, tests: 0 },
   });
 }
 
@@ -231,6 +237,16 @@ async function runSource() {
   }
 }
 
+async function testSource() {
+  setBusy("Testing");
+  activateTab("output");
+  try {
+    renderResult(await fetchJson("/api/test", { source: editor.value }));
+  } catch (error) {
+    renderFailure(error);
+  }
+}
+
 async function fetchJson(url, payload) {
   const options = payload
     ? {
@@ -251,7 +267,7 @@ function renderResult(result) {
   const hasErrors = result.diagnostics.some(item => item.level === "error");
   health.textContent = result.ok && !hasErrors ? "OK" : "Issue";
   health.className = result.ok && !hasErrors ? "okText" : "errorText";
-  summary.textContent = `${result.summary.effects} effects · ${result.summary.types} types · ${result.summary.callables} callables`;
+  summary.textContent = `${result.summary.effects} effects · ${result.summary.types} types · ${result.summary.callables} callables · ${result.summary.tests || 0} tests`;
   output.textContent = result.output.length ? result.output.join("\n") : "";
   ast.textContent = result.ast || "";
   renderDiagnostics(result.diagnostics, result.ok);

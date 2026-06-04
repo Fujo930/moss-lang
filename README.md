@@ -13,6 +13,7 @@ From this folder:
 python -m pip install -e .
 moss check examples/order.moss
 moss run examples/order.moss
+moss test examples/order.moss
 moss studio
 ```
 
@@ -28,6 +29,7 @@ python -m mosslang.cli run examples/order.moss
 - `type` declarations for records and simple unions
 - `rule` declarations as pure expression functions
 - `fn` declarations with optional `uses EffectName`
+- `test "name" { ... }` blocks for language-level executable checks
 - records, record field access, and record updates
 - nullary and payload variants such as `Paid` and `ShipError.NotReady(Pending)`
 - `match` expressions with wildcard and payload binding patterns
@@ -74,6 +76,7 @@ print("stored:", dbGet("A-100").status)
 ```powershell
 moss check <file.moss>
 moss run <file.moss>
+moss test <file.moss>
 moss tokens <file.moss>
 moss ast <file.moss>
 moss studio

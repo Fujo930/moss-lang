@@ -27,6 +27,7 @@ from .nodes import (
     RequireStmt,
     ReturnStmt,
     RuleDecl,
+    TestDecl,
     TryExpr,
     TypeDecl,
     UnaryExpr,
@@ -36,7 +37,7 @@ from .nodes import (
 from .tokens import Token, tokenize
 
 
-DECL_START = {"effect", "type", "rule", "fn"}
+DECL_START = {"effect", "type", "rule", "fn", "test"}
 STMT_START = {"let", "return", "require", "if"}
 
 
@@ -57,6 +58,8 @@ class Parser:
                 items.append(self.parse_rule_decl())
             elif self.check_value("fn"):
                 items.append(self.parse_function_decl())
+            elif self.check_value("test"):
+                items.append(self.parse_test_decl())
             else:
                 items.append(self.parse_statement())
             self.skip_newlines()
@@ -127,6 +130,16 @@ class Parser:
         body = self.parse_block()
         self.consume_statement_end()
         return FunctionDecl(name=name, params=params, return_type=return_type, uses=uses, body=body)
+
+    def parse_test_decl(self) -> TestDecl:
+        self.expect_value("test")
+        if self.match_kind("STRING"):
+            name = self.previous().value
+        else:
+            name = self.expect_ident()
+        body = self.parse_block()
+        self.consume_statement_end()
+        return TestDecl(name, body)
 
     def parse_params(self) -> list[Param]:
         params: list[Param] = []

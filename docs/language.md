@@ -52,6 +52,18 @@ fn ship(order: Order) -> Result<Order, ShipError> uses Database {
 }
 ```
 
+Tests are top-level executable checks:
+
+```moss
+test "ships paid orders" {
+  shipped = ship(order)?
+  assert(shipped.status == Shipped, "expected shipped status")
+}
+```
+
+`moss run` ignores test blocks. `moss test` runs program setup first, then runs
+each test block and reports pass/fail results.
+
 ## Values
 
 The prototype supports:

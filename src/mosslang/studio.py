@@ -29,7 +29,7 @@ EXAMPLES = {
 }
 
 
-def analyze_source(source: str, *, execute: bool) -> dict[str, Any]:
+def analyze_source(source: str, *, execute: bool, test: bool = False) -> dict[str, Any]:
     output: list[str] = []
     response: dict[str, Any] = {
         "ok": False,
@@ -37,7 +37,7 @@ def analyze_source(source: str, *, execute: bool) -> dict[str, Any]:
         "output": output,
         "tokens": [],
         "ast": "",
-        "summary": {"effects": 0, "types": 0, "callables": 0},
+        "summary": {"effects": 0, "types": 0, "callables": 0, "tests": 0},
     }
 
     try:
@@ -56,7 +56,18 @@ def analyze_source(source: str, *, execute: bool) -> dict[str, Any]:
             return response
 
         if execute:
-            Runtime(output.append).run(program)
+            runtime = Runtime(output.append)
+            if test:
+                results = runtime.run_tests(program)
+                for result in results:
+                    marker = "PASS" if result["status"] == "pass" else "FAIL"
+                    detail = f": {result['message']}" if result["message"] else ""
+                    output.append(f"{marker} {result['name']}{detail}")
+                failed = sum(1 for result in results if result["status"] == "fail")
+                output.append(f"{len(results) - failed}/{len(results)} tests passed")
+                response["ok"] = failed == 0
+                return response
+            runtime.run(program)
         response["ok"] = True
         return response
     except MossError as exc:
@@ -74,6 +85,7 @@ def summarize_program(program: Any) -> dict[str, int]:
         "effects": sum(1 for item in program.items if item.__class__.__name__ == "EffectDecl"),
         "types": sum(1 for item in program.items if item.__class__.__name__ == "TypeDecl"),
         "callables": sum(1 for item in program.items if item.__class__.__name__ in {"RuleDecl", "FunctionDecl"}),
+        "tests": sum(1 for item in program.items if item.__class__.__name__ == "TestDecl"),
     }
 
 
@@ -123,6 +135,9 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
                 return
             if self.path == "/api/run":
                 self.send_json(analyze_source(source, execute=True))
+                return
+            if self.path == "/api/test":
+                self.send_json(analyze_source(source, execute=True, test=True))
                 return
             self.send_error(HTTPStatus.NOT_FOUND)
 

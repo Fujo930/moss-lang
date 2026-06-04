@@ -29,3 +29,8 @@ let draft = { id: "A-300", status: Pending, total: 42.usd }
 let paid = { id: "A-301", status: Paid, total: 42.usd }
 print(explain(ship(draft)))
 print(explain(ship(paid)))
+
+test "explain result branches" {
+  assert(explain(ship(draft)) == "not ready: Pending", "draft branch")
+  assert(explain(ship(paid)) == "shipped A-301", "paid branch")
+}

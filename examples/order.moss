@@ -24,3 +24,9 @@ let order = { id: "A-100", status: Paid, total: 42.usd }
 let shipped = ship(order)?
 print("status:", shipped.status)
 print("stored:", dbGet("A-100").status)
+
+test "ship stores paid order" {
+  checked = ship(order)?
+  assert(checked.status == Shipped, "expected shipped status")
+  assert(dbGet("A-100").status == Shipped, "expected persisted shipped order")
+}

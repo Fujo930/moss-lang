@@ -27,6 +27,7 @@ from .nodes import (
     RequireStmt,
     ReturnStmt,
     RuleDecl,
+    TestDecl,
     TryExpr,
     TypeDecl,
     UnaryExpr,
@@ -160,6 +161,7 @@ class Runtime:
         self.output = output or print
         self.effect_stack: list[set[str]] = []
         self.install_builtins()
+        self.tests: list[TestDecl] = []
 
     def install_builtins(self) -> None:
         self.globals.define("print", BuiltinFunction("print", self.builtin_print))
@@ -180,6 +182,8 @@ class Runtime:
                 self.globals.define(item.name, UserFunction(item, self, self.globals, is_rule=True))
             elif isinstance(item, FunctionDecl):
                 self.globals.define(item.name, UserFunction(item, self, self.globals))
+            elif isinstance(item, TestDecl):
+                self.tests.append(item)
             else:
                 statements.append(item)
 
@@ -193,6 +197,24 @@ class Runtime:
             except EarlyErrSignal as signal:
                 raise MossRuntimeError(f"top-level '?' received Err({format_value(signal.value)})")
         return self.globals
+
+    def run_tests(self, program: Program) -> list[dict[str, str]]:
+        self.run(program)
+        results: list[dict[str, str]] = []
+        for test in self.tests:
+            try:
+                self.execute_block(test.body, Environment(self.globals))
+            except MossRuntimeError as exc:
+                results.append({"name": test.name, "status": "fail", "message": str(exc)})
+            except ReturnSignal:
+                results.append({"name": test.name, "status": "fail", "message": "return is not allowed inside test blocks"})
+            except RequirementFailedSignal as signal:
+                results.append({"name": test.name, "status": "fail", "message": f"require failed: {format_value(signal.value)}"})
+            except EarlyErrSignal as signal:
+                results.append({"name": test.name, "status": "fail", "message": f"'?' received Err({format_value(signal.value)})"})
+            else:
+                results.append({"name": test.name, "status": "pass", "message": ""})
+        return results
 
     def execute_block(self, statements: list[Any], env: Environment) -> None:
         for statement in statements:

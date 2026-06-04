@@ -16,7 +16,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="moss", description="Moss language prototype")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    for command in ("run", "check", "tokens", "ast"):
+    for command in ("run", "check", "test", "tokens", "ast"):
         cmd = sub.add_parser(command)
         cmd.add_argument("file", type=Path)
 
@@ -51,20 +51,32 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{diagnostic.level}: {diagnostic.message}")
             if any(d.level == "error" for d in diagnostics):
                 return 1
-            effect_count = sum(1 for item in program.items if item.__class__.__name__ == "EffectDecl")
-            type_count = sum(1 for item in program.items if item.__class__.__name__ == "TypeDecl")
-            callable_count = sum(1 for item in program.items if item.__class__.__name__ in {"RuleDecl", "FunctionDecl"})
-            print(f"ok: {effect_count} effect block(s), {type_count} type(s), {callable_count} callable(s)")
+            summary = summarize(program)
+            print(
+                f"ok: {summary['effects']} effect block(s), {summary['types']} type(s), "
+                f"{summary['callables']} callable(s), {summary['tests']} test(s)"
+            )
             return 0
 
-        if args.command == "run":
+        if args.command in {"run", "test"}:
             diagnostics = check_program(program)
             errors = [d for d in diagnostics if d.level == "error"]
             if errors:
                 for diagnostic in diagnostics:
                     print(f"{diagnostic.level}: {diagnostic.message}", file=sys.stderr)
                 return 1
-            Runtime().run(program)
+            runtime = Runtime()
+            if args.command == "run":
+                runtime.run(program)
+            else:
+                results = runtime.run_tests(program)
+                for result in results:
+                    marker = "PASS" if result["status"] == "pass" else "FAIL"
+                    detail = f": {result['message']}" if result["message"] else ""
+                    print(f"{marker} {result['name']}{detail}")
+                failed = sum(1 for result in results if result["status"] == "fail")
+                print(f"{len(results) - failed}/{len(results)} tests passed")
+                return 1 if failed else 0
             return 0
 
         parser.error(f"unknown command {args.command}")
@@ -75,6 +87,15 @@ def main(argv: list[str] | None = None) -> int:
     except MossError as exc:
         print(f"moss: {exc}", file=sys.stderr)
         return 1
+
+
+def summarize(program):
+    return {
+        "effects": sum(1 for item in program.items if item.__class__.__name__ == "EffectDecl"),
+        "types": sum(1 for item in program.items if item.__class__.__name__ == "TypeDecl"),
+        "callables": sum(1 for item in program.items if item.__class__.__name__ in {"RuleDecl", "FunctionDecl"}),
+        "tests": sum(1 for item in program.items if item.__class__.__name__ == "TestDecl"),
+    }
 
 
 if __name__ == "__main__":
