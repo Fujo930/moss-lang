@@ -74,4 +74,27 @@ for error in checked.errors {
 
 test "self-host project files check cleanly" {
   assert(len(checked.errors) == 0, "self-host project should have no checker errors")
+
+  tokenFile = parseProgram(sketchTokens(textJoin([
+    "type SharedToken =\n",
+    "  kind: Text\n",
+    "fn make() -> Text {\n",
+    "  return \"ok\"\n",
+    "}\n",
+  ])))
+  parserFile = parseProgram(sketchTokens(textJoin([
+    "type ParserState =\n",
+    "  token: SharedToken\n",
+    "fn parse() -> Text {\n",
+    "  return \"ok\"\n",
+    "}\n",
+  ])))
+  localCheck = checkProgramNodes(parserFile.nodes)
+  assert(len(localCheck.errors) == 1, "local check should not know imported types")
+
+  types = builtInTypeNames()
+  types = addTypeNames(types, tokenFile.nodes)
+  types = addTypeNames(types, parserFile.nodes)
+  projectCheck = checkProgramNodesWithTypes(parserFile.nodes, types)
+  assert(len(projectCheck.errors) == 0, "project check should know cross-file types")
 }
