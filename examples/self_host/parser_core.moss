@@ -8,6 +8,7 @@ type MossNode =
 type ParseState =
   tokens: List<MossToken>
   index: Number
+  depth: Number
   nodes: List<MossNode>
   errors: List<Text>
 
@@ -16,7 +17,7 @@ fn node(kind: Text, name: Text, value: Text) -> MossNode {
 }
 
 fn parserState(tokens: List<MossToken>) -> ParseState {
-  return { tokens: tokens, index: 0, nodes: [], errors: [] }
+  return { tokens: tokens, index: 0, depth: 0, nodes: [], errors: [] }
 }
 
 fn currentToken(state: ParseState) -> MossToken {
@@ -24,7 +25,15 @@ fn currentToken(state: ParseState) -> MossToken {
 }
 
 fn advance(state: ParseState) -> ParseState {
-  return state with index = state.index + 1
+  item = currentToken(state)
+  nextDepth = state.depth
+  if item.value == "{" {
+    nextDepth = nextDepth + 1
+  }
+  if item.value == "}" and nextDepth > 0 {
+    nextDepth = nextDepth - 1
+  }
+  return state with index = state.index + 1, depth = nextDepth
 }
 
 fn addNode(state: ParseState, item: MossNode) -> ParseState {
@@ -58,9 +67,21 @@ fn lineText(state: ParseState) -> Text {
   return text
 }
 
+rule isTopLevelKeyword(text: Text) -> Bool =
+  text == "effect" or text == "import" or text == "type" or text == "rule" or text == "fn" or text == "test" or text == "let"
+
 fn advanceToNextLine(state: ParseState) -> ParseState {
   while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
     state = advance(state)
+  }
+  return state
+}
+
+fn skipTypeContinuation(state: ParseState) -> ParseState {
+  state = skipNewlines(state)
+  while currentToken(state).kind != "EOF" and not (currentToken(state).kind == "IDENT" and isTopLevelKeyword(currentToken(state).value)) {
+    state = advanceToNextLine(state)
+    state = skipNewlines(state)
   }
   return state
 }
@@ -105,6 +126,9 @@ fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
   state = advance(state)
   value = lineText(state)
   state = advanceToNextLine(state)
+  if kind == "Type" and textTrim(value) == "=" {
+    state = skipTypeContinuation(state)
+  }
   return addNode(state, node(kind, name.value, value))
 }
 
@@ -186,7 +210,11 @@ fn parseProgram(tokens: List<MossToken>) -> ParseState {
   state = skipNewlines(state)
 
   while currentToken(state).kind != "EOF" {
-    state = parseStatement(state)
+    if state.depth == 0 {
+      state = parseStatement(state)
+    } else {
+      state = advanceToNextLine(state)
+    }
     state = skipNewlines(state)
   }
 

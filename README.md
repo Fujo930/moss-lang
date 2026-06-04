@@ -47,7 +47,7 @@ python -m mosslang.cli run examples/order.moss
   `listFiles`
 - top-level `import "path.moss"` declarations
 - self-hosting sketches with structured token records, reusable lexer/parser
-  cores, a line-oriented parser, and a first checker sketch:
+  cores, a top-level declaration parser, and a first checker sketch:
   `examples/self_host/tokenizer_sketch.moss` and
   `examples/self_host/parser_sketch.moss` and
   `examples/self_host/checker_sketch.moss`
