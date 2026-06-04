@@ -20,7 +20,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd = sub.add_parser(command)
         cmd.add_argument("file", type=Path)
 
-    sub.add_parser("selfhost")
+    selfhost_cmd = sub.add_parser("selfhost")
+    selfhost_cmd.add_argument("--quick", action="store_true", help="skip the slower project-level self-host check")
 
     studio_cmd = sub.add_parser("studio")
     studio_cmd.add_argument("--host", default="127.0.0.1")
@@ -36,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "selfhost":
-            return run_selfhost_checks()
+            return run_selfhost_checks(quick=args.quick)
 
         source = args.file.read_text(encoding="utf-8")
         if args.command == "tokens":
@@ -104,13 +105,14 @@ def summarize(program):
     }
 
 
-def run_selfhost_checks() -> int:
+def run_selfhost_checks(quick: bool = False) -> int:
     paths = [
         Path("examples/self_host/tokenizer_sketch.moss"),
         Path("examples/self_host/parser_sketch.moss"),
         Path("examples/self_host/checker_sketch.moss"),
-        Path("examples/self_host/project_check.moss"),
     ]
+    if not quick:
+        paths.append(Path("examples/self_host/project_check.moss"))
     failed = 0
 
     for path in paths:

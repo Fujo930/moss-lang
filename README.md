@@ -18,6 +18,7 @@ moss check examples/order.moss
 moss run examples/order.moss
 moss test examples/order.moss
 moss selfhost
+moss selfhost --quick
 moss studio
 ```
 

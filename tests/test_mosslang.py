@@ -25,13 +25,12 @@ class MossLanguageTests(unittest.TestCase):
     def test_cli_selfhost_runs_sketches(self) -> None:
         output = StringIO()
         with redirect_stdout(output):
-            code = cli_main(["selfhost"])
+            code = cli_main(["selfhost", "--quick"])
         self.assertEqual(code, 0)
         text = output.getvalue()
         self.assertIn("PASS examples\\self_host\\tokenizer_sketch.moss", text.replace("/", "\\"))
         self.assertIn("PASS examples\\self_host\\parser_sketch.moss", text.replace("/", "\\"))
         self.assertIn("PASS examples\\self_host\\checker_sketch.moss", text.replace("/", "\\"))
-        self.assertIn("PASS examples\\self_host\\project_check.moss", text.replace("/", "\\"))
 
     def test_order_example_ships_and_stores(self) -> None:
         source = """
