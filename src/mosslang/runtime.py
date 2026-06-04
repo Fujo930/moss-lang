@@ -643,10 +643,10 @@ class Runtime:
         require_text(needle, "textContains needle")
         return needle in text
 
-    def builtin_text_index_of(self, text: Any, needle: Any) -> int:
+    def builtin_text_index_of(self, text: Any, needle: Any) -> Decimal:
         require_text(text, "textIndexOf")
         require_text(needle, "textIndexOf needle")
-        return text.find(needle)
+        return Decimal(text.find(needle))
 
     def builtin_text_starts_with(self, text: Any, prefix: Any) -> bool:
         require_text(text, "textStartsWith")

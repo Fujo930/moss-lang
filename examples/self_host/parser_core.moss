@@ -99,9 +99,9 @@ fn typeFieldText(state: ParseState) -> Text {
 
   while currentToken(state).kind != "EOF" and not (currentToken(state).kind == "IDENT" and isTopLevelKeyword(currentToken(state).value)) {
     line = lineText(state)
-    parts = textSplit(line, ":")
-    if len(parts) > 1 {
-      field = textTrim(parts[0])
+    colon = textIndexOf(line, ":")
+    if colon >= 0 {
+      field = textTrim(textSlice(line, 0, colon))
       if field != "" {
         fields = wordText(fields, field)
       }
