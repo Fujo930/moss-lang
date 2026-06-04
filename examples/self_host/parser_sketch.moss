@@ -28,4 +28,16 @@ test "parser sketch summarizes declarations" {
   assert(countNodes(parsed.nodes, "Let") == 2, "expected two let statements")
   assert(countNodes(parsed.nodes, "Test") == 1, "expected one test")
   assert(len(parsed.errors) == 0, "line parser should avoid errors")
+
+  typeSource = ""
+  typeSource = typeSource + "type Person =\n"
+  typeSource = typeSource + "  name: Text\n"
+  typeSource = typeSource + "  age: Number\n"
+  typeSource = typeSource + "fn build() -> Text {\n"
+  typeSource = typeSource + "  return \"ok\"\n"
+  typeSource = typeSource + "}\n"
+  typeParsed = parseProgram(sketchTokens(typeSource))
+  firstType = listGet(typeParsed.nodes, 0, node("Missing", "", ""))
+  assert(firstType.kind == "Type", "first declaration should be a type")
+  assert(firstType.value == "name age", "type fields should be captured")
 }

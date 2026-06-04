@@ -72,6 +72,24 @@ fn duplicateEffectNames(nodes: List<MossNode>) -> List<Text> {
   return duplicates
 }
 
+fn duplicateTypeFields(item: MossNode) -> List<Text> {
+  seen = mapNew()
+  duplicates = []
+
+  for name in textSplit(item.value, " ") {
+    clean = textTrim(name)
+    if isNameToken(clean) {
+      if mapHas(seen, clean) {
+        duplicates = listPush(duplicates, clean)
+      } else {
+        seen = mapPut(seen, clean, true)
+      }
+    }
+  }
+
+  return duplicates
+}
+
 fn effectNames(nodes: List<MossNode>) -> Map<Text, Bool> {
   names = mapNew()
 
@@ -161,6 +179,11 @@ fn checkProgramNodes(nodes: List<MossNode>) -> CheckResult {
   }
 
   for item in nodes {
+    if item.kind == "Type" {
+      for field in duplicateTypeFields(item) {
+        result = addError(result, item.name + " has duplicate field " + field)
+      }
+    }
     if item.kind == "Import" {
       if not textEndsWith(item.value, ".moss") {
         result = addWarning(result, "import does not end with .moss: " + item.value)

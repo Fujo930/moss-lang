@@ -58,6 +58,13 @@ fn tokenText(text: Text, item: MossToken) -> Text {
   return text + " " + item.value
 }
 
+fn wordText(text: Text, word: Text) -> Text {
+  if text == "" {
+    return word
+  }
+  return text + " " + word
+}
+
 fn lineText(state: ParseState) -> Text {
   text = ""
   while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
@@ -84,6 +91,26 @@ fn skipTypeContinuation(state: ParseState) -> ParseState {
     state = skipNewlines(state)
   }
   return state
+}
+
+fn typeFieldText(state: ParseState) -> Text {
+  fields = ""
+  state = skipNewlines(state)
+
+  while currentToken(state).kind != "EOF" and not (currentToken(state).kind == "IDENT" and isTopLevelKeyword(currentToken(state).value)) {
+    line = lineText(state)
+    parts = textSplit(line, ":")
+    if len(parts) > 1 {
+      field = textTrim(parts[0])
+      if field != "" {
+        fields = wordText(fields, field)
+      }
+    }
+    state = advanceToNextLine(state)
+    state = skipNewlines(state)
+  }
+
+  return fields
 }
 
 fn parseImport(state: ParseState) -> ParseState {
@@ -127,6 +154,7 @@ fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
   value = lineText(state)
   state = advanceToNextLine(state)
   if kind == "Type" and textTrim(value) == "=" {
+    value = typeFieldText(state)
     state = skipTypeContinuation(state)
   }
   return addNode(state, node(kind, name.value, value))
