@@ -239,11 +239,20 @@ fn parseProgram(tokens: List<MossToken>) -> ParseState {
 
   while currentToken(state).kind != "EOF" {
     if state.depth == 0 {
-      state = parseStatement(state)
+      if currentToken(state).value == "}" {
+        state = addError(state, "unexpected }")
+        state = advance(state)
+      } else {
+        state = parseStatement(state)
+      }
     } else {
       state = advanceToNextLine(state)
     }
     state = skipNewlines(state)
+  }
+
+  if state.depth > 0 {
+    state = addError(state, "unclosed block")
   }
 
   return state
