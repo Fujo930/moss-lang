@@ -135,6 +135,9 @@ fn checkProgramNodes(nodes: List<MossNode>) -> CheckResult {
 
   for item in nodes {
     if item.kind == "Function" {
+      if not textContains(item.value, "->") {
+        result = addWarning(result, item.name + " has no explicit return type")
+      }
       for effect in usesEffects(item) {
         if not mapHas(effects, effect) {
           result = addError(result, item.name + " uses undeclared effect " + effect)

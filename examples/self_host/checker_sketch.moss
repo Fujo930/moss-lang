@@ -72,4 +72,11 @@ test "checker sketch accepts order example" {
   duplicateImportSource = duplicateImportSource + "}\n"
   duplicateImportCheck = checkProgramNodes(parseProgram(sketchTokens(duplicateImportSource)).nodes)
   assert(len(duplicateImportCheck.errors) == 1, "duplicate import should fail")
+
+  implicitReturnSource = ""
+  implicitReturnSource = implicitReturnSource + "fn work() {\n"
+  implicitReturnSource = implicitReturnSource + "  return \"ok\"\n"
+  implicitReturnSource = implicitReturnSource + "}\n"
+  implicitReturnCheck = checkProgramNodes(parseProgram(sketchTokens(implicitReturnSource)).nodes)
+  assert(len(implicitReturnCheck.warnings) == 1, "missing return type should warn")
 }
