@@ -23,6 +23,9 @@ def main(argv: list[str] | None = None) -> int:
     selfhost_cmd = sub.add_parser("selfhost")
     selfhost_cmd.add_argument("--quick", action="store_true", help="skip the slower project-level self-host check")
 
+    compare_cmd = sub.add_parser("selfhost-compare")
+    compare_cmd.add_argument("file", type=Path)
+
     studio_cmd = sub.add_parser("studio")
     studio_cmd.add_argument("--host", default="127.0.0.1")
     studio_cmd.add_argument("--port", type=int, default=8765)
@@ -38,6 +41,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "selfhost":
             return run_selfhost_checks(quick=args.quick)
+
+        if args.command == "selfhost-compare":
+            return run_selfhost_compare(args.file)
 
         source = args.file.read_text(encoding="utf-8")
         if args.command == "tokens":
@@ -140,6 +146,37 @@ def run_selfhost_checks(quick: bool = False) -> int:
             print(f"PASS {path} ({len(results)} test(s))")
 
     return 1 if failed else 0
+
+
+def run_selfhost_compare(path: Path) -> int:
+    source = path.read_text(encoding="utf-8")
+    host = summarize(parse_source(source))
+
+    runtime = Runtime(base_path=Path.cwd())
+    runtime.run(parse_source('import "examples/self_host/parser_core.moss"\n'))
+    tokens = runtime.call(runtime.globals.get("sketchTokens"), [source])
+    parsed = runtime.call(runtime.globals.get("parseProgram"), [tokens])
+    nodes = parsed["nodes"]
+    errors = parsed["errors"]
+    selfhost = {
+        "effects": sum(1 for item in nodes if item["kind"] == "Effect"),
+        "imports": sum(1 for item in nodes if item["kind"] == "Import"),
+        "types": sum(1 for item in nodes if item["kind"] == "Type"),
+        "callables": sum(1 for item in nodes if item["kind"] in {"Rule", "Function"}),
+        "tests": sum(1 for item in nodes if item["kind"] == "Test"),
+    }
+
+    print(f"host: {host}")
+    print(f"selfhost: {selfhost}")
+    if errors:
+        for error in errors:
+            print(f"selfhost parse error: {error}")
+        return 1
+    if host != selfhost:
+        print("selfhost comparison failed")
+        return 1
+    print("selfhost comparison passed")
+    return 0
 
 
 if __name__ == "__main__":

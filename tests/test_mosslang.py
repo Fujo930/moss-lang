@@ -34,6 +34,13 @@ class MossLanguageTests(unittest.TestCase):
         self.assertIn("PASS examples\\self_host\\parser_sketch.moss", text.replace("/", "\\"))
         self.assertIn("PASS examples\\self_host\\checker_sketch.moss", text.replace("/", "\\"))
 
+    def test_cli_selfhost_compare_matches_order_example(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            code = cli_main(["selfhost-compare", "examples/order.moss"])
+        self.assertEqual(code, 0)
+        self.assertIn("selfhost comparison passed", output.getvalue())
+
     def test_order_example_ships_and_stores(self) -> None:
         source = """
 effect Database
