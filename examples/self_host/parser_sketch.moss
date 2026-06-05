@@ -37,7 +37,7 @@ test "parser sketch summarizes declarations" {
   typeSource = typeSource + "  return \"ok\"\n"
   typeSource = typeSource + "}\n"
   typeParsed = parseProgram(sketchTokens(typeSource))
-  firstType = listGet(typeParsed.nodes, 0, node("Missing", "", ""))
+  firstType = listGet(typeParsed.nodes, 0, node("Missing", "", "", null))
   assert(firstType.kind == "Type", "first declaration should be a type")
   assert(firstType.value == "name:Text;age:Number", "type fields should include types")
 
@@ -49,4 +49,11 @@ test "parser sketch summarizes declarations" {
 
   stringBraces = parseProgram(sketchTokens("fn build() -> Text {\n  return \"{\"\n}\n"))
   assert(len(stringBraces.errors) == 0, "string braces should not affect block depth")
+
+  letParsed = parseProgram(sketchTokens("let total = 1 + 2 * 3\n"))
+  firstLet = listGet(letParsed.nodes, 0, node("Missing", "", "", null))
+  assert(firstLet.kind == "Let", "let declaration should be parsed")
+  assert(firstLet.data.kind == "Binary", "let should retain structured expression")
+  assert(firstLet.data.value == "+", "let expression should retain precedence tree")
+  assert(firstLet.data.right.value == "*", "nested multiplication should be structured")
 }

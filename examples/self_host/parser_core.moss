@@ -1,9 +1,10 @@
-import "examples/self_host/lexer_core.moss"
+import "examples/self_host/expression_core.moss"
 
 type MossNode =
   kind: Text
   name: Text
   value: Text
+  data: Any
 
 type ParseState =
   tokens: List<MossToken>
@@ -12,8 +13,8 @@ type ParseState =
   nodes: List<MossNode>
   errors: List<Text>
 
-fn node(kind: Text, name: Text, value: Text) -> MossNode {
-  return { kind: kind, name: name, value: value }
+fn node(kind: Text, name: Text, value: Text, data) -> MossNode {
+  return { kind: kind, name: name, value: value, data: data }
 }
 
 fn parserState(tokens: List<MossToken>) -> ParseState {
@@ -132,7 +133,7 @@ fn parseImport(state: ParseState) -> ParseState {
   }
 
   state = advance(state)
-  return addNode(state, node("Import", "", path.value))
+  return addNode(state, node("Import", "", path.value, null))
 }
 
 fn parseEffect(state: ParseState) -> ParseState {
@@ -147,7 +148,7 @@ fn parseEffect(state: ParseState) -> ParseState {
     state = advance(state)
   }
 
-  return addNode(state, node("Effect", "", names))
+  return addNode(state, node("Effect", "", names, null))
 }
 
 fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
@@ -166,7 +167,7 @@ fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
     value = typeFieldText(state)
     state = skipTypeContinuation(state)
   }
-  return addNode(state, node(kind, name.value, value))
+  return addNode(state, node(kind, name.value, value, null))
 }
 
 fn parseLet(state: ParseState) -> ParseState {
@@ -187,25 +188,39 @@ fn parseLet(state: ParseState) -> ParseState {
   }
 
   state = advance(state)
-  expr = ""
+  sourceText = ""
+  expressionTokens = []
   while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
-    expr = tokenText(expr, currentToken(state))
+    expressionTokens = listPush(expressionTokens, currentToken(state))
+    sourceText = tokenText(sourceText, currentToken(state))
     state = advance(state)
   }
 
-  return addNode(state, node("Let", name.value, expr))
+  expressionTokens = listPush(expressionTokens, token("EOF", "", 0, 0))
+  parsed = parseOrExpr(exprState(expressionTokens))
+  for error in parsed.state.errors {
+    state = addError(state, "let " + name.value + ": " + error)
+  }
+  return addNode(state, node("Let", name.value, sourceText, parsed.expr))
 }
 
 fn parseExprLine(state: ParseState) -> ParseState {
-  expr = ""
+  sourceText = ""
+  expressionTokens = []
   while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
-    expr = tokenText(expr, currentToken(state))
+    expressionTokens = listPush(expressionTokens, currentToken(state))
+    sourceText = tokenText(sourceText, currentToken(state))
     state = advance(state)
   }
-  if expr == "" {
+  if sourceText == "" {
     return state
   }
-  return addNode(state, node("Expr", "", expr))
+  expressionTokens = listPush(expressionTokens, token("EOF", "", 0, 0))
+  parsed = parseOrExpr(exprState(expressionTokens))
+  for error in parsed.state.errors {
+    state = addError(state, "expression: " + error)
+  }
+  return addNode(state, node("Expr", "", sourceText, parsed.expr))
 }
 
 fn parseStatement(state: ParseState) -> ParseState {
