@@ -36,4 +36,13 @@ test "expression sketch builds structured precedence tree" {
   chained = parseExpressionSource("service.load()[0].name")
   assert(chained.expr.kind == "Field", "postfix expressions should chain")
   assert(chained.expr.value == "name", "last field should be root")
+
+  logic = parseExpressionSource("ready and paid or override")
+  assert(logic.expr.value == "or", "or should be the lowest precedence")
+  assert(logic.expr.left.value == "and", "and should bind tighter than or")
+
+  tried = parseExpressionSource("load(path)?.name")
+  assert(tried.expr.kind == "Field", "field access should follow try")
+  assert(tried.expr.left.kind == "Try", "question mark should produce try expression")
+  assert(tried.expr.left.left.kind == "Call", "try should retain its operand")
 }

@@ -64,7 +64,7 @@ fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
     return exprResult(exprAdvance(state), expr("Identifier", item.value, null, null))
   }
   if item.value == "(" {
-    nested = parseEqualityExpr(exprAdvance(state))
+    nested = parseOrExpr(exprAdvance(state))
     if exprCurrent(nested.state).value != ")" {
       failed = exprError(nested.state, "expected ) after expression")
       return exprResult(failed, nested.expr)
@@ -85,7 +85,7 @@ fn parseCallArguments(state: ExprParseState) -> ExprListParseResult {
   }
 
   while exprCurrent(state).kind != "EOF" {
-    parsed = parseEqualityExpr(state)
+    parsed = parseOrExpr(state)
     items = listPush(items, parsed.expr)
     state = parsed.state
 
@@ -106,10 +106,12 @@ fn parseCallArguments(state: ExprParseState) -> ExprListParseResult {
 fn parsePostfixExpr(state: ExprParseState) -> ExprParseResult {
   result = parsePrimaryExpr(state)
 
-  while exprCurrent(result.state).value == "(" or exprCurrent(result.state).value == "." or exprCurrent(result.state).value == "[" {
+  while exprCurrent(result.state).value == "(" or exprCurrent(result.state).value == "." or exprCurrent(result.state).value == "[" or exprCurrent(result.state).value == "?" {
     operator = exprCurrent(result.state).value
 
-    if operator == "(" {
+    if operator == "?" {
+      result = exprResult(exprAdvance(result.state), expr("Try", "", result.expr, null))
+    } else if operator == "(" {
       args = parseCallArguments(exprAdvance(result.state))
       result = exprResult(args.state, expr("Call", "", result.expr, args.items))
     } else if operator == "." {
@@ -122,7 +124,7 @@ fn parsePostfixExpr(state: ExprParseState) -> ExprParseResult {
         result = exprResult(exprAdvance(fieldState), expr("Field", field.value, result.expr, null))
       }
     } else {
-      index = parseEqualityExpr(exprAdvance(result.state))
+      index = parseOrExpr(exprAdvance(result.state))
       if exprCurrent(index.state).value != "]" {
         failed = exprError(index.state, "expected ] after index")
         result = exprResult(failed, expr("Index", "", result.expr, index.expr))
@@ -194,6 +196,28 @@ fn parseEqualityExpr(state: ExprParseState) -> ExprParseResult {
   return result
 }
 
+fn parseAndExpr(state: ExprParseState) -> ExprParseResult {
+  result = parseEqualityExpr(state)
+
+  while exprCurrent(result.state).value == "and" {
+    right = parseEqualityExpr(exprAdvance(result.state))
+    result = exprResult(right.state, expr("Binary", "and", result.expr, right.expr))
+  }
+
+  return result
+}
+
+fn parseOrExpr(state: ExprParseState) -> ExprParseResult {
+  result = parseAndExpr(state)
+
+  while exprCurrent(result.state).value == "or" {
+    right = parseAndExpr(exprAdvance(result.state))
+    result = exprResult(right.state, expr("Binary", "or", result.expr, right.expr))
+  }
+
+  return result
+}
+
 fn parseExpressionSource(source: Text) -> ExprParseResult {
-  return parseEqualityExpr(exprState(sketchTokens(source)))
+  return parseOrExpr(exprState(sketchTokens(source)))
 }
