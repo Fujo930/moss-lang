@@ -80,5 +80,5 @@ moss project-check --locked .
 moss project-test --locked .
 ```
 
-This does not mean Moss is fully self-hosted. It means the 0.4 project system
+This does not mean Moss is fully self-hosted. It means the project system
 now directly describes, checks, and tests the Moss-written frontend.

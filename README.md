@@ -255,8 +255,11 @@ Suitable claims:
 - Moss has begun self-hosting.
 - Moss is still alpha software and should not be described as fully self-hosted.
 
-The next work continues toward replacing host frontend stages with Moss-written
-stages while strengthening module boundaries and package dependencies.
+The 0.6 milestone focuses on a five-minute first-run experience, a VS Code
+extension, hosted playground, cross-platform releases, and a controlled
+`Process` effect for existing Python, Node, and command-line tools. Typed Python
+FFI begins as a 0.7 prototype; stable Python and Node bindings belong to 0.8
+after their effect and type boundaries are proven.
 
 GitHub's language bar is powered by Linguist. `.moss` files are marked
 detectable in `.gitattributes`, but GitHub will only show `Moss` as a first-class
@@ -266,6 +269,7 @@ See `docs/language.md` for the current language surface,
 `docs/projects.md` for manifests and project commands,
 `docs/studio.md` for the browser editor,
 `docs/tooling.md` for editor and developer tooling,
+`docs/ecosystem.md` for adoption and external-language compatibility strategy,
 `docs/history.md` for a commit-by-commit feature guide, and
 `docs/roadmap.md` for the path from prototype to a serious implementation.
 See `docs/release-0.5.md` for the current release notes and packaging checklist,

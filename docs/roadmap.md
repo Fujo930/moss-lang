@@ -86,14 +86,13 @@ Make Moss feel like a language for real systems:
 - reachable-module project formatting and CI format checks
 - project-wide checks for missing imports, cycles, and declaration conflicts
 - deterministic project lock files with module content hashes
-- schema migration declarations
-- effect definitions with custom capabilities
 - JSON adapter with deterministic serialization
 - explicit `Network` effect HTTP GET and JSON POST adapters
 - source-mapped rule evaluation traces through `moss trace`
 
-The 0.4 product-engineering roadmap is implemented. Stronger module boundaries
-and external package dependencies remain longer-term work.
+The implemented 0.4 product-engineering scope is complete. Schema migration
+declarations, user-defined capability implementations, stronger module
+boundaries, and external package dependencies remain future work.
 
 ## Version 0.5: editor and playground
 
@@ -107,8 +106,88 @@ Developer experience:
 - test runner with golden output files
 - generated Markdown API and schema docs
 
-Version 0.5 feature work is complete. The next milestone focuses on replacing
-host frontend stages with the verified Moss-written frontend.
+Version 0.5 feature work is complete. The next milestone focuses on reducing
+friction in the first user experience while preparing the verified Moss-written
+frontend for active use.
+
+## Version 0.6: adoption and integration foundation
+
+Make a stranger productive with Moss in five minutes:
+
+- official VS Code extension bundling the TextMate grammar and `moss-lsp`
+- hosted browser playground using the existing Studio JSON API shape
+- `moss new` templates for rule services, CLI tools, and libraries
+- actionable diagnostics with suggested fixes
+- cross-platform release automation for Windows, macOS, and Linux
+- reusable GitHub Actions workflow
+- five-minute tutorial and a realistic explainable business-rules showcase
+- explicit `Process` effect for controlled external commands
+- deterministic JSON request/response convention for Python, Node, and other
+  subprocess integrations
+
+The external-process bridge is an integration boundary, not the final FFI. It
+lets Moss reuse existing ecosystems without silently weakening its type and
+effect model.
+
+## Version 0.7: active self-host frontend and typed FFI prototype
+
+Move verified Moss-written compiler work into the real toolchain:
+
+- selectable Python-host and Moss-written frontend modes
+- differential tests and compatibility gates for both frontends
+- Moss-written tokenizer and parser used by real compiler commands
+- expand the Moss-written checker and improve self-host performance
+- define the Moss FFI model, type mapping, failures, and effect boundaries
+- prototype typed Python bindings under an explicit `Python` effect
+- generate Moss declarations from selected Python modules
+
+The Python prototype should expose declared, typed bindings rather than
+arbitrary Python objects.
+
+## Version 0.8: packages and external ecosystems
+
+Let projects safely reuse Moss and host-language libraries:
+
+- package dependency resolution and deterministic package locks
+- module visibility and explicit public APIs
+- package registry prototype and documentation site
+- standard-library versioning and compatibility policy
+- schema migration declarations and user-defined capability implementations
+- stable `moss bind python <module>` workflow
+- Python functions, selected classes, async calls, and exception mapping
+- typed Node/JavaScript bindings under an explicit `JavaScript` effect
+- extension protocol for future host-language adapters
+
+Python is the first official FFI because the current runtime can integrate it
+with the smallest trusted boundary. Node follows after the binding model is
+proven.
+
+## Version 0.9: language stabilization
+
+- freeze the core syntax and publish a complete language specification
+- define source and package compatibility guarantees
+- make the self-host frontend the default
+- improve performance, security boundaries, sandboxing, and benchmarks
+- validate Moss with larger projects maintained by multiple contributors
+
+## Version 1.0: trustworthy commitment
+
+Release 1.0 only after the core language is stable, the self-host compiler path
+is reliable, installation works across supported platforms, compatibility
+policy is enforceable, and people outside this repository have completed real
+projects with Moss.
+
+## Adoption and ecosystem strategy
+
+Moss should earn users through a distinctive capability, not novelty alone.
+Its public design center is explainable business rules, explicit effects, and
+deterministic project surfaces that humans and AI agents can inspect together.
+
+Near-term success is measured by successful first runs, editor installs,
+external projects, issues, and contributions rather than stars alone. The
+ecosystem priority order is editor and installation quality, tutorials and
+showcases, CI integration, a dependable standard library, then a package
+registry after module APIs and compatibility rules are stable.
 
 ## Research track
 
@@ -118,3 +197,5 @@ The bigger language questions:
 - Can schema evolution be represented as first-class code?
 - Can effects stay explicit without creating annotation fatigue?
 - Can concurrency be structured around product workflows rather than raw tasks?
+- Can typed host-language bindings preserve explainability and deterministic
+  review boundaries?

@@ -25,6 +25,16 @@ Why it matters: Moss's compiler surfaces now serve humans, editors, CI, and AI
 agents through stable structures instead of requiring each tool to scrape CLI
 text independently.
 
+The post-0.5 direction is now explicit. Version 0.6 prioritizes adoption and a
+controlled subprocess bridge; 0.7 activates Moss-written frontend stages and
+prototypes typed Python bindings; 0.8 adds package infrastructure and stable
+Python followed by Node bindings. Host-language compatibility must preserve
+Moss's explicit effects, typed declarations, and deterministic review surfaces.
+
+Why it matters: future development has a clear order. Moss can reuse mature
+ecosystems before recreating them, while avoiding an unrestricted FFI that
+would erase the language properties it is trying to establish.
+
 ## 0.4.0-alpha project foundation
 
 Moss now supports `moss.toml` package manifests, deterministic reachable import
@@ -246,13 +256,16 @@ Why it matters: self-hosting progress is no longer measured only by whether a
 sketch runs. The repository now has an executable equivalence gate that can be
 made stricter as the Moss AST grows.
 
-## Current direction
+## Direction at that stage
 
-The next self-hosting milestones are:
+The self-hosting milestones identified at that stage were:
 
 - parse recursive control flow and match expressions into structured AST nodes
 - compare full Moss-written AST output against the Python host frontend
 - gradually replace host pieces only after the Moss version is tested
+
+The first two milestones were completed during 0.3. Replacing active host
+frontend stages remains planned for 0.7 after the 0.6 adoption work.
 
 ## Language identity and Studio refresh
 
