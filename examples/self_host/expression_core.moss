@@ -15,6 +15,10 @@ type ExprParseResult =
   state: ExprParseState
   expr: MossExpr
 
+type ExprListParseResult =
+  state: ExprParseState
+  items: List<Any>
+
 fn expr(kind: Text, value: Text, left, right) -> MossExpr {
   return { kind: kind, value: value, left: left, right: right }
 }
@@ -43,6 +47,10 @@ fn exprResult(state: ExprParseState, value: MossExpr) -> ExprParseResult {
   return { state: state, expr: value }
 }
 
+fn exprListResult(state: ExprParseState, items: List<Any>) -> ExprListParseResult {
+  return { state: state, items: items }
+}
+
 fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
   item = exprCurrent(state)
 
@@ -68,13 +76,72 @@ fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
   return exprResult(exprAdvance(failed), missingExpr())
 }
 
+fn parseCallArguments(state: ExprParseState) -> ExprListParseResult {
+  items = []
+  closeParen = ")"
+
+  if exprCurrent(state).value == closeParen {
+    return exprListResult(exprAdvance(state), items)
+  }
+
+  while exprCurrent(state).kind != "EOF" {
+    parsed = parseEqualityExpr(state)
+    items = listPush(items, parsed.expr)
+    state = parsed.state
+
+    if exprCurrent(state).value == closeParen {
+      return exprListResult(exprAdvance(state), items)
+    }
+    if exprCurrent(state).value != "," {
+      state = exprError(state, "expected comma or ) after argument")
+      return exprListResult(state, items)
+    }
+    state = exprAdvance(state)
+  }
+
+  state = exprError(state, "expected ) after arguments")
+  return exprListResult(state, items)
+}
+
+fn parsePostfixExpr(state: ExprParseState) -> ExprParseResult {
+  result = parsePrimaryExpr(state)
+
+  while exprCurrent(result.state).value == "(" or exprCurrent(result.state).value == "." or exprCurrent(result.state).value == "[" {
+    operator = exprCurrent(result.state).value
+
+    if operator == "(" {
+      args = parseCallArguments(exprAdvance(result.state))
+      result = exprResult(args.state, expr("Call", "", result.expr, args.items))
+    } else if operator == "." {
+      fieldState = exprAdvance(result.state)
+      field = exprCurrent(fieldState)
+      if field.kind != "IDENT" {
+        fieldState = exprError(fieldState, "expected field name after .")
+        result = exprResult(fieldState, expr("Field", "", result.expr, missingExpr()))
+      } else {
+        result = exprResult(exprAdvance(fieldState), expr("Field", field.value, result.expr, null))
+      }
+    } else {
+      index = parseEqualityExpr(exprAdvance(result.state))
+      if exprCurrent(index.state).value != "]" {
+        failed = exprError(index.state, "expected ] after index")
+        result = exprResult(failed, expr("Index", "", result.expr, index.expr))
+      } else {
+        result = exprResult(exprAdvance(index.state), expr("Index", "", result.expr, index.expr))
+      }
+    }
+  }
+
+  return result
+}
+
 fn parseUnaryExpr(state: ExprParseState) -> ExprParseResult {
   item = exprCurrent(state)
   if item.value == "not" or item.value == "-" {
     right = parseUnaryExpr(exprAdvance(state))
     return exprResult(right.state, expr("Unary", item.value, null, right.expr))
   }
-  return parsePrimaryExpr(state)
+  return parsePostfixExpr(state)
 }
 
 fn parseFactorExpr(state: ExprParseState) -> ExprParseResult {

@@ -23,4 +23,17 @@ test "expression sketch builds structured precedence tree" {
 
   broken = parseExpressionSource("(1 + 2")
   assert(len(broken.state.errors) == 1, "missing closing paren should be reported")
+
+  call = parseExpressionSource("save(order.id, items[0])")
+  assert(call.expr.kind == "Call", "call should produce call expression")
+  assert(call.expr.left.value == "save", "call should retain callee")
+  assert(len(call.expr.right) == 2, "call should capture arguments")
+  assert(call.expr.right[0].kind == "Field", "first argument should be field access")
+  assert(call.expr.right[0].value == "id", "field name should be captured")
+  assert(call.expr.right[1].kind == "Index", "second argument should be index access")
+  assert(call.expr.right[1].right.value == "0", "index expression should be captured")
+
+  chained = parseExpressionSource("service.load()[0].name")
+  assert(chained.expr.kind == "Field", "postfix expressions should chain")
+  assert(chained.expr.value == "name", "last field should be root")
 }
