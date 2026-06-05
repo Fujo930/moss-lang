@@ -17,6 +17,13 @@ disagree.
 Why it matters: compiler code commonly initializes a value before branching.
 Moss can now retain that value's proven type after control flow rejoins.
 
+Union matches now reject variants outside the subject union, validate payload
+pattern counts when the alias declares them, and warn about cases made
+unreachable by an earlier catch-all.
+
+Why it matters: exhaustive matching is only trustworthy when every accepted
+case actually belongs to the union and can bind the payload it claims.
+
 ## efeb3d1 Initial Moss language prototype
 
 Started the executable Moss prototype: a tokenizer, parser, AST, interpreter,

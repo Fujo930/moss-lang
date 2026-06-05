@@ -323,16 +323,32 @@ def check_match_coverage(
     if not union_text:
         return
 
-    expected = {part.strip().split("(", 1)[0] for part in union_text.split("|")}
+    variants = union_variants(union_text)
+    expected = set(variants)
     covered: set[str] = set()
     catches_all = False
     for case in expr.cases:
         pattern = case.pattern
+        if catches_all:
+            diagnostics.append(Diagnostic("warning", "unreachable match case after catch-all", location))
+            continue
         if isinstance(pattern, (WildcardPattern, BindingPattern)):
             catches_all = True
             continue
         if isinstance(pattern, VariantPattern):
             name = pattern.name.split(".")[-1]
+            if name not in expected:
+                diagnostics.append(Diagnostic("error", f"variant '{name}' is not part of {subject_type}", location))
+                continue
+            expected_arity = variants[name]
+            if expected_arity is not None and len(pattern.payload) != expected_arity:
+                diagnostics.append(
+                    Diagnostic(
+                        "error",
+                        f"variant '{name}' expects {expected_arity} payload pattern(s), got {len(pattern.payload)}",
+                        location,
+                    )
+                )
             if name in covered:
                 diagnostics.append(Diagnostic("warning", f"duplicate match case '{name}'", location))
             covered.add(name)
@@ -340,6 +356,36 @@ def check_match_coverage(
     missing = sorted(expected - covered)
     if missing and not catches_all:
         diagnostics.append(Diagnostic("error", f"non-exhaustive match for {subject_type}; missing: {', '.join(missing)}", location))
+
+
+def union_variants(union_text: str) -> dict[str, int | None]:
+    """Return variant names and declared payload arity; None means unspecified."""
+    result: dict[str, int | None] = {}
+    for part in split_top_level(union_text, "|"):
+        member = part.strip()
+        if "(" not in member or not member.endswith(")"):
+            result[member] = None
+            continue
+        name, payload = member.split("(", 1)
+        content = payload[:-1].strip()
+        result[name.strip()] = 0 if not content else len(split_top_level(content, ","))
+    return result
+
+
+def split_top_level(text: str, delimiter: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    for index, char in enumerate(text):
+        if char in "(<[":
+            depth += 1
+        elif char in ")>]":
+            depth = max(0, depth - 1)
+        elif char == delimiter and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+    parts.append(text[start:])
+    return parts
 
 
 def check_effect_calls(

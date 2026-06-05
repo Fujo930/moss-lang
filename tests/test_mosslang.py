@@ -376,6 +376,49 @@ rule label(status: Status) -> Text =
         diagnostics = check_program(program)
         self.assertFalse(any("non-exhaustive match" in item.message for item in diagnostics))
 
+    def test_static_checker_rejects_unknown_union_match_variant(self) -> None:
+        program = parse_source(
+            """
+type Status = Pending | Paid
+rule label(status: Status) -> Text =
+  match status {
+    Pending -> "pending"
+    Missing -> "missing"
+    Paid -> "paid"
+  }
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertTrue(any("variant 'Missing' is not part of Status" in item.message for item in diagnostics))
+
+    def test_static_checker_checks_declared_variant_payload_arity(self) -> None:
+        program = parse_source(
+            """
+type Event = Ready | Failed(Text, Number)
+rule label(event: Event) -> Text =
+  match event {
+    Ready -> "ready"
+    Failed(message) -> message
+  }
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertTrue(any("expects 2 payload pattern(s), got 1" in item.message for item in diagnostics))
+
+    def test_static_checker_warns_after_match_catch_all(self) -> None:
+        program = parse_source(
+            """
+type Status = Pending | Paid
+rule label(status: Status) -> Text =
+  match status {
+    _ -> "unknown"
+    Paid -> "paid"
+  }
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertTrue(any("unreachable match case after catch-all" in item.message for item in diagnostics))
+
     def test_match_expression_matches_result_payloads(self) -> None:
         source = """
 fn ship(status) -> Result<Text, ShipError> {

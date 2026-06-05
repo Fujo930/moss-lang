@@ -63,6 +63,7 @@ Implemented:
 - conservative local-binding and expression type inference
 - static callable argument, return, record-field access, and record-update checks
 - exhaustive union `match` checks and duplicate-case warnings
+- union membership, declared payload arity, and unreachable match-case checks
 - flow-sensitive type merging across complete `if`/`else` branches
 - machine-readable `moss check --json` diagnostics and summaries
 - recursive text and JSON project checking through `moss project-check`
@@ -71,7 +72,6 @@ High-value next steps:
 
 - structured match-pattern comparison
 - compare complete expression AST output against the Python host frontend
-- payload-aware union pattern checking
 - expression-level checker locations
 - formatter support for canonical expression spacing
 - multiline REPL
