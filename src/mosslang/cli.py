@@ -74,6 +74,10 @@ def main(argv: list[str] | None = None) -> int:
     project_lock_cmd = sub.add_parser("project-lock")
     project_lock_cmd.add_argument("directory", type=Path)
 
+    project_format_cmd = sub.add_parser("project-format")
+    project_format_cmd.add_argument("directory", type=Path)
+    project_format_cmd.add_argument("--check", action="store_true", help="fail if any reachable module needs formatting")
+
     sub.add_parser("repl", help="start an interactive multiline Moss session")
 
     studio_cmd = sub.add_parser("studio")
@@ -112,6 +116,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "project-lock":
             return run_project_lock(args.directory)
+
+        if args.command == "project-format":
+            return run_project_format(args.directory, check=args.check)
 
         if args.command == "repl":
             return run_repl()
@@ -446,6 +453,33 @@ def run_project_lock(directory: Path) -> int:
     path = write_project_lock(graph)
     print(f"locked {len(graph.programs)} module(s): {path}")
     return 0
+
+
+def run_project_format(directory: Path, *, check: bool = False) -> int:
+    from .formatter import format_source
+
+    manifest_path = find_manifest(directory)
+    if manifest_path is None:
+        raise ValueError(f"no moss.toml found from {directory}")
+    graph = build_project_graph(load_manifest(manifest_path))
+    if graph.diagnostics:
+        for diagnostic in graph.diagnostics:
+            print(f"{diagnostic['file']}: {diagnostic['level']}: {diagnostic['message']}", file=sys.stderr)
+        return 1
+    changed: list[Path] = []
+    for path in sorted(graph.programs):
+        source = path.read_text(encoding="utf-8-sig")
+        formatted = format_source(source)
+        if formatted == source:
+            continue
+        changed.append(path)
+        if not check:
+            path.write_text(formatted, encoding="utf-8")
+    for path in changed:
+        prefix = "needs formatting" if check else "formatted"
+        print(f"{prefix}: {graph.relative(path)}")
+    print(f"project format: {len(graph.programs)} module(s), {len(changed)} changed")
+    return 1 if check and changed else 0
 
 
 def run_repl(*, input_fn=input, output_fn=print) -> int:

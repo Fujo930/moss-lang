@@ -163,6 +163,8 @@ moss project-check --json <directory>
 moss project-info <directory>
 moss project-info --json <directory>
 moss project-lock <directory>
+moss project-format <directory>
+moss project-format --check <directory>
 moss project-run <directory>
 moss project-test <directory>
 moss project-init <directory> [--name <package-name>]
@@ -199,6 +201,9 @@ project.
 `moss project-lock` writes the current module graph and SHA-256 source hashes to
 `moss.lock`. Use `moss project-check --locked`, `moss project-run --locked`, or
 `moss project-test --locked` in CI when project drift must be explicit.
+
+`moss project-format` formats only modules reachable from the manifest entry.
+Its `--check` mode is a deterministic CI formatting gate.
 
 `moss format` normalizes block indentation, expression spacing, trailing
 whitespace, and the final newline while preserving strings and comments.

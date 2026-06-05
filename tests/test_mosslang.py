@@ -295,6 +295,32 @@ class MossLanguageTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("invalid lock file: expected an object with modules", output.getvalue())
 
+    def test_project_format_checks_and_writes_reachable_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "moss.toml").write_text(
+                '[package]\nname = "format"\nversion = "0.4.0"\nentry = "main.moss"\n',
+                encoding="utf-8",
+            )
+            main = root / "main.moss"
+            helper = root / "helper.moss"
+            unreachable = root / "unreachable.moss"
+            main.write_text('import "helper.moss"\nprint(greet())\n', encoding="utf-8")
+            helper.write_text('fn greet()->Text {\nreturn "hi"\n}\n', encoding="utf-8")
+            unreachable.write_text('fn untouched(){\nreturn\n}\n', encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                check_code = cli_main(["project-format", "--check", str(root)])
+                write_code = cli_main(["project-format", str(root)])
+                clean_code = cli_main(["project-format", "--check", str(root)])
+            helper_source = helper.read_text(encoding="utf-8")
+            unreachable_source = unreachable.read_text(encoding="utf-8")
+        self.assertEqual(check_code, 1)
+        self.assertEqual(write_code, 0)
+        self.assertEqual(clean_code, 0)
+        self.assertIn('  return "hi"', helper_source)
+        self.assertIn("return\n", unreachable_source)
+
     def test_multiline_repl_keeps_runtime_state(self) -> None:
         lines = iter(["fn double(value: Number) -> Number {", "return value * 2", "}", "", "print(double(4))"])
         output: list[str] = []

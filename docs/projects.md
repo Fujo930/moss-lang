@@ -36,6 +36,8 @@ moss project-info --json .
 moss project-check .
 moss project-check --json .
 moss project-lock .
+moss project-format .
+moss project-format --check .
 moss project-run .
 moss project-test .
 ```
@@ -47,6 +49,10 @@ project-boundary escapes, cycles, and cross-module declaration conflicts.
 
 `project-run` executes the entry module. `project-test` executes every test
 reachable through its imports.
+
+`project-format` formats the same reachable module set used by the other
+project commands. Unreachable scratch files are left alone. `--check` reports
+drift without writing and is suitable for CI.
 
 ## Locked projects
 

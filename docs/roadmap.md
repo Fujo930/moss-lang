@@ -83,6 +83,7 @@ Make Moss feel like a language for real systems:
 - module imports with deterministic project graphs
 - package manifests with entry modules and source roots
 - project initialization, inspection, checking, running, and testing
+- reachable-module project formatting and CI format checks
 - project-wide checks for missing imports, cycles, and declaration conflicts
 - deterministic project lock files with module content hashes
 - schema migration declarations

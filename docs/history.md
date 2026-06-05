@@ -28,6 +28,10 @@ modules, import edges, and SHA-256 source hashes. Locked checks, runs, and tests
 fail on drift, giving both CI and AI agents a reliable boundary between
 inspection and execution.
 
+`moss project-format` applies the formatter to the same reachable module graph
+used by project checks, runs, and tests. Its check mode gives CI a formatting
+gate without modifying files or sweeping unrelated scratch modules.
+
 The first 0.4 data adapter adds `jsonParse` and `jsonStringify`. Parsed JSON
 numbers retain Moss `Number` behavior, object output is deterministically
 sorted, malformed input reports its line and column, and unsupported runtime
