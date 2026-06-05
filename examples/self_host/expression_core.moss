@@ -1,0 +1,132 @@
+import "examples/self_host/lexer_core.moss"
+
+type MossExpr =
+  kind: Text
+  value: Text
+  left: Any
+  right: Any
+
+type ExprParseState =
+  tokens: List<MossToken>
+  index: Number
+  errors: List<Text>
+
+type ExprParseResult =
+  state: ExprParseState
+  expr: MossExpr
+
+fn expr(kind: Text, value: Text, left, right) -> MossExpr {
+  return { kind: kind, value: value, left: left, right: right }
+}
+
+fn missingExpr() -> MossExpr {
+  return expr("Missing", "", null, null)
+}
+
+fn exprState(tokens: List<MossToken>) -> ExprParseState {
+  return { tokens: tokens, index: 0, errors: [] }
+}
+
+fn exprCurrent(state: ExprParseState) -> MossToken {
+  return listGet(state.tokens, state.index, token("EOF", "", 0, 0))
+}
+
+fn exprAdvance(state: ExprParseState) -> ExprParseState {
+  return state with index = state.index + 1
+}
+
+fn exprError(state: ExprParseState, message: Text) -> ExprParseState {
+  return state with errors = listPush(state.errors, message)
+}
+
+fn exprResult(state: ExprParseState, value: MossExpr) -> ExprParseResult {
+  return { state: state, expr: value }
+}
+
+fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
+  item = exprCurrent(state)
+
+  if item.kind == "NUMBER" {
+    return exprResult(exprAdvance(state), expr("Number", item.value, null, null))
+  }
+  if item.kind == "STRING" {
+    return exprResult(exprAdvance(state), expr("Text", item.value, null, null))
+  }
+  if item.kind == "IDENT" {
+    return exprResult(exprAdvance(state), expr("Identifier", item.value, null, null))
+  }
+  if item.value == "(" {
+    nested = parseEqualityExpr(exprAdvance(state))
+    if exprCurrent(nested.state).value != ")" {
+      failed = exprError(nested.state, "expected ) after expression")
+      return exprResult(failed, nested.expr)
+    }
+    return exprResult(exprAdvance(nested.state), nested.expr)
+  }
+
+  failed = exprError(state, "expected expression")
+  return exprResult(exprAdvance(failed), missingExpr())
+}
+
+fn parseUnaryExpr(state: ExprParseState) -> ExprParseResult {
+  item = exprCurrent(state)
+  if item.value == "not" or item.value == "-" {
+    right = parseUnaryExpr(exprAdvance(state))
+    return exprResult(right.state, expr("Unary", item.value, null, right.expr))
+  }
+  return parsePrimaryExpr(state)
+}
+
+fn parseFactorExpr(state: ExprParseState) -> ExprParseResult {
+  result = parseUnaryExpr(state)
+
+  while exprCurrent(result.state).value == "*" or exprCurrent(result.state).value == "/" {
+    operator = exprCurrent(result.state).value
+    right = parseUnaryExpr(exprAdvance(result.state))
+    result = exprResult(right.state, expr("Binary", operator, result.expr, right.expr))
+  }
+
+  return result
+}
+
+fn parseTermExpr(state: ExprParseState) -> ExprParseResult {
+  result = parseFactorExpr(state)
+
+  while exprCurrent(result.state).value == "+" or exprCurrent(result.state).value == "-" {
+    operator = exprCurrent(result.state).value
+    right = parseFactorExpr(exprAdvance(result.state))
+    result = exprResult(right.state, expr("Binary", operator, result.expr, right.expr))
+  }
+
+  return result
+}
+
+fn parseComparisonExpr(state: ExprParseState) -> ExprParseResult {
+  result = parseTermExpr(state)
+  operator = exprCurrent(result.state).value
+
+  while operator == "<" or operator == "<=" or operator == ">" or operator == ">=" {
+    right = parseTermExpr(exprAdvance(result.state))
+    result = exprResult(right.state, expr("Binary", operator, result.expr, right.expr))
+    operator = exprCurrent(result.state).value
+  }
+
+  return result
+}
+
+fn parseEqualityExpr(state: ExprParseState) -> ExprParseResult {
+  result = parseComparisonExpr(state)
+  operator = exprCurrent(result.state).value
+
+  while operator == "==" or operator == "!=" {
+    right = parseComparisonExpr(exprAdvance(result.state))
+    result = exprResult(right.state, expr("Binary", operator, result.expr, right.expr))
+    operator = exprCurrent(result.state).value
+  }
+
+  return result
+}
+
+fn parseExpressionSource(source: Text) -> ExprParseResult {
+  return parseEqualityExpr(exprState(sketchTokens(source)))
+}

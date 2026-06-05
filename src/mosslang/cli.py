@@ -108,6 +108,7 @@ def summarize(program):
 def run_selfhost_checks(quick: bool = False) -> int:
     paths = [
         Path("examples/self_host/tokenizer_sketch.moss"),
+        Path("examples/self_host/expression_sketch.moss"),
         Path("examples/self_host/parser_sketch.moss"),
         Path("examples/self_host/checker_sketch.moss"),
     ]

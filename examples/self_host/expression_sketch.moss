@@ -1,0 +1,26 @@
+import "examples/self_host/expression_core.moss"
+
+let parsed = parseExpressionSource("1 + 2 * 3 == 7")
+
+print("expression kind:", parsed.expr.kind)
+print("expression operator:", parsed.expr.value)
+print("expression errors:", len(parsed.state.errors))
+
+test "expression sketch builds structured precedence tree" {
+  assert(len(parsed.state.errors) == 0, "expression should parse")
+  assert(parsed.expr.kind == "Binary", "root should be binary")
+  assert(parsed.expr.value == "==", "equality should be root")
+  assert(parsed.expr.left.value == "+", "addition should be below equality")
+  assert(parsed.expr.left.right.value == "*", "multiplication should bind tighter")
+
+  grouped = parseExpressionSource("(1 + 2) * 3")
+  assert(grouped.expr.value == "*", "multiplication should be root after grouping")
+  assert(grouped.expr.left.value == "+", "grouped addition should stay together")
+
+  unary = parseExpressionSource("not ready")
+  assert(unary.expr.kind == "Unary", "not should produce unary expression")
+  assert(unary.expr.right.value == "ready", "unary operand should be captured")
+
+  broken = parseExpressionSource("(1 + 2")
+  assert(len(broken.state.errors) == 1, "missing closing paren should be reported")
+}

@@ -268,7 +268,7 @@ fn checkProgramNodesWithTypes(nodes: List<MossNode>, types: Map<Text, Bool>) -> 
   counts = countByKind(nodes)
   effects = effectNames(nodes)
 
-  if mapGet(counts, "Function", 0) == 0 and mapGet(counts, "Rule", 0) == 0 {
+  if mapGet(counts, "Function", 0) == 0 and mapGet(counts, "Rule", 0) == 0 and mapGet(counts, "Test", 0) == 0 {
     result = addWarning(result, "program has no callable declarations")
   }
 

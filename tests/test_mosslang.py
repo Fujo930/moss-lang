@@ -29,6 +29,7 @@ class MossLanguageTests(unittest.TestCase):
         self.assertEqual(code, 0)
         text = output.getvalue()
         self.assertIn("PASS examples\\self_host\\tokenizer_sketch.moss", text.replace("/", "\\"))
+        self.assertIn("PASS examples\\self_host\\expression_sketch.moss", text.replace("/", "\\"))
         self.assertIn("PASS examples\\self_host\\parser_sketch.moss", text.replace("/", "\\"))
         self.assertIn("PASS examples\\self_host\\checker_sketch.moss", text.replace("/", "\\"))
 
