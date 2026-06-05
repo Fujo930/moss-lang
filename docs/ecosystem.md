@@ -55,6 +55,17 @@ Before a public package registry, Moss needs:
 
 A registry arrives only after Moss can make meaningful compatibility promises.
 
+## Moss Grove
+
+After language stabilization, Moss will grow a separate open-source editor
+ecosystem through Moss Grove. Grove will live in the public `moss-grove`
+repository, use Moss for its application logic, and expose a stable plugin API.
+It complements Studio and the VS Code extension rather than replacing them.
+
+Grove is also an adoption test: a language intended for long-lived human/AI
+projects must be able to maintain its own substantial native development
+environment.
+
 ## Success measures
 
 - time from discovery to first successful Moss run
@@ -63,3 +74,4 @@ A registry arrives only after Moss can make meaningful compatibility promises.
 - issues, discussions, and merged external contributions
 - users returning after their first experiment
 - active compiler stages implemented in Moss
+- developers using Moss Grove to maintain Moss and external Moss projects

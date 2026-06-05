@@ -157,10 +157,13 @@ Let projects safely reuse Moss and host-language libraries:
 - Python functions, selected classes, async calls, and exception mapping
 - typed Node/JavaScript bindings under an explicit `JavaScript` effect
 - extension protocol for future host-language adapters
+- design the native window, rendering, input, editor, and extension APIs needed
+  by Moss Grove
 
 Python is the first official FFI because the current runtime can integrate it
 with the smallest trusted boundary. Node follows after the binding model is
-proven.
+proven. Moss Grove begins as a separate public repository during this milestone
+once those native API contracts have an executable foundation.
 
 ## Version 0.9: language stabilization
 
@@ -169,13 +172,45 @@ proven.
 - make the self-host frontend the default
 - improve performance, security boundaries, sandboxing, and benchmarks
 - validate Moss with larger projects maintained by multiple contributors
+- use an early Moss Grove build while developing and stabilizing Moss
+
+## Version 0.10: Moss Grove
+
+Build and release a Moss-native development environment as an independent,
+public, MIT-licensed open-source project:
+
+- repository: `Fujo930/moss-grove`
+- editor core, project model, commands, and extension host written in Moss
+- small C platform layer for native windows, rendering, input, file watching,
+  clipboard, process launching, and operating-system integration
+- no required browser, Node, Electron, or Python runtime
+- multi-file editing, tabs, project tree, global search, command palette, and
+  workspace restore
+- diagnostics, completion, hover, definition, references, rename, formatting,
+  tests, debugging, and source-mapped rule traces
+- visual effect, type, module-dependency, and call graphs
+- self-host compiler status and differential-test views
+- Python and Node binding inspection
+- stable plugin API with structured commands that humans and AI agents can use
+
+Studio remains the lightweight browser playground, and the VS Code extension
+remains the lowest-friction integration for existing users. Grove is the
+complete Moss-native environment and a serious proof that Moss can maintain a
+large, long-lived application.
+
+Grove belongs in its own repository so its release cadence, issues, extensions,
+and contributors can grow independently from the compiler. The `moss-lang`
+repository owns language, compiler, VM, LSP, and shared protocol contracts;
+`moss-grove` owns the native editor product.
 
 ## Version 1.0: trustworthy commitment
 
 Release 1.0 only after the core language is stable, the self-host compiler path
 is reliable, installation works across supported platforms, compatibility
 policy is enforceable, and people outside this repository have completed real
-projects with Moss.
+projects with Moss. Moss Grove must also demonstrate that Moss can sustain a
+substantial native application. If these criteria are not met after 0.10,
+development continues through later `0.x` releases instead of forcing 1.0.
 
 ## Adoption and ecosystem strategy
 

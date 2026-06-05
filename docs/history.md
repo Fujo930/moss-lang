@@ -35,6 +35,14 @@ Why it matters: future development has a clear order. Moss can reuse mature
 ecosystems before recreating them, while avoiding an unrestricted FFI that
 would erase the language properties it is trying to establish.
 
+The roadmap also reserves version 0.10 for Moss Grove, an independent,
+MIT-licensed open-source native editor whose application logic will be written
+in Moss. Grove will be created as a public `moss-grove` repository when native
+UI and editor contracts begin to exist during 0.8.
+
+Why it matters: Grove gives Moss a demanding long-lived application of its own,
+without coupling the compiler repository to an editor product's release cycle.
+
 ## 0.4.0-alpha project foundation
 
 Moss now supports `moss.toml` package manifests, deterministic reachable import

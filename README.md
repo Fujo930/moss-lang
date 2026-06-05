@@ -275,6 +275,7 @@ See `docs/language.md` for the current language surface,
 `docs/studio.md` for the browser editor,
 `docs/tooling.md` for editor and developer tooling,
 `docs/ecosystem.md` for adoption and external-language compatibility strategy,
+`docs/grove.md` for the planned Moss-native open-source editor,
 `docs/history.md` for a commit-by-commit feature guide, and
 `docs/roadmap.md` for the path from prototype to a serious implementation.
 See `docs/release-0.5.md` for the current release notes and packaging checklist,
