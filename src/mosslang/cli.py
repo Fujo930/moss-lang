@@ -15,6 +15,7 @@ from .checker import check_program
 from .errors import MossError
 from .nodes import FunctionDecl, RuleDecl, TypeDecl
 from .parser import parse_source
+from .project import build_project_graph, find_manifest, initialize_project, load_manifest
 from .runtime import Runtime
 from .tokens import tokenize
 
@@ -44,6 +45,20 @@ def main(argv: list[str] | None = None) -> int:
     project_cmd.add_argument("directory", type=Path)
     project_cmd.add_argument("--json", action="store_true", help="emit one structured project result")
 
+    project_run_cmd = sub.add_parser("project-run")
+    project_run_cmd.add_argument("directory", type=Path)
+
+    project_test_cmd = sub.add_parser("project-test")
+    project_test_cmd.add_argument("directory", type=Path)
+
+    project_info_cmd = sub.add_parser("project-info")
+    project_info_cmd.add_argument("directory", type=Path)
+    project_info_cmd.add_argument("--json", action="store_true", help="emit the deterministic import graph")
+
+    project_init_cmd = sub.add_parser("project-init")
+    project_init_cmd.add_argument("directory", type=Path)
+    project_init_cmd.add_argument("--name", help="package name; defaults to the directory name")
+
     sub.add_parser("repl", help="start an interactive multiline Moss session")
 
     studio_cmd = sub.add_parser("studio")
@@ -67,6 +82,18 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "project-check":
             return run_project_check(args.directory, json_output=args.json)
+
+        if args.command == "project-run":
+            return run_project_run(args.directory)
+
+        if args.command == "project-test":
+            return run_project_test(args.directory)
+
+        if args.command == "project-info":
+            return run_project_info(args.directory, json_output=args.json)
+
+        if args.command == "project-init":
+            return run_project_init(args.directory, name=args.name)
 
         if args.command == "repl":
             return run_repl()
@@ -148,6 +175,9 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as exc:
         print(f"moss: {exc}", file=sys.stderr)
         return 1
+    except ValueError as exc:
+        print(f"moss: {exc}", file=sys.stderr)
+        return 1
     except MossError as exc:
         if getattr(args, "command", None) == "check" and getattr(args, "json", False):
             location = getattr(exc, "location", None)
@@ -178,6 +208,9 @@ def diagnostic_json(diagnostic) -> dict:
 
 
 def run_project_check(directory: Path, *, json_output: bool = False) -> int:
+    manifest_path = find_manifest(directory)
+    if manifest_path is not None:
+        return run_manifest_project_check(manifest_path, json_output=json_output)
     paths = sorted(directory.rglob("*.moss"))
     results: list[dict] = []
     error_count = 0
@@ -222,6 +255,126 @@ def run_project_check(directory: Path, *, json_output: bool = False) -> int:
                 print(f"{result['file']}: {diagnostic['level']}: {location}{diagnostic['message']}")
         print(f"project: {len(paths)} file(s), {warning_count} warning(s), {error_count} error(s)")
     return 1 if error_count else 0
+
+
+def run_manifest_project_check(manifest_path: Path, *, json_output: bool = False) -> int:
+    manifest = load_manifest(manifest_path)
+    graph = build_project_graph(manifest)
+    results: list[dict] = []
+    diagnostics = list(graph.diagnostics)
+
+    for path in sorted(graph.programs):
+        program = graph.programs[path]
+        file_diagnostics = [diagnostic_json(item) for item in check_program(program)]
+        for item in file_diagnostics:
+            diagnostics.append({"file": graph.relative(path), **item})
+        results.append(
+            {
+                "file": graph.relative(path),
+                "ok": not any(item["level"] == "error" for item in file_diagnostics),
+                "diagnostics": file_diagnostics,
+                "summary": summarize(program),
+            }
+        )
+
+    package_diagnostics = [diagnostic_json(item) for item in check_program(graph.combined_program())]
+    diagnostics.extend({"file": "<package>", **item} for item in package_diagnostics)
+    error_count = sum(1 for item in diagnostics if item["level"] == "error")
+    warning_count = sum(1 for item in diagnostics if item["level"] == "warning")
+    payload = {
+        "ok": error_count == 0,
+        "package": graph.as_json()["package"],
+        "files": results,
+        "graph": graph.as_json()["modules"],
+        "diagnostics": diagnostics,
+        "summary": {"files": len(results), "errors": error_count, "warnings": warning_count},
+    }
+    if json_output:
+        print(json.dumps(payload))
+    else:
+        for diagnostic in diagnostics:
+            location = f"{diagnostic.get('line')}:{diagnostic.get('column')}: " if diagnostic.get("line") else ""
+            print(f"{diagnostic['file']}: {diagnostic['level']}: {location}{diagnostic['message']}")
+        print(
+            f"project {manifest.name} {manifest.version}: "
+            f"{len(results)} module(s), {warning_count} warning(s), {error_count} error(s)"
+        )
+    return 1 if error_count else 0
+
+
+def run_project_info(directory: Path, *, json_output: bool = False) -> int:
+    manifest_path = find_manifest(directory)
+    if manifest_path is None:
+        raise ValueError(f"no moss.toml found from {directory}")
+    graph = build_project_graph(load_manifest(manifest_path))
+    payload = graph.as_json()
+    if json_output:
+        print(json.dumps(payload))
+    else:
+        package = payload["package"]
+        print(f"{package['name']} {package['version']} ({package['entry']})")
+        for module in payload["modules"]:
+            dependencies = ", ".join(module["imports"]) or "-"
+            print(f"  {module['path']} -> {dependencies}")
+        for diagnostic in payload["diagnostics"]:
+            print(f"{diagnostic['file']}: {diagnostic['level']}: {diagnostic['message']}")
+    return 1 if any(item["level"] == "error" for item in graph.diagnostics) else 0
+
+
+def run_project_run(directory: Path) -> int:
+    manifest_path = find_manifest(directory)
+    if manifest_path is None:
+        raise ValueError(f"no moss.toml found from {directory}")
+    manifest = load_manifest(manifest_path)
+    graph = build_project_graph(manifest)
+    if graph.diagnostics:
+        for diagnostic in graph.diagnostics:
+            print(f"{diagnostic['file']}: {diagnostic['level']}: {diagnostic['message']}", file=sys.stderr)
+        return 1
+    program = graph.programs[manifest.entry]
+    diagnostics = check_program(graph.combined_program())
+    errors = [item for item in diagnostics if item.level == "error"]
+    if errors:
+        for diagnostic in diagnostics:
+            print(diagnostic.format(), file=sys.stderr)
+        return 1
+    Runtime(base_path=manifest.entry.parent, import_paths=[*manifest.source_roots, manifest.root]).run(program)
+    return 0
+
+
+def run_project_test(directory: Path) -> int:
+    manifest_path = find_manifest(directory)
+    if manifest_path is None:
+        raise ValueError(f"no moss.toml found from {directory}")
+    manifest = load_manifest(manifest_path)
+    graph = build_project_graph(manifest)
+    if graph.diagnostics:
+        for diagnostic in graph.diagnostics:
+            print(f"{diagnostic['file']}: {diagnostic['level']}: {diagnostic['message']}", file=sys.stderr)
+        return 1
+    diagnostics = check_program(graph.combined_program())
+    errors = [item for item in diagnostics if item.level == "error"]
+    if errors:
+        for diagnostic in diagnostics:
+            print(diagnostic.format(), file=sys.stderr)
+        return 1
+    runtime = Runtime(base_path=manifest.entry.parent, import_paths=[*manifest.source_roots, manifest.root])
+    results = runtime.run_tests(graph.programs[manifest.entry])
+    for result in results:
+        marker = "PASS" if result["status"] == "pass" else "FAIL"
+        detail = f": {result['message']}" if result["message"] else ""
+        print(f"{marker} {result['name']}{detail}")
+    failed = sum(1 for result in results if result["status"] == "fail")
+    print(f"{len(results) - failed}/{len(results)} project tests passed")
+    return 1 if failed else 0
+
+
+def run_project_init(directory: Path, *, name: str | None = None) -> int:
+    package_name = name or directory.resolve().name
+    manifest = initialize_project(directory, package_name)
+    print(f"created {manifest.name} at {manifest.root}")
+    print(f"entry: {manifest.entry.relative_to(manifest.root).as_posix()}")
+    return 0
 
 
 def run_repl(*, input_fn=input, output_fn=print) -> int:

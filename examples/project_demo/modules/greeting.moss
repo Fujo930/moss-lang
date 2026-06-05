@@ -1,0 +1,3 @@
+fn greeting(name: Text) -> Text {
+  return "Hello, " + name
+}

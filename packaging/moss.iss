@@ -1,5 +1,5 @@
 #define AppName "Moss"
-#define AppVersion "0.3.0-alpha"
+#define AppVersion "0.4.0-alpha"
 #define AppPublisher "Codex and Fujo930"
 
 [Setup]
@@ -10,7 +10,7 @@ AppPublisher={#AppPublisher}
 DefaultDirName={localappdata}\Programs\Moss
 DefaultGroupName=Moss
 OutputDir=..\installer
-OutputBaseFilename=Moss-0.3.0-alpha-Windows-Setup
+OutputBaseFilename=Moss-0.4.0-alpha-Windows-Setup
 SetupIconFile=moss.ico
 UninstallDisplayIcon={app}\Moss Studio.exe
 PrivilegesRequired=lowest

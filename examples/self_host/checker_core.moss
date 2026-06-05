@@ -12,7 +12,7 @@ fn addWarning(result, message: Text) -> Any {
   return result with warnings = listPush(result.warnings, message)
 }
 
-fn addError(result, message: Text) -> Any {
+fn addCheckError(result, message: Text) -> Any {
   return result with errors = listPush(result.errors, message)
 }
 
@@ -180,7 +180,7 @@ fn checkDuplicateKind(nodes: List < MossNode >, kind: Text, result: CheckResult)
   duplicates = duplicateNames(nodes, kind)
 
   for name in duplicates {
-    result = addError(result, "duplicate " + kind + " " + name)
+    result = addCheckError(result, "duplicate " + kind + " " + name)
   }
 
   return result
@@ -190,7 +190,7 @@ fn checkDuplicateImport(nodes: List < MossNode >, result: CheckResult) -> CheckR
   duplicates = duplicateValues(nodes, "Import")
 
   for path in duplicates {
-    result = addError(result, "duplicate Import " + path)
+    result = addCheckError(result, "duplicate Import " + path)
   }
 
   return result
@@ -201,7 +201,7 @@ fn checkTypeText(owner: Text, typeText: Text, types: Map < Text, Bool >, result:
     for piece in textSplit(textReplace(textReplace(textReplace(typeText, "<", " "), ">", " "), ",", " "), " ") {
       clean = textTrim(piece)
       if isTypeToken(clean) and not mapHas(types, clean) {
-        result = addError(result, owner + " uses unknown type " + clean)
+        result = addCheckError(result, owner + " uses unknown type " + clean)
       }
     }
   }
@@ -279,13 +279,13 @@ fn checkProgramNodesWithTypes(nodes: List < MossNode >, types: Map < Text, Bool 
   result = checkDuplicateKind(nodes, "Test", result)
   result = checkDuplicateImport(nodes, result)
   for effect in duplicateEffectNames(nodes) {
-    result = addError(result, "duplicate Effect " + effect)
+    result = addCheckError(result, "duplicate Effect " + effect)
   }
 
   for item in nodes {
     if item.kind == "Type" {
       for field in duplicateTypeFields(item) {
-        result = addError(result, item.name + " has duplicate field " + field)
+        result = addCheckError(result, item.name + " has duplicate field " + field)
       }
       result = checkFieldTypes(item, types, result)
     }
@@ -303,7 +303,7 @@ fn checkProgramNodesWithTypes(nodes: List < MossNode >, types: Map < Text, Bool 
       }
       for effect in usesEffects(item) {
         if not mapHas(effects, effect) {
-          result = addError(result, item.name + " uses undeclared effect " + effect)
+          result = addCheckError(result, item.name + " uses undeclared effect " + effect)
         }
       }
     }

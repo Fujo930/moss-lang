@@ -8,6 +8,21 @@ documented, committed, and pushed the current language prototype in
 collaboration with Fujo930. This history is intentionally part development log,
 part memory for future AI agents and human contributors.
 
+## 0.4.0-alpha project foundation
+
+Moss now supports `moss.toml` package manifests, deterministic reachable import
+graphs, declared source roots, and project initialization, inspection,
+checking, running, and testing commands. Project checks reject missing imports,
+project-boundary escapes, cycles, and cross-module declaration conflicts.
+
+The repository root is now a Moss project whose entry is the Moss-written
+self-host project checker. The first project-wide check exposed and fixed a
+real duplicate global helper in the self-host frontend.
+
+Why it matters: Moss can now reason about a codebase as a project rather than
+as isolated files, and its own Moss-written compiler work is the first real
+consumer of that model.
+
 ## 0.3.0-alpha static confidence
 
 The static checker now merges local types learned independently by both sides

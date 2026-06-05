@@ -1,0 +1,7 @@
+[package]
+name = "moss-self-host"
+version = "0.4.0-alpha"
+entry = "examples/self_host/project_check.moss"
+
+[paths]
+source = ["."]

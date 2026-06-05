@@ -80,12 +80,18 @@ product-engineering track or the longer self-hosting replacement track.
 
 Make Moss feel like a language for real systems:
 
-- module imports
-- package manifests
+- module imports with deterministic project graphs
+- package manifests with entry modules and source roots
+- project initialization, inspection, checking, running, and testing
+- project-wide checks for missing imports, cycles, and declaration conflicts
 - schema migration declarations
 - effect definitions with custom capabilities
 - JSON and HTTP adapters
 - source maps for rule evaluation traces
+
+The manifest and project-command foundation is implemented. The remaining 0.4
+work focuses on stronger module boundaries, external package dependencies,
+migrations, custom capability implementations, adapters, and traces.
 
 ## Version 0.5: editor and playground
 

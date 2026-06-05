@@ -173,7 +173,12 @@ class UserFunction:
 
 
 class Runtime:
-    def __init__(self, output: Callable[[str], None] | None = None, base_path: str | Path | None = None):
+    def __init__(
+        self,
+        output: Callable[[str], None] | None = None,
+        base_path: str | Path | None = None,
+        import_paths: list[str | Path] | None = None,
+    ):
         self.effects: set[str] = set()
         self.types: dict[str, TypeDecl] = {}
         self.globals = Environment()
@@ -182,6 +187,7 @@ class Runtime:
         self.effect_stack: list[set[str]] = []
         self.base_path = Path(base_path) if base_path is not None else Path.cwd()
         self.import_root = self.base_path
+        self.import_paths = [Path(path) for path in import_paths or []]
         self.imported_paths: set[Path] = set()
         self.install_builtins()
         self.tests: list[TestDecl] = []
@@ -276,7 +282,11 @@ class Runtime:
 
     def resolve_import_path(self, import_path: str) -> Path:
         path = Path(import_path)
-        candidates = [path] if path.is_absolute() else [self.base_path / path, self.import_root / path, Path.cwd() / path]
+        candidates = (
+            [path]
+            if path.is_absolute()
+            else [self.base_path / path, *(root / path for root in self.import_paths), self.import_root / path, Path.cwd() / path]
+        )
         for candidate in candidates:
             if candidate.exists():
                 return candidate.resolve()

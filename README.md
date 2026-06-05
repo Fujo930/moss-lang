@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
-![Version: 0.3.0-alpha](https://img.shields.io/badge/version-0.3.0--alpha-4f7edb)
+![Version: 0.4.0-alpha](https://img.shields.io/badge/version-0.4.0--alpha-4f7edb)
 ![Built by Codex](https://img.shields.io/badge/built%20by-Codex-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -17,9 +17,10 @@ debugged, documented, committed, and pushed by Codex in collaboration with
 Fujo930. The project is public as a record of that process and as a runnable
 language prototype.
 
-Version `0.3.0-alpha` completes the static-confidence roadmap. Moss is not fully
-self-hosted yet, but its Moss-written frontend is recursively compared with the
-Python host frontend across the bundled examples.
+Version `0.4.0-alpha` begins the product-engineering roadmap with project
+manifests, deterministic module graphs, project-wide checking, and project
+commands. Moss is not fully self-hosted yet, but its Moss-written frontend is
+now declared, checked, and tested as a Moss project.
 
 The branching M is Moss's language mark: two contributors meeting in a shared
 syntax tree. See `docs/identity.md` for the public description and identity
@@ -88,6 +89,9 @@ The package exposes a console command named `moss`.
 - `FileSystem` effect builtins: `readText`, `writeText`, `fileExists`, and
   `listFiles`
 - top-level `import "path.moss"` declarations
+- `moss.toml` manifests, deterministic import graphs, and declared source roots
+- project initialization, inspection, checking, running, and testing commands
+- project-wide checks for missing imports, cycles, and declaration conflicts
 - self-hosting sketches with structured token records, reusable lexer/parser
   cores, structured expression and recursive control-flow statement AST nodes,
   a top-level declaration parser, and a first checker sketch:
@@ -152,6 +156,11 @@ moss check <file.moss>
 moss check --json <file.moss>
 moss project-check <directory>
 moss project-check --json <directory>
+moss project-info <directory>
+moss project-info --json <directory>
+moss project-run <directory>
+moss project-test <directory>
+moss project-init <directory> [--name <package-name>]
 moss run <file.moss>
 moss test <file.moss>
 moss tokens <file.moss>
@@ -172,6 +181,13 @@ locations, and a declaration summary for CI, editors, and AI agents.
 
 `moss project-check` recursively checks every `.moss` file in a directory and
 returns an aggregate project health result.
+When it finds a `moss.toml`, it follows the entry module's reachable import
+graph and performs an additional package-wide static check.
+
+`moss project-info` exposes the deterministic module graph for humans, CI, and
+AI agents. `moss project-run` and `moss project-test` run the manifest entry
+with its declared source roots. `moss project-init` creates a minimal runnable
+project.
 
 `moss format` normalizes block indentation, expression spacing, trailing
 whitespace, and the final newline while preserving strings and comments.
@@ -185,8 +201,8 @@ expression and match-pattern ASTs across all root example programs.
 
 ## Project status
 
-This is version `0.3.0-alpha`: a compact interpreter with real syntax, runtime
-semantics, static-confidence tooling, a browser editor, and a verified
+This is version `0.4.0-alpha`: a compact interpreter with real syntax, runtime
+semantics, project engineering tooling, a browser editor, and a verified
 Moss-written frontend.
 The repository is released under the MIT License.
 
@@ -197,14 +213,15 @@ Suitable claims:
 - Moss has begun self-hosting.
 - Moss is still alpha software and should not be described as fully self-hosted.
 
-The next useful steps belong to the 0.4 product-engineering and frontend
-replacement tracks.
+The current 0.4 work continues toward module boundaries, package dependencies,
+custom effects, adapters, traces, and frontend replacement.
 
 GitHub's language bar is powered by Linguist. `.moss` files are marked
 detectable in `.gitattributes`, but GitHub will only show `Moss` as a first-class
 language after Moss is accepted into the upstream Linguist language list.
 
 See `docs/language.md` for the current language surface,
+`docs/projects.md` for manifests and project commands,
 `docs/studio.md` for the browser editor,
 `docs/history.md` for a commit-by-commit feature guide, and
 `docs/roadmap.md` for the path from prototype to a serious implementation.

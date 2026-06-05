@@ -1,6 +1,6 @@
-Moss 0.3.0-alpha for Windows
+Moss 0.4.0-alpha for Windows
 
-Run Moss-0.3.0-alpha-Windows-Setup.exe to install the Moss compiler and Studio.
+Run Moss-0.4.0-alpha-Windows-Setup.exe to install the Moss compiler and Studio.
 
 Installed components:
 - moss.exe command-line compiler

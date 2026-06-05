@@ -88,6 +88,123 @@ class MossLanguageTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["files"], 2)
         self.assertEqual(payload["summary"]["errors"], 1)
 
+    def test_manifest_project_info_emits_deterministic_import_graph(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            code = cli_main(["project-info", "--json", "examples/project_demo"])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["package"]["name"], "moss-project-demo")
+        self.assertEqual(payload["package"]["entry"], "main.moss")
+        self.assertEqual(
+            payload["modules"],
+            [
+                {"path": "main.moss", "imports": ["modules/greeting.moss"]},
+                {"path": "modules/greeting.moss", "imports": []},
+            ],
+        )
+
+    def test_manifest_project_check_reports_missing_import(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "moss.toml").write_text(
+                '[package]\nname = "broken"\nversion = "0.4.0"\nentry = "main.moss"\n',
+                encoding="utf-8",
+            )
+            (root / "main.moss").write_text('import "missing.moss"\n', encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["project-check", "--json", str(root)])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 1)
+        self.assertIn("import not found: missing.moss", payload["diagnostics"][0]["message"])
+
+    def test_manifest_project_check_reports_import_cycle(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "moss.toml").write_text(
+                '[package]\nname = "cycle"\nversion = "0.4.0"\nentry = "a.moss"\n',
+                encoding="utf-8",
+            )
+            (root / "a.moss").write_text('import "b.moss"\n', encoding="utf-8")
+            (root / "b.moss").write_text('import "a.moss"\n', encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["project-check", "--json", str(root)])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 1)
+        self.assertIn("import cycle: a.moss -> b.moss -> a.moss", payload["diagnostics"][0]["message"])
+
+    def test_manifest_project_run_executes_entry(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            code = cli_main(["project-run", "examples/project_demo"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.getvalue().strip(), "Hello, Moss")
+
+    def test_manifest_project_test_runs_imported_tests(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "moss.toml").write_text(
+                '[package]\nname = "tested"\nversion = "0.4.0"\nentry = "main.moss"\n',
+                encoding="utf-8",
+            )
+            (root / "main.moss").write_text('import "helper.moss"\n', encoding="utf-8")
+            (root / "helper.moss").write_text('test "imported works" { assert(true, "works") }\n', encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["project-test", str(root)])
+        self.assertEqual(code, 0)
+        self.assertIn("PASS imported works", output.getvalue())
+        self.assertIn("1/1 project tests passed", output.getvalue())
+
+    def test_project_init_creates_runnable_manifest_project(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "new-project"
+            output = StringIO()
+            with redirect_stdout(output):
+                init_code = cli_main(["project-init", str(root), "--name", "new-moss-project"])
+                run_code = cli_main(["project-run", str(root)])
+            manifest = (root / "moss.toml").read_text(encoding="utf-8")
+        self.assertEqual(init_code, 0)
+        self.assertEqual(run_code, 0)
+        self.assertIn('name = "new-moss-project"', manifest)
+        self.assertIn("Hello from Moss", output.getvalue())
+
+    def test_manifest_project_check_detects_cross_module_duplicate_callable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "moss.toml").write_text(
+                '[package]\nname = "duplicates"\nversion = "0.4.0"\nentry = "main.moss"\n',
+                encoding="utf-8",
+            )
+            (root / "main.moss").write_text('import "helper.moss"\nfn shared() { print("main") }\n', encoding="utf-8")
+            (root / "helper.moss").write_text('fn shared() { print("helper") }\n', encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["project-check", "--json", str(root)])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 1)
+        self.assertTrue(any("duplicate callable 'shared'" in item["message"] for item in payload["diagnostics"]))
+
+    def test_manifest_project_run_uses_declared_source_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            (root / "lib").mkdir()
+            (root / "moss.toml").write_text(
+                '[package]\nname = "roots"\nversion = "0.4.0"\nentry = "src/main.moss"\n\n'
+                '[paths]\nsource = ["src", "lib"]\n',
+                encoding="utf-8",
+            )
+            (root / "src" / "main.moss").write_text('import "greeting.moss"\nprint(greeting())\n', encoding="utf-8")
+            (root / "lib" / "greeting.moss").write_text('fn greeting() -> Text { return "from lib" }\n', encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["project-run", str(root)])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.getvalue().strip(), "from lib")
+
     def test_multiline_repl_keeps_runtime_state(self) -> None:
         lines = iter(["fn double(value: Number) -> Number {", "return value * 2", "}", "", "print(double(4))"])
         output: list[str] = []

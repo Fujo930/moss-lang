@@ -13,7 +13,7 @@ The build creates:
 
 - `build/windows/moss/moss.exe`: standalone command-line compiler
 - `build/windows/moss/Moss Studio.exe`: desktop Studio launcher
-- `installer/Moss-0.3.0-alpha-Windows-Setup.exe`: Windows installer
+- `installer/Moss-0.4.0-alpha-Windows-Setup.exe`: Windows installer
 
 The installer places Moss under `%LOCALAPPDATA%\Programs\Moss`, can add the
 compiler to the user PATH, creates Start menu shortcuts, and registers a
