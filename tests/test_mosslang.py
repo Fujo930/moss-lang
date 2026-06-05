@@ -75,6 +75,19 @@ class MossLanguageTests(unittest.TestCase):
         self.assertEqual(payload["diagnostics"][0]["line"], 1)
         self.assertIsNone(payload["summary"])
 
+    def test_cli_project_check_json_aggregates_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "good.moss").write_text("fn good() -> Number {\n  return 1\n}\n", encoding="utf-8")
+            (root / "bad.moss").write_text("fn bad() uses Missing {\n  return 1\n}\n", encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["project-check", "--json", str(root)])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["summary"]["files"], 2)
+        self.assertEqual(payload["summary"]["errors"], 1)
+
     def test_cli_selfhost_compare_checks_recursive_body_structure(self) -> None:
         output = StringIO()
         with redirect_stdout(output):
@@ -270,6 +283,19 @@ fn work() -> Number {
         )
         diagnostics = check_program(program)
         self.assertTrue(any("assignment to total" in item.message for item in diagnostics))
+
+    def test_static_checker_allows_null_placeholder_to_narrow(self) -> None:
+        program = parse_source(
+            """
+fn work() -> List<Number> {
+  result = null
+  result = [1, 2]
+  return result
+}
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertFalse(any("assignment to result" in item.message for item in diagnostics))
 
     def test_static_checker_checks_call_argument_types(self) -> None:
         program = parse_source(

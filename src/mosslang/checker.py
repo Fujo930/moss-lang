@@ -144,8 +144,9 @@ def check_statement_types(
         elif isinstance(statement, AssignStmt):
             actual = infer_expr_type(statement.expr, env, functions, types, diagnostics, function.location)
             expected = env.get(statement.name, "Unknown")
-            report_mismatch(expected, actual, f"assignment to {statement.name}", diagnostics, function.location)
-            if expected == "Unknown":
+            if expected not in {"Unknown", "Null"}:
+                report_mismatch(expected, actual, f"assignment to {statement.name}", diagnostics, function.location)
+            if expected in {"Unknown", "Null"}:
                 env[statement.name] = actual
         elif isinstance(statement, ReturnStmt):
             actual = infer_expr_type(statement.expr, env, functions, types, diagnostics, function.location)

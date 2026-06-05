@@ -146,6 +146,8 @@ print("stored:", dbGet("A-100").status)
 ```powershell
 moss check <file.moss>
 moss check --json <file.moss>
+moss project-check <directory>
+moss project-check --json <directory>
 moss run <file.moss>
 moss test <file.moss>
 moss tokens <file.moss>
@@ -162,6 +164,9 @@ moss studio
 
 `moss check --json` emits stable machine-readable diagnostics, source
 locations, and a declaration summary for CI, editors, and AI agents.
+
+`moss project-check` recursively checks every `.moss` file in a directory and
+returns an aggregate project health result.
 
 `moss format` safely normalizes block indentation, trailing whitespace, and the
 final newline while preserving source tokens and comments. `--check` makes it

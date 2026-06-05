@@ -39,6 +39,10 @@ def main(argv: list[str] | None = None) -> int:
     compare_cmd = sub.add_parser("selfhost-compare")
     compare_cmd.add_argument("file", type=Path)
 
+    project_cmd = sub.add_parser("project-check")
+    project_cmd.add_argument("directory", type=Path)
+    project_cmd.add_argument("--json", action="store_true", help="emit one structured project result")
+
     studio_cmd = sub.add_parser("studio")
     studio_cmd.add_argument("--host", default="127.0.0.1")
     studio_cmd.add_argument("--port", type=int, default=8765)
@@ -57,6 +61,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "selfhost-compare":
             return run_selfhost_compare(args.file)
+
+        if args.command == "project-check":
+            return run_project_check(args.directory, json_output=args.json)
 
         source = args.file.read_text(encoding="utf-8")
         if args.command == "format":
@@ -162,6 +169,53 @@ def diagnostic_json(diagnostic) -> dict:
     if diagnostic.location is not None:
         result.update({"line": diagnostic.location.line, "column": diagnostic.location.column})
     return result
+
+
+def run_project_check(directory: Path, *, json_output: bool = False) -> int:
+    paths = sorted(directory.rglob("*.moss"))
+    results: list[dict] = []
+    error_count = 0
+    warning_count = 0
+
+    for path in paths:
+        try:
+            program = parse_source(path.read_text(encoding="utf-8-sig"))
+            diagnostics = check_program(program)
+            summary = summarize(program)
+        except MossError as exc:
+            location = getattr(exc, "location", None)
+            diagnostic = {"level": "error", "message": getattr(exc, "message", str(exc))}
+            if location is not None:
+                diagnostic.update({"line": location.line, "column": location.column})
+            diagnostics = []
+            result = {"file": str(path), "ok": False, "diagnostics": [diagnostic], "summary": None}
+        else:
+            result = {
+                "file": str(path),
+                "ok": not any(item.level == "error" for item in diagnostics),
+                "diagnostics": [diagnostic_json(item) for item in diagnostics],
+                "summary": summary,
+            }
+
+        error_count += sum(1 for item in result["diagnostics"] if item["level"] == "error")
+        warning_count += sum(1 for item in result["diagnostics"] if item["level"] == "warning")
+        results.append(result)
+
+    payload = {
+        "ok": error_count == 0,
+        "directory": str(directory),
+        "files": results,
+        "summary": {"files": len(paths), "errors": error_count, "warnings": warning_count},
+    }
+    if json_output:
+        print(json.dumps(payload))
+    else:
+        for result in results:
+            for diagnostic in result["diagnostics"]:
+                location = f"{diagnostic.get('line')}:{diagnostic.get('column')}: " if diagnostic.get("line") else ""
+                print(f"{result['file']}: {diagnostic['level']}: {location}{diagnostic['message']}")
+        print(f"project: {len(paths)} file(s), {warning_count} warning(s), {error_count} error(s)")
+    return 1 if error_count else 0
 
 
 def run_selfhost_checks(quick: bool = False) -> int:
