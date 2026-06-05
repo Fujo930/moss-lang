@@ -1,0 +1,28 @@
+import "examples/self_host/statement_core.moss"
+
+let parsed = parseStatementSource("let total = 1 + 2 * 3")
+
+print("statement kind:", parsed.stmt.kind)
+print("statement errors:", len(parsed.errors))
+
+test "statement sketch builds structured statements" {
+  assert(len(parsed.errors) == 0, "let statement should parse")
+  assert(parsed.stmt.kind == "Let", "let should produce let statement")
+  assert(parsed.stmt.name == "total", "let name should be captured")
+  assert(parsed.stmt.value.kind == "Binary", "let value should be structured")
+
+  assigned = parseStatementSource("total = total + 1")
+  assert(assigned.stmt.kind == "Assign", "assignment should be recognized")
+  assert(assigned.stmt.value.value == "+", "assignment expression should be parsed")
+
+  returned = parseStatementSource("return Ok(total)")
+  assert(returned.stmt.kind == "Return", "return should be recognized")
+  assert(returned.stmt.value.kind == "Call", "return value should be structured")
+
+  called = parseStatementSource("print(total)")
+  assert(called.stmt.kind == "Expr", "call should be an expression statement")
+  assert(called.stmt.value.kind == "Call", "expression statement should retain call")
+
+  broken = parseStatementSource("let = 1")
+  assert(len(broken.errors) == 1, "malformed let should report an error")
+}

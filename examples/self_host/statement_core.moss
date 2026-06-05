@@ -1,0 +1,57 @@
+import "examples/self_host/expression_core.moss"
+
+type MossStmt =
+  kind: Text
+  name: Text
+  value: Any
+
+type StmtParseResult =
+  stmt: MossStmt
+  errors: List<Text>
+
+fn stmt(kind: Text, name: Text, value) -> MossStmt {
+  return { kind: kind, name: name, value: value }
+}
+
+fn stmtResult(value: MossStmt, errors: List<Text>) -> StmtParseResult {
+  return { stmt: value, errors: errors }
+}
+
+fn parseStatementExpression(tokens: List<MossToken>, start: Number) -> ExprParseResult {
+  expressionTokens = listSlice(tokens, start, len(tokens))
+  return parseOrExpr(exprState(expressionTokens))
+}
+
+fn parseStatementTokens(tokens: List<MossToken>) -> StmtParseResult {
+  first = listGet(tokens, 0, token("EOF", "", 0, 0))
+  second = listGet(tokens, 1, token("EOF", "", 0, 0))
+  third = listGet(tokens, 2, token("EOF", "", 0, 0))
+
+  if first.value == "let" {
+    if second.kind != "IDENT" {
+      return stmtResult(stmt("Missing", "", null), ["expected name after let"])
+    }
+    if third.value != "=" {
+      return stmtResult(stmt("Missing", second.value, null), ["expected = after let name"])
+    }
+    parsed = parseStatementExpression(tokens, 3)
+    return stmtResult(stmt("Let", second.value, parsed.expr), parsed.state.errors)
+  }
+
+  if first.value == "return" {
+    parsed = parseStatementExpression(tokens, 1)
+    return stmtResult(stmt("Return", "", parsed.expr), parsed.state.errors)
+  }
+
+  if first.kind == "IDENT" and second.value == "=" {
+    parsed = parseStatementExpression(tokens, 2)
+    return stmtResult(stmt("Assign", first.value, parsed.expr), parsed.state.errors)
+  }
+
+  parsed = parseStatementExpression(tokens, 0)
+  return stmtResult(stmt("Expr", "", parsed.expr), parsed.state.errors)
+}
+
+fn parseStatementSource(source: Text) -> StmtParseResult {
+  return parseStatementTokens(sketchTokens(source))
+}
