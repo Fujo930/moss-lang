@@ -160,7 +160,9 @@ def run_selfhost_compare(path: Path) -> int:
 
 def compare_selfhost_file(path: Path) -> bool:
     source = path.read_text(encoding="utf-8")
-    host = summarize(parse_source(source))
+    host_program = parse_source(source)
+    host = summarize(host_program)
+    host_names = host_declaration_names(host_program)
 
     runtime = Runtime(base_path=Path.cwd())
     runtime.run(parse_source('import "examples/self_host/parser_core.moss"\n'))
@@ -175,6 +177,7 @@ def compare_selfhost_file(path: Path) -> bool:
         "callables": sum(1 for item in nodes if item["kind"] in {"Rule", "Function"}),
         "tests": sum(1 for item in nodes if item["kind"] == "Test"),
     }
+    selfhost_names = selfhost_declaration_names(nodes)
 
     print(f"{path}:")
     print(f"  host: {host}")
@@ -186,8 +189,40 @@ def compare_selfhost_file(path: Path) -> bool:
     if host != selfhost:
         print("  selfhost comparison failed")
         return False
+    if host_names != selfhost_names:
+        print(f"  host names: {host_names}")
+        print(f"  selfhost names: {selfhost_names}")
+        print("  selfhost declaration-name comparison failed")
+        return False
     print("  selfhost comparison passed")
     return True
+
+
+def host_declaration_names(program) -> dict[str, list[str]]:
+    result = {"imports": [], "types": [], "rules": [], "functions": [], "tests": []}
+    for item in program.items:
+        kind = item.__class__.__name__
+        if kind == "ImportDecl":
+            result["imports"].append(item.path)
+        elif kind == "TypeDecl":
+            result["types"].append(item.name)
+        elif kind == "RuleDecl":
+            result["rules"].append(item.name)
+        elif kind == "FunctionDecl":
+            result["functions"].append(item.name)
+        elif kind == "TestDecl":
+            result["tests"].append(item.name)
+    return {key: sorted(values) for key, values in result.items()}
+
+
+def selfhost_declaration_names(nodes: list[dict]) -> dict[str, list[str]]:
+    mapping = {"Import": "imports", "Type": "types", "Rule": "rules", "Function": "functions", "Test": "tests"}
+    result = {"imports": [], "types": [], "rules": [], "functions": [], "tests": []}
+    for item in nodes:
+        target = mapping.get(item["kind"])
+        if target is not None:
+            result[target].append(item["value"] if item["kind"] == "Import" else item["name"])
+    return {key: sorted(values) for key, values in result.items()}
 
 
 if __name__ == "__main__":
