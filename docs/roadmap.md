@@ -37,6 +37,8 @@ Implemented:
 - `moss selfhost --quick` for fast self-hosting smoke checks
 - `moss selfhost` for the full Moss-written self-host project check
 - Moss-written project checker with project-wide type-name collection
+- structured Moss-written expression and simple statement AST parsers
+- host/self-host declaration count and name comparison across bundled examples
 - self-host checker coverage for duplicate declarations, duplicate record
   fields, import paths, parse errors, undeclared effects, record field types,
   function parameter and return types, and rule parameter and return types
@@ -50,8 +52,8 @@ This version is public-ready as an alpha. It should be described as
 
 High-value next steps:
 
-- structured Moss AST nodes for expressions and statements
-- compare Moss-written frontend output against the Python host frontend
+- recursive control-flow and match AST nodes
+- compare complete Moss-written AST output against the Python host frontend
 - static type inference for local bindings
 - static field checks for records
 - exhaustive checks for union variants

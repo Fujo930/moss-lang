@@ -334,6 +334,10 @@ Moss frontend:
 - `token_tools.moss` defines structured token records
 - `lexer_core.moss` turns source text into tokens
 - `tokenizer_sketch.moss` runs the lexer against a Moss file
+- `expression_core.moss` parses structured expression AST nodes, including
+  precedence, calls, field/index access, lists, records, record updates, and `?`
+- `statement_core.moss` parses simple structured statements such as `let`,
+  assignment, `return`, expression statements, and `require`
 - `parser_core.moss` consumes those tokens into simple top-level AST nodes
 - `parser_sketch.moss` runs the parser against a Moss file
   and summarizes declarations such as `effect`, `type`, `rule`, `fn`, and `test`
@@ -351,6 +355,12 @@ Run the full self-hosting project check with:
 
 ```powershell
 moss selfhost
+```
+
+Compare the host parser and Moss-written parser across the bundled examples:
+
+```powershell
+moss selfhost-compare examples
 ```
 
 As of `0.2.0`, the Moss-written checker validates duplicate declarations,

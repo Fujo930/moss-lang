@@ -151,10 +151,25 @@ Why it matters: Moss is not fully self-hosted, but the repository now contains a
 working loop where Moss code reads and checks Moss code. That is the first real
 self-hosting foothold.
 
+## Structured self-host AST and comparison
+
+The Moss-written frontend now builds structured expression nodes for literals,
+operators, calls, field/index access, `?`, lists, records, and record updates.
+It also builds simple statement nodes for `let`, assignment, `return`, calls,
+and `require`, and attaches those nodes to parsed function bodies.
+
+`moss selfhost-compare examples` now compares declaration counts and names from
+the Python host parser and Moss-written parser across every bundled root
+example.
+
+Why it matters: self-hosting progress is no longer measured only by whether a
+sketch runs. The repository now has an executable equivalence gate that can be
+made stricter as the Moss AST grows.
+
 ## Current direction
 
 The next self-hosting milestones are:
 
-- parse real Moss expressions into structured AST nodes
-- compare Moss-written frontend output against the Python host frontend
+- parse recursive control flow and match expressions into structured AST nodes
+- compare full Moss-written AST output against the Python host frontend
 - gradually replace host pieces only after the Moss version is tested
