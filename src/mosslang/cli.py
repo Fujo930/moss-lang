@@ -149,6 +149,16 @@ def run_selfhost_checks(quick: bool = False) -> int:
 
 
 def run_selfhost_compare(path: Path) -> int:
+    paths = sorted(path.glob("*.moss")) if path.is_dir() else [path]
+    failed = 0
+
+    for source_path in paths:
+        if not compare_selfhost_file(source_path):
+            failed += 1
+    return 1 if failed else 0
+
+
+def compare_selfhost_file(path: Path) -> bool:
     source = path.read_text(encoding="utf-8")
     host = summarize(parse_source(source))
 
@@ -166,17 +176,18 @@ def run_selfhost_compare(path: Path) -> int:
         "tests": sum(1 for item in nodes if item["kind"] == "Test"),
     }
 
-    print(f"host: {host}")
-    print(f"selfhost: {selfhost}")
+    print(f"{path}:")
+    print(f"  host: {host}")
+    print(f"  selfhost: {selfhost}")
     if errors:
         for error in errors:
-            print(f"selfhost parse error: {error}")
-        return 1
+            print(f"  selfhost parse error: {error}")
+        return False
     if host != selfhost:
-        print("selfhost comparison failed")
-        return 1
-    print("selfhost comparison passed")
-    return 0
+        print("  selfhost comparison failed")
+        return False
+    print("  selfhost comparison passed")
+    return True
 
 
 if __name__ == "__main__":

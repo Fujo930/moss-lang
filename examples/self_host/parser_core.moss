@@ -302,7 +302,7 @@ fn parseStatement(state: ParseState) -> ParseState {
     return parseLet(state)
   }
 
-  if item.kind == "IDENT" and (item.value == "if" or item.value == "for" or item.value == "while") {
+  if item.kind == "IDENT" and (item.value == "if" or item.value == "for" or item.value == "while" or item.value == "match") {
     return advanceToNextLine(state)
   }
 
