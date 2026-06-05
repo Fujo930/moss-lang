@@ -1,6 +1,6 @@
 effect FileSystem
 
-fn countCodeLines(path: Text) -> Result<Number, Text> uses FileSystem {
+fn countCodeLines(path: Text) -> Result < Number, Text > uses FileSystem {
   source = readText(path)
   lines = textSplit(source, "\n")
   count = 0

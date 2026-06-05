@@ -3,13 +3,13 @@ effect Database
 rule canShip(order) =
   order.status == Paid and order.total > 0.usd
 
-fn ship(order) -> Result<Order, ShipError> uses Database {
+fn ship(order) -> Result < Order, ShipError > uses Database {
   require canShip(order)
     else ShipError.NotReady(order.status)
 
   return Ok(order with status = Shipped)
 }
 
-let draft = { id: "A-101", status: Pending, total: 42.usd }
+let draft = { id: "A-101", status: Pending, total: 42.usd}
 let result = ship(draft)
 print(result)

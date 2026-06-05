@@ -10,13 +10,13 @@ fn appendProjectWarning(result, path: Text, message: Text) -> Any {
   return result with warnings = listPush(result.warnings, path + ": " + message)
 }
 
-fn checkSelfHostFile(path: Text) -> Result<CheckResult, Text> uses FileSystem {
+fn checkSelfHostFile(path: Text) -> Result < CheckResult, Text > uses FileSystem {
   source = readText(path)
   parsed = parseProgram(sketchTokens(source))
   return Ok(checkParseState(parsed))
 }
 
-fn checkSelfHostDirectory(path: Text) -> Result<CheckResult, Text> uses FileSystem {
+fn checkSelfHostDirectory(path: Text) -> Result < CheckResult, Text > uses FileSystem {
   result = emptyCheckResult()
   parsedFiles = []
   projectTypes = builtInTypeNames()
@@ -25,7 +25,7 @@ fn checkSelfHostDirectory(path: Text) -> Result<CheckResult, Text> uses FileSyst
     if textEndsWith(file, ".moss") {
       source = readText(file)
       parsed = parseProgram(sketchTokens(source))
-      parsedFiles = listPush(parsedFiles, { path: file, state: parsed })
+      parsedFiles = listPush(parsedFiles, { path: file, state: parsed})
       projectTypes = addTypeNames(projectTypes, parsed.nodes)
     }
   }
@@ -46,7 +46,7 @@ fn checkSelfHostDirectory(path: Text) -> Result<CheckResult, Text> uses FileSyst
   return Ok(result)
 }
 
-fn checkSelfHostDirectorySlow(path: Text) -> Result<CheckResult, Text> uses FileSystem {
+fn checkSelfHostDirectorySlow(path: Text) -> Result < CheckResult, Text > uses FileSystem {
   result = emptyCheckResult()
 
   for file in listFiles(path) {
@@ -76,18 +76,18 @@ test "self-host project files check cleanly" {
   assert(len(checked.errors) == 0, "self-host project should have no checker errors")
 
   tokenFile = parseProgram(sketchTokens(textJoin([
-    "type SharedToken =\n",
-    "  kind: Text\n",
-    "fn make() -> Text {\n",
-    "  return \"ok\"\n",
-    "}\n",
+  "type SharedToken =\n",
+  "  kind: Text\n",
+  "fn make() -> Text {\n",
+  "  return \"ok\"\n",
+  "}\n",
   ])))
   parserFile = parseProgram(sketchTokens(textJoin([
-    "type ParserState =\n",
-    "  token: SharedToken\n",
-    "fn parse() -> Text {\n",
-    "  return \"ok\"\n",
-    "}\n",
+  "type ParserState =\n",
+  "  token: SharedToken\n",
+  "fn parse() -> Text {\n",
+  "  return \"ok\"\n",
+  "}\n",
   ])))
   localCheck = checkProgramNodes(parserFile.nodes)
   assert(len(localCheck.errors) == 1, "local check should not know imported types")

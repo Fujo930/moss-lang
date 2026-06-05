@@ -7,9 +7,9 @@ type MossExpr =
   right: Any
 
 type ExprParseState =
-  tokens: List<MossToken>
+  tokens: List < MossToken >
   index: Number
-  errors: List<Text>
+  errors: List < Text >
 
 type ExprParseResult =
   state: ExprParseState
@@ -17,18 +17,18 @@ type ExprParseResult =
 
 type ExprListParseResult =
   state: ExprParseState
-  items: List<Any>
+  items: List < Any >
 
 fn expr(kind: Text, value: Text, left, right) -> MossExpr {
-  return { kind: kind, value: value, left: left, right: right }
+  return { kind: kind, value: value, left: left, right: right}
 }
 
 fn missingExpr() -> MossExpr {
   return expr("Missing", "", null, null)
 }
 
-fn exprState(tokens: List<MossToken>) -> ExprParseState {
-  return { tokens: tokens, index: 0, errors: [] }
+fn exprState(tokens: List < MossToken >) -> ExprParseState {
+  return { tokens: tokens, index: 0, errors: []}
 }
 
 fn exprCurrent(state: ExprParseState) -> MossToken {
@@ -44,11 +44,11 @@ fn exprError(state: ExprParseState, message: Text) -> ExprParseState {
 }
 
 fn exprResult(state: ExprParseState, value: MossExpr) -> ExprParseResult {
-  return { state: state, expr: value }
+  return { state: state, expr: value}
 }
 
-fn exprListResult(state: ExprParseState, items: List<Any>) -> ExprListParseResult {
-  return { state: state, items: items }
+fn exprListResult(state: ExprParseState, items: List < Any >) -> ExprListParseResult {
+  return { state: state, items: items}
 }
 
 fn parseListExpr(state: ExprParseState) -> ExprParseResult {
@@ -183,7 +183,7 @@ fn parseMatchExpr(state: ExprParseState) -> ExprParseResult {
       return exprResult(exprError(state, "expected -> after match pattern"), expr("Match", "", subject.expr, cases))
     }
     value = parseUpdateExpr(exprAdvance(state))
-    cases = listPush(cases, { pattern: pattern.expr, expression: value.expr })
+    cases = listPush(cases, { pattern: pattern.expr, expression: value.expr})
     state = value.state
     if exprCurrent(state).value == "," or exprCurrent(state).value == ";" {
       state = exprAdvance(state)
@@ -428,7 +428,7 @@ fn parseUpdateExpr(state: ExprParseState) -> ExprParseResult {
   return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
 }
 
-fn parseExpressionTokens(tokens: List<MossToken>) -> ExprParseResult {
+fn parseExpressionTokens(tokens: List < MossToken >) -> ExprParseResult {
   result = parseUpdateExpr(exprState(tokens))
   if exprCurrent(result.state).kind != "EOF" {
     failed = exprError(result.state, "unexpected token after expression: " + exprCurrent(result.state).value)

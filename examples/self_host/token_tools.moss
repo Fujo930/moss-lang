@@ -5,17 +5,17 @@ type MossToken =
   column: Number
 
 fn token(kind: Text, value: Text, line: Number, column: Number) -> MossToken {
-  return { kind: kind, value: value, line: line, column: column }
+  return { kind: kind, value: value, line: line, column: column}
 }
 
 rule tokenLabel(item: MossToken) -> Text =
   item.kind + ":" + item.value
 
-fn tokenAt(tokens: List<MossToken>, index: Number) -> Option<MossToken> {
+fn tokenAt(tokens: List < MossToken >, index: Number) -> Option < MossToken > {
   return listGet(tokens, index, null)
 }
 
-fn tokenKindAt(tokens: List<MossToken>, index: Number) -> Text {
+fn tokenKindAt(tokens: List < MossToken >, index: Number) -> Text {
   item = tokenAt(tokens, index)
   if item == null {
     return "EOF"

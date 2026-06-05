@@ -7,22 +7,22 @@ type MossStmt =
 
 type StmtParseResult =
   stmt: MossStmt
-  errors: List<Text>
+  errors: List < Text >
 
 fn stmt(kind: Text, name: Text, value) -> MossStmt {
-  return { kind: kind, name: name, value: value }
+  return { kind: kind, name: name, value: value}
 }
 
-fn stmtResult(value: MossStmt, errors: List<Text>) -> StmtParseResult {
-  return { stmt: value, errors: errors }
+fn stmtResult(value: MossStmt, errors: List < Text >) -> StmtParseResult {
+  return { stmt: value, errors: errors}
 }
 
-fn parseStatementExpression(tokens: List<MossToken>, start: Number) -> ExprParseResult {
+fn parseStatementExpression(tokens: List < MossToken >, start: Number) -> ExprParseResult {
   expressionTokens = listSlice(tokens, start, len(tokens))
   return parseExpressionTokens(expressionTokens)
 }
 
-fn parseStatementTokens(tokens: List<MossToken>) -> StmtParseResult {
+fn parseStatementTokens(tokens: List < MossToken >) -> StmtParseResult {
   first = listGet(tokens, 0, token("EOF", "", 0, 0))
   second = listGet(tokens, 1, token("EOF", "", 0, 0))
   third = listGet(tokens, 2, token("EOF", "", 0, 0))
@@ -58,7 +58,7 @@ fn parseStatementTokens(tokens: List<MossToken>) -> StmtParseResult {
     condition = parseExpressionTokens(conditionTokens)
     errorValue = parseExpressionTokens(errorTokens)
     errors = listConcat(condition.state.errors, errorValue.state.errors)
-    return stmtResult(stmt("Require", "", { condition: condition.expr, error: errorValue.expr }), errors)
+    return stmtResult(stmt("Require", "", { condition: condition.expr, error: errorValue.expr}), errors)
   }
 
   if first.value == "break" {

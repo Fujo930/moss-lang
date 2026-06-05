@@ -2,7 +2,7 @@ import "examples/self_host/checker_core.moss"
 
 effect FileSystem
 
-fn analyzeFile(path: Text) -> Result<CheckResult, Text> uses FileSystem {
+fn analyzeFile(path: Text) -> Result < CheckResult, Text > uses FileSystem {
   source = readText(path)
   parsed = parseProgram(sketchTokens(source))
   return Ok(checkParseState(parsed))
@@ -20,11 +20,11 @@ test "checker sketch accepts order example" {
   assert(len(checked.errors) == 0, "order example should not fail")
 
   duplicateSource = textJoin([
-    "type Order = Paid\n",
-    "type Order = Pending\n",
-    "fn work() -> Text {\n",
-    "  return \"ok\"\n",
-    "}\n",
+  "type Order = Paid\n",
+  "type Order = Pending\n",
+  "fn work() -> Text {\n",
+  "  return \"ok\"\n",
+  "}\n",
   ])
   duplicate = parseProgram(sketchTokens(duplicateSource))
   duplicateCheck = checkProgramNodes(duplicate.nodes)
@@ -34,77 +34,77 @@ test "checker sketch accepts order example" {
   assert(len(parseErrorCheck.errors) == 1, "parse errors should become check errors")
 
   duplicateFieldSource = textJoin([
-    "type Person =\n",
-    "  name: Text\n",
-    "  name: Text\n",
-    "fn build() -> Text {\n",
-    "  return \"ok\"\n",
-    "}\n",
+  "type Person =\n",
+  "  name: Text\n",
+  "  name: Text\n",
+  "fn build() -> Text {\n",
+  "  return \"ok\"\n",
+  "}\n",
   ])
   duplicateFieldCheck = checkProgramNodes(parseProgram(sketchTokens(duplicateFieldSource)).nodes)
   assert(len(duplicateFieldCheck.errors) == 1, "duplicate type field should fail")
 
   unknownTypeSource = textJoin([
-    "type Person =\n",
-    "  name: MissingType\n",
-    "fn build() -> Text {\n",
-    "  return \"ok\"\n",
-    "}\n",
+  "type Person =\n",
+  "  name: MissingType\n",
+  "fn build() -> Text {\n",
+  "  return \"ok\"\n",
+  "}\n",
   ])
   unknownTypeCheck = checkProgramNodes(parseProgram(sketchTokens(unknownTypeSource)).nodes)
   assert(len(unknownTypeCheck.errors) == 1, "unknown field type should fail")
 
   knownTypeSource = textJoin([
-    "type Address =\n",
-    "  city: Text\n",
-    "type Person =\n",
-    "  address: Address\n",
-    "fn build() -> Text {\n",
-    "  return \"ok\"\n",
-    "}\n",
+  "type Address =\n",
+  "  city: Text\n",
+  "type Person =\n",
+  "  address: Address\n",
+  "fn build() -> Text {\n",
+  "  return \"ok\"\n",
+  "}\n",
   ])
   knownTypeCheck = checkProgramNodes(parseProgram(sketchTokens(knownTypeSource)).nodes)
   assert(len(knownTypeCheck.errors) == 0, "declared field type should pass")
 
   unknownReturnSource = textJoin([
-    "fn build() -> MissingReturn {\n",
-    "  return \"ok\"\n",
-    "}\n",
+  "fn build() -> MissingReturn {\n",
+  "  return \"ok\"\n",
+  "}\n",
   ])
   unknownReturnCheck = checkProgramNodes(parseProgram(sketchTokens(unknownReturnSource)).nodes)
   assert(len(unknownReturnCheck.errors) == 1, "unknown return type should fail")
 
   knownReturnSource = textJoin([
-    "type Person =\n",
-    "  name: Text\n",
-    "fn build() -> Person {\n",
-    "  return { name: \"moss\" }\n",
-    "}\n",
+  "type Person =\n",
+  "  name: Text\n",
+  "fn build() -> Person {\n",
+  "  return { name: \"moss\" }\n",
+  "}\n",
   ])
   knownReturnCheck = checkProgramNodes(parseProgram(sketchTokens(knownReturnSource)).nodes)
   assert(len(knownReturnCheck.errors) == 0, "declared return type should pass")
 
   unknownParamSource = textJoin([
-    "fn build(value: MissingParam) -> Text {\n",
-    "  return \"ok\"\n",
-    "}\n",
+  "fn build(value: MissingParam) -> Text {\n",
+  "  return \"ok\"\n",
+  "}\n",
   ])
   unknownParamCheck = checkProgramNodes(parseProgram(sketchTokens(unknownParamSource)).nodes)
   assert(len(unknownParamCheck.errors) == 1, "unknown parameter type should fail")
 
   knownParamSource = textJoin([
-    "type Person =\n",
-    "  name: Text\n",
-    "fn build(value: Person) -> Text {\n",
-    "  return value.name\n",
-    "}\n",
+  "type Person =\n",
+  "  name: Text\n",
+  "fn build(value: Person) -> Text {\n",
+  "  return value.name\n",
+  "}\n",
   ])
   knownParamCheck = checkProgramNodes(parseProgram(sketchTokens(knownParamSource)).nodes)
   assert(len(knownParamCheck.errors) == 0, "declared parameter type should pass")
 
   unknownRuleTypeSource = textJoin([
-    "rule ready(value: MissingRuleParam) -> MissingRuleReturn =\n",
-    "  true\n",
+  "rule ready(value: MissingRuleParam) -> MissingRuleReturn =\n",
+  "  true\n",
   ])
   unknownRuleTypeCheck = checkProgramNodes(parseProgram(sketchTokens(unknownRuleTypeSource)).nodes)
   assert(len(unknownRuleTypeCheck.errors) == 2, "unknown rule parameter and return types should fail")

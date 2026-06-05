@@ -18,15 +18,15 @@ rule explain(result) =
     _ -> "unknown"
   }
 
-fn ship(order: Order) -> Result<Order, ShipError> {
+fn ship(order: Order) -> Result < Order, ShipError > {
   require canShip(order)
     else ShipError.NotReady(order.status)
 
   return Ok(order with status = Shipped)
 }
 
-let draft = { id: "A-300", status: Pending, total: 42.usd }
-let paid = { id: "A-301", status: Paid, total: 42.usd }
+let draft = { id: "A-300", status: Pending, total: 42.usd}
+let paid = { id: "A-301", status: Paid, total: 42.usd}
 print(explain(ship(draft)))
 print(explain(ship(paid)))
 

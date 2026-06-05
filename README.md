@@ -5,8 +5,8 @@
 # Moss language prototype
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
-![Self-hosting: started](https://img.shields.io/badge/self--hosting-started-f2c14e)
-![Version: 0.2.0](https://img.shields.io/badge/version-0.2.0-4f7edb)
+![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
+![Version: 0.3.0-alpha](https://img.shields.io/badge/version-0.3.0--alpha-4f7edb)
 ![Built by Codex](https://img.shields.io/badge/built%20by-Codex-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -17,9 +17,9 @@ debugged, documented, committed, and pushed by Codex in collaboration with
 Fujo930. The project is public as a record of that process and as a runnable
 language prototype.
 
-Version `0.2.0` is a self-hosting preview. Moss is not fully self-hosted yet,
-but Moss-written lexer, parser, checker, and project-check sketches already run
-against Moss source.
+Version `0.3.0-alpha` completes the static-confidence roadmap. Moss is not fully
+self-hosted yet, but its Moss-written frontend is recursively compared with the
+Python host frontend across the bundled examples.
 
 The branching M is Moss's language mark: two contributors meeting in a shared
 syntax tree. See `docs/identity.md` for the public description and identity
@@ -37,6 +37,8 @@ moss test examples/order.moss
 moss format --check examples/order.moss
 moss selfhost
 moss selfhost --quick
+moss selfhost-compare examples
+moss repl
 moss studio
 ```
 
@@ -106,6 +108,8 @@ The package exposes a console command named `moss`.
 - conservative static inference for local bindings, assignments, calls, returns,
   and list element types
 - static record-field access/update checks and exhaustive union `match` checks
+- flow-sensitive branch inference and payload-aware union pattern checks
+- expression-located diagnostics and complete host/self-host expression AST comparison
 - `List<T>`, `Map<K, V>`, and `Option<T>` runtime type contracts
 - a tiny in-memory database through `dbPut` and `dbGet`, guarded by the
   `Database` effect inside functions
@@ -157,6 +161,7 @@ moss format --check <file.moss>
 moss selfhost
 moss selfhost --quick
 moss selfhost-compare examples
+moss repl
 moss studio
 ```
 
@@ -168,21 +173,21 @@ locations, and a declaration summary for CI, editors, and AI agents.
 `moss project-check` recursively checks every `.moss` file in a directory and
 returns an aggregate project health result.
 
-`moss format` safely normalizes block indentation, trailing whitespace, and the
-final newline while preserving source tokens and comments. `--check` makes it
-suitable for CI.
+`moss format` normalizes block indentation, expression spacing, trailing
+whitespace, and the final newline while preserving strings and comments.
+`--check` makes it suitable for CI.
 
 `moss selfhost --quick` runs the fast self-hosting sketches. `moss selfhost`
 also runs the slower Moss-written project check over `examples/self_host`.
 `moss selfhost-compare examples` compares Python-host and Moss-written parser
-declaration counts, names, and recursive function/test body statement shapes
-across all root example programs. It also compares record fields, aliases,
-callable parameters, return types, and declared effects.
+declarations, metadata, recursive statement shapes, and complete recursive
+expression and match-pattern ASTs across all root example programs.
 
 ## Project status
 
-This is version `0.2.0`: a compact interpreter with real syntax, runtime
-semantics, a browser editor, and Moss-written self-hosting sketches.
+This is version `0.3.0-alpha`: a compact interpreter with real syntax, runtime
+semantics, static-confidence tooling, a browser editor, and a verified
+Moss-written frontend.
 The repository is released under the MIT License.
 
 Suitable claims:
@@ -192,8 +197,8 @@ Suitable claims:
 - Moss has begun self-hosting.
 - Moss is still alpha software and should not be described as fully self-hosted.
 
-The next useful steps are richer diagnostics, a formatter, static local type
-inference, and deeper host/self-host expression AST comparison.
+The next useful steps belong to the 0.4 product-engineering and frontend
+replacement tracks.
 
 GitHub's language bar is powered by Linguist. `.moss` files are marked
 detectable in `.gitattributes`, but GitHub will only show `Moss` as a first-class
@@ -203,5 +208,5 @@ See `docs/language.md` for the current language surface,
 `docs/studio.md` for the browser editor,
 `docs/history.md` for a commit-by-commit feature guide, and
 `docs/roadmap.md` for the path from prototype to a serious implementation.
-See `docs/release.md` for the public `0.2.0` release notes and packaging
+See `docs/release.md` for the public `0.3.0-alpha` release notes and packaging
 checklist, and `docs/identity.md` for the Moss identity.

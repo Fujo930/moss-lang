@@ -5,7 +5,7 @@ prototype.
 
 Moss is AI-designed and AI-built. Codex designed, implemented, debugged,
 documented, committed, and pushed the current prototype in collaboration with
-Fujo930. The current public version is `0.2.0`, a self-hosting preview rather
+Fujo930. The current public version is `0.3.0-alpha`, a self-hosting preview rather
 than a finished self-hosted compiler.
 
 The language's public identity and supported project wording live in
@@ -384,17 +384,23 @@ moss format examples/order.moss
 moss format --check examples/order.moss
 ```
 
-The initial formatter is deliberately conservative: it normalizes block
-indentation, trailing whitespace, and the final newline while retaining source
-tokens and comments.
+The formatter normalizes block indentation, common expression spacing,
+trailing whitespace, and the final newline while preserving strings and
+comments.
 
-As of `0.2.0`, the Moss-written checker validates duplicate declarations,
+As of `0.3.0-alpha`, the Moss-written checker validates duplicate declarations,
 duplicate record fields, import shape, undeclared effects, parse errors, and
 simple type references in record fields, function signatures, and rule
 signatures. This is the start of self-hosting, not the end state.
 
-The Moss-written parser also preserves declaration names and builds structured
-nodes for expressions and recursive control-flow statements.
-`moss selfhost-compare examples` checks declaration counts, names, and recursive
-function/test body statement shapes; complete expression AST equivalence
-remains a future milestone.
+The Moss-written parser preserves declaration names and builds structured nodes
+for expressions, recursive match patterns, and control-flow statements.
+`moss selfhost-compare examples` checks declarations, metadata, recursive
+statement shapes, and complete recursive expression and pattern AST
+equivalence.
+
+Start a persistent multiline session with:
+
+```powershell
+moss repl
+```

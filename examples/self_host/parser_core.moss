@@ -7,31 +7,31 @@ type MossNode =
   data: Any
 
 type ParseState =
-  tokens: List<MossToken>
+  tokens: List < MossToken >
   index: Number
   depth: Number
-  nodes: List<MossNode>
-  errors: List<Text>
+  nodes: List < MossNode >
+  errors: List < Text >
 
 type BlockParseResult =
   state: ParseState
-  statements: List<Any>
+  statements: List < Any >
 
 type LineParseResult =
   state: ParseState
-  tokens: List<MossToken>
+  tokens: List < MossToken >
 
 type BlockStepResult =
   state: ParseState
   stmt: MossStmt
-  errors: List<Text>
+  errors: List < Text >
 
 fn node(kind: Text, name: Text, value: Text, data) -> MossNode {
-  return { kind: kind, name: name, value: value, data: data }
+  return { kind: kind, name: name, value: value, data: data}
 }
 
-fn parserState(tokens: List<MossToken>) -> ParseState {
-  return { tokens: tokens, index: 0, depth: 0, nodes: [], errors: [] }
+fn parserState(tokens: List < MossToken >) -> ParseState {
+  return { tokens: tokens, index: 0, depth: 0, nodes: [], errors: []}
 }
 
 fn currentToken(state: ParseState) -> MossToken {
@@ -142,10 +142,10 @@ fn readLineTokens(state: ParseState) -> LineParseResult {
     tokens = listPush(tokens, currentToken(state))
     state = advance(state)
   }
-  return { state: state, tokens: tokens }
+  return { state: state, tokens: tokens}
 }
 
-fn parseControlExpression(tokens: List<MossToken>, start: Number, end: Number) -> ExprParseResult {
+fn parseControlExpression(tokens: List < MossToken >, start: Number, end: Number) -> ExprParseResult {
   expressionTokens = listSlice(tokens, start, end)
   expressionTokens = listPush(expressionTokens, token("EOF", "", 0, 0))
   return parseExpressionTokens(expressionTokens)
@@ -173,8 +173,8 @@ fn parseIfBlock(state: ParseState, conditionStart: Number) -> BlockStepResult {
     }
   }
 
-  value = { condition: condition.expr, thenBody: body.statements, elseBody: elseBody }
-  return { state: state, stmt: stmt("If", "", value), errors: errors }
+  value = { condition: condition.expr, thenBody: body.statements, elseBody: elseBody}
+  return { state: state, stmt: stmt("If", "", value), errors: errors}
 }
 
 fn parseLoopBlock(state: ParseState, kind: Text) -> BlockStepResult {
@@ -187,8 +187,8 @@ fn parseLoopBlock(state: ParseState, kind: Text) -> BlockStepResult {
   }
   expression = parseControlExpression(line.tokens, start, len(line.tokens) - 1)
   body = parseBlockStatements(line.state)
-  value = { expression: expression.expr, body: body.statements }
-  return { state: body.state, stmt: stmt(kind, name, value), errors: expression.state.errors }
+  value = { expression: expression.expr, body: body.statements}
+  return { state: body.state, stmt: stmt(kind, name, value), errors: expression.state.errors}
 }
 
 fn parseBlockStatements(state: ParseState) -> BlockParseResult {
@@ -199,7 +199,7 @@ fn parseBlockStatements(state: ParseState) -> BlockParseResult {
   while currentToken(state).kind != "EOF" and state.depth >= blockDepth {
     if currentToken(state).value == "}" and state.depth == blockDepth {
       state = advance(state)
-      return { state: state, statements: statements }
+      return { state: state, statements: statements}
     }
 
     first = currentToken(state)
@@ -236,7 +236,7 @@ fn parseBlockStatements(state: ParseState) -> BlockParseResult {
     state = skipNewlines(state)
   }
 
-  return { state: state, statements: statements }
+  return { state: state, statements: statements}
 }
 
 fn parseImport(state: ParseState) -> ParseState {
@@ -383,7 +383,7 @@ fn parseStatement(state: ParseState) -> ParseState {
   return parseExprLine(state)
 }
 
-fn parseProgram(tokens: List<MossToken>) -> ParseState {
+fn parseProgram(tokens: List < MossToken >) -> ParseState {
   state = parserState(tokens)
   state = skipNewlines(state)
 
@@ -408,7 +408,7 @@ fn parseProgram(tokens: List<MossToken>) -> ParseState {
   return state
 }
 
-fn countNodes(nodes: List<MossNode>, kind: Text) -> Number {
+fn countNodes(nodes: List < MossNode >, kind: Text) -> Number {
   count = 0
   for item in nodes {
     if item.kind == kind {

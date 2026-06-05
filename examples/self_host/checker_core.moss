@@ -1,11 +1,11 @@
 import "examples/self_host/parser_core.moss"
 
 type CheckResult =
-  warnings: List<Text>
-  errors: List<Text>
+  warnings: List < Text >
+  errors: List < Text >
 
 fn emptyCheckResult() -> CheckResult {
-  return { warnings: [], errors: [] }
+  return { warnings: [], errors: []}
 }
 
 fn addWarning(result, message: Text) -> Any {
@@ -16,7 +16,7 @@ fn addError(result, message: Text) -> Any {
   return result with errors = listPush(result.errors, message)
 }
 
-fn duplicateNames(nodes: List<MossNode>, kind: Text) -> List<Text> {
+fn duplicateNames(nodes: List < MossNode >, kind: Text) -> List < Text > {
   seen = mapNew()
   duplicates = []
 
@@ -33,7 +33,7 @@ fn duplicateNames(nodes: List<MossNode>, kind: Text) -> List<Text> {
   return duplicates
 }
 
-fn duplicateValues(nodes: List<MossNode>, kind: Text) -> List<Text> {
+fn duplicateValues(nodes: List < MossNode >, kind: Text) -> List < Text > {
   seen = mapNew()
   duplicates = []
 
@@ -50,7 +50,7 @@ fn duplicateValues(nodes: List<MossNode>, kind: Text) -> List<Text> {
   return duplicates
 }
 
-fn duplicateEffectNames(nodes: List<MossNode>) -> List<Text> {
+fn duplicateEffectNames(nodes: List < MossNode >) -> List < Text > {
   seen = mapNew()
   duplicates = []
 
@@ -72,7 +72,7 @@ fn duplicateEffectNames(nodes: List<MossNode>) -> List<Text> {
   return duplicates
 }
 
-fn duplicateTypeFields(item: MossNode) -> List<Text> {
+fn duplicateTypeFields(item: MossNode) -> List < Text > {
   seen = mapNew()
   duplicates = []
 
@@ -91,7 +91,7 @@ fn duplicateTypeFields(item: MossNode) -> List<Text> {
   return duplicates
 }
 
-fn effectNames(nodes: List<MossNode>) -> Map<Text, Bool> {
+fn effectNames(nodes: List < MossNode >) -> Map < Text, Bool > {
   names = mapNew()
 
   for item in nodes {
@@ -107,12 +107,12 @@ fn effectNames(nodes: List<MossNode>) -> Map<Text, Bool> {
   return names
 }
 
-fn typeNames(nodes: List<MossNode>) -> Map<Text, Bool> {
+fn typeNames(nodes: List < MossNode >) -> Map < Text, Bool > {
   names = builtInTypeNames()
   return addTypeNames(names, nodes)
 }
 
-fn builtInTypeNames() -> Map<Text, Bool> {
+fn builtInTypeNames() -> Map < Text, Bool > {
   names = mapNew()
 
   names = mapPut(names, "Any", true)
@@ -129,7 +129,7 @@ fn builtInTypeNames() -> Map<Text, Bool> {
   return names
 }
 
-fn addTypeNames(names: Map<Text, Bool>, nodes: List<MossNode>) -> Map<Text, Bool> {
+fn addTypeNames(names: Map < Text, Bool >, nodes: List < MossNode >) -> Map < Text, Bool > {
   for item in nodes {
     if item.kind == "Type" {
       names = mapPut(names, item.name, true)
@@ -145,7 +145,7 @@ rule isNameToken(text: Text) -> Bool =
 rule isTypeToken(text: Text) -> Bool =
   isNameToken(text) and text != ":" and text != ";" and text != "|" and text != "<" and text != ">" and text != "." and text != "="
 
-fn usesEffects(item: MossNode) -> List<Text> {
+fn usesEffects(item: MossNode) -> List < Text > {
   if not textContains(item.value, "uses") {
     return []
   }
@@ -165,7 +165,7 @@ fn usesEffects(item: MossNode) -> List<Text> {
   return result
 }
 
-fn countByKind(nodes: List<MossNode>) -> Map<Text, Number> {
+fn countByKind(nodes: List < MossNode >) -> Map < Text, Number > {
   counts = mapNew()
 
   for item in nodes {
@@ -176,7 +176,7 @@ fn countByKind(nodes: List<MossNode>) -> Map<Text, Number> {
   return counts
 }
 
-fn checkDuplicateKind(nodes: List<MossNode>, kind: Text, result: CheckResult) -> CheckResult {
+fn checkDuplicateKind(nodes: List < MossNode >, kind: Text, result: CheckResult) -> CheckResult {
   duplicates = duplicateNames(nodes, kind)
 
   for name in duplicates {
@@ -186,7 +186,7 @@ fn checkDuplicateKind(nodes: List<MossNode>, kind: Text, result: CheckResult) ->
   return result
 }
 
-fn checkDuplicateImport(nodes: List<MossNode>, result: CheckResult) -> CheckResult {
+fn checkDuplicateImport(nodes: List < MossNode >, result: CheckResult) -> CheckResult {
   duplicates = duplicateValues(nodes, "Import")
 
   for path in duplicates {
@@ -196,7 +196,7 @@ fn checkDuplicateImport(nodes: List<MossNode>, result: CheckResult) -> CheckResu
   return result
 }
 
-fn checkTypeText(owner: Text, typeText: Text, types: Map<Text, Bool>, result: CheckResult) -> CheckResult {
+fn checkTypeText(owner: Text, typeText: Text, types: Map < Text, Bool >, result: CheckResult) -> CheckResult {
   if not textContains(typeText, "|") {
     for piece in textSplit(textReplace(textReplace(textReplace(typeText, "<", " "), ">", " "), ",", " "), " ") {
       clean = textTrim(piece)
@@ -209,7 +209,7 @@ fn checkTypeText(owner: Text, typeText: Text, types: Map<Text, Bool>, result: Ch
   return result
 }
 
-fn checkFieldTypes(item: MossNode, types: Map<Text, Bool>, result: CheckResult) -> CheckResult {
+fn checkFieldTypes(item: MossNode, types: Map < Text, Bool >, result: CheckResult) -> CheckResult {
   for fieldInfo in textSplit(item.value, ";") {
     parts = textSplit(fieldInfo, ":")
     fieldType = textTrim(listGet(parts, 1, ""))
@@ -235,7 +235,7 @@ fn returnTypeText(item: MossNode) -> Text {
   return textTrim(result)
 }
 
-fn checkParameterTypes(item: MossNode, types: Map<Text, Bool>, result: CheckResult) -> CheckResult {
+fn checkParameterTypes(item: MossNode, types: Map < Text, Bool >, result: CheckResult) -> CheckResult {
   openParen = "("
   closeParen = ")"
 
@@ -259,11 +259,11 @@ fn checkParameterTypes(item: MossNode, types: Map<Text, Bool>, result: CheckResu
   return result
 }
 
-fn checkProgramNodes(nodes: List<MossNode>) -> CheckResult {
+fn checkProgramNodes(nodes: List < MossNode >) -> CheckResult {
   return checkProgramNodesWithTypes(nodes, typeNames(nodes))
 }
 
-fn checkProgramNodesWithTypes(nodes: List<MossNode>, types: Map<Text, Bool>) -> CheckResult {
+fn checkProgramNodesWithTypes(nodes: List < MossNode >, types: Map < Text, Bool >) -> CheckResult {
   result = emptyCheckResult()
   counts = countByKind(nodes)
   effects = effectNames(nodes)

@@ -10,7 +10,7 @@ type ShipError = NotReady | Missing
 rule canShip(order: Order) -> Bool =
   order.status == Paid and order.total > 0.usd
 
-fn ship(order: Order) -> Result<Order, ShipError> uses Database {
+fn ship(order: Order) -> Result < Order, ShipError > uses Database {
   require canShip(order)
     else ShipError.NotReady(order.status)
 
@@ -20,7 +20,7 @@ fn ship(order: Order) -> Result<Order, ShipError> uses Database {
   return Ok(updated)
 }
 
-let order = { id: "A-100", status: Paid, total: 42.usd }
+let order = { id: "A-100", status: Paid, total: 42.usd}
 let shipped = ship(order)?
 print("status:", shipped.status)
 print("stored:", dbGet("A-100").status)

@@ -2,7 +2,7 @@ import "examples/self_host/lexer_core.moss"
 
 effect FileSystem
 
-fn tokenizeFile(path: Text) -> Result<List<MossToken>, Text> uses FileSystem {
+fn tokenizeFile(path: Text) -> Result < List < MossToken >, Text > uses FileSystem {
   source = readText(path)
   return Ok(sketchTokens(source))
 }

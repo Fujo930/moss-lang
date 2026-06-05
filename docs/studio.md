@@ -5,7 +5,7 @@ runtime as the CLI.
 
 Like the rest of Moss, Studio was designed, implemented, debugged, documented,
 committed, and pushed by Codex in collaboration with Fujo930. It is part of the
-`0.2.0` alpha release, not a hosted product.
+`0.3.0-alpha` release, not a hosted product.
 
 Start it from the project folder:
 

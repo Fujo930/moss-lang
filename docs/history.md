@@ -8,7 +8,7 @@ documented, committed, and pushed the current language prototype in
 collaboration with Fujo930. This history is intentionally part development log,
 part memory for future AI agents and human contributors.
 
-## Unreleased 0.3 static confidence
+## 0.3.0-alpha static confidence
 
 The static checker now merges local types learned independently by both sides
 of a complete `if`/`else`, while refusing to assume a type when the branches

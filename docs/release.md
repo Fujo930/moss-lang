@@ -1,8 +1,9 @@
 # Release notes
 
-## 0.2.0 alpha
+## 0.3.0-alpha
 
-Moss `0.2.0` is the first public-ready self-hosting preview.
+Moss `0.3.0-alpha` completes the static-confidence roadmap and provides a
+verified Moss-written frontend preview.
 
 Public description:
 
@@ -31,6 +32,8 @@ moss check examples/order.moss
 moss run examples/order.moss
 moss test examples/order.moss
 moss selfhost --quick
+moss selfhost-compare examples
+moss repl
 ```
 
 ## Build local artifacts
@@ -47,6 +50,8 @@ The build command creates a source distribution and wheel under `dist/`.
 - `python -m unittest discover -s tests -v`
 - `python -m mosslang.cli selfhost --quick`
 - `python -m mosslang.cli selfhost`
+- `python -m mosslang.cli selfhost-compare examples`
+- `python -m mosslang.cli project-check examples`
 - `python -m build`
 
 ## Current limitations
@@ -54,9 +59,9 @@ The build command creates a source distribution and wheel under `dist/`.
 - The host interpreter, parser, and CLI are still Python.
 - The Moss-written frontend is a checked self-hosting sketch, not the active
   compiler frontend.
-- The self-host parser currently focuses on top-level declarations and simple
-  signature/type metadata, plus structured expressions and simple statements.
-- Diagnostics are useful but still early.
+- The verified Moss frontend is not yet wired in as the default compiler
+  frontend.
+- Static inference remains intentionally conservative.
 - GitHub will not show `Moss` as a first-class language until Linguist adds it.
 
 ## Included developer surfaces

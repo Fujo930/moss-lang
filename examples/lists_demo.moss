@@ -1,4 +1,4 @@
-fn joinWords(words: List<Text>) -> Text {
+fn joinWords(words: List < Text >) -> Text {
   result = ""
   for word in words {
     result = result + word
@@ -6,7 +6,7 @@ fn joinWords(words: List<Text>) -> Text {
   return result
 }
 
-fn collectNumbers() -> List<Number> {
+fn collectNumbers() -> List < Number > {
   values = []
   for value in range(1, 5) {
     values = listPush(values, value)

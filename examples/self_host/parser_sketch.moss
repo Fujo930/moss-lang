@@ -2,7 +2,7 @@ import "examples/self_host/parser_core.moss"
 
 effect FileSystem
 
-fn parseFile(path: Text) -> Result<ParseState, Text> uses FileSystem {
+fn parseFile(path: Text) -> Result < ParseState, Text > uses FileSystem {
   source = readText(path)
   return Ok(parseProgram(sketchTokens(source)))
 }

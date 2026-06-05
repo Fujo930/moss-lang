@@ -1,4 +1,4 @@
-fn normalizeWords(text: Text) -> List<Text> {
+fn normalizeWords(text: Text) -> List < Text > {
   rawWords = textSplit(textTrim(text), " ")
   words = []
 
@@ -13,7 +13,7 @@ fn normalizeWords(text: Text) -> List<Text> {
   return words
 }
 
-fn countWords(words: List<Text>) -> Map<Text, Number> {
+fn countWords(words: List < Text >) -> Map < Text, Number > {
   counts = mapNew()
 
   for word in words {

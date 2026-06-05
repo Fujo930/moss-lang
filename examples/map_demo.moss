@@ -1,4 +1,4 @@
-fn wordCounts(words: List<Text>) -> Map<Text, Number> {
+fn wordCounts(words: List < Text >) -> Map < Text, Number > {
   counts = mapNew()
 
   for word in words {

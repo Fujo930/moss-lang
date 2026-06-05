@@ -34,7 +34,7 @@ fn escapedChar(ch: Text) -> Text {
   return ch
 }
 
-fn sketchTokens(source: Text) -> List<MossToken> {
+fn sketchTokens(source: Text) -> List < MossToken > {
   chars = textChars(source)
   tokens = []
   index = 0
