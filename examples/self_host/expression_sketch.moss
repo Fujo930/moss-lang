@@ -45,4 +45,14 @@ test "expression sketch builds structured precedence tree" {
   assert(tried.expr.kind == "Field", "field access should follow try")
   assert(tried.expr.left.kind == "Try", "question mark should produce try expression")
   assert(tried.expr.left.left.kind == "Call", "try should retain its operand")
+
+  listValue = parseExpressionSource("[1, order.id,]")
+  assert(listValue.expr.kind == "List", "list literal should be structured")
+  assert(len(listValue.expr.right) == 2, "list literal should capture items")
+  assert(listValue.expr.right[1].kind == "Field", "list item should retain expression")
+
+  recordValue = parseExpressionSource("{ id: order.id, ready: true, }")
+  assert(recordValue.expr.kind == "Record", "record literal should be structured")
+  assert(mapHas(recordValue.expr.right, "id"), "record should capture id field")
+  assert(mapGet(recordValue.expr.right, "id", missingExpr()).kind == "Field", "record field should retain expression")
 }

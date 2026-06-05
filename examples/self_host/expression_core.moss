@@ -51,6 +51,77 @@ fn exprListResult(state: ExprParseState, items: List<Any>) -> ExprListParseResul
   return { state: state, items: items }
 }
 
+fn parseListExpr(state: ExprParseState) -> ExprParseResult {
+  items = []
+  closeBracket = "]"
+
+  if exprCurrent(state).value == closeBracket {
+    return exprResult(exprAdvance(state), expr("List", "", null, items))
+  }
+
+  while exprCurrent(state).kind != "EOF" {
+    parsed = parseOrExpr(state)
+    items = listPush(items, parsed.expr)
+    state = parsed.state
+
+    if exprCurrent(state).value == closeBracket {
+      return exprResult(exprAdvance(state), expr("List", "", null, items))
+    }
+    if exprCurrent(state).value != "," {
+      state = exprError(state, "expected comma or ] after list item")
+      return exprResult(state, expr("List", "", null, items))
+    }
+    state = exprAdvance(state)
+    if exprCurrent(state).value == closeBracket {
+      return exprResult(exprAdvance(state), expr("List", "", null, items))
+    }
+  }
+
+  state = exprError(state, "expected ] after list")
+  return exprResult(state, expr("List", "", null, items))
+}
+
+fn parseRecordExpr(state: ExprParseState) -> ExprParseResult {
+  fields = mapNew()
+  closeBrace = "}"
+
+  if exprCurrent(state).value == closeBrace {
+    return exprResult(exprAdvance(state), expr("Record", "", null, fields))
+  }
+
+  while exprCurrent(state).kind != "EOF" {
+    field = exprCurrent(state)
+    if field.kind != "IDENT" {
+      state = exprError(state, "expected record field name")
+      return exprResult(state, expr("Record", "", null, fields))
+    }
+    state = exprAdvance(state)
+    if exprCurrent(state).value != ":" {
+      state = exprError(state, "expected colon after record field")
+      return exprResult(state, expr("Record", "", null, fields))
+    }
+
+    parsed = parseOrExpr(exprAdvance(state))
+    fields = mapPut(fields, field.value, parsed.expr)
+    state = parsed.state
+
+    if exprCurrent(state).value == closeBrace {
+      return exprResult(exprAdvance(state), expr("Record", "", null, fields))
+    }
+    if exprCurrent(state).value != "," {
+      state = exprError(state, "expected comma or } after record field")
+      return exprResult(state, expr("Record", "", null, fields))
+    }
+    state = exprAdvance(state)
+    if exprCurrent(state).value == closeBrace {
+      return exprResult(exprAdvance(state), expr("Record", "", null, fields))
+    }
+  }
+
+  state = exprError(state, "expected } after record")
+  return exprResult(state, expr("Record", "", null, fields))
+}
+
 fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
   item = exprCurrent(state)
 
@@ -62,6 +133,12 @@ fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
   }
   if item.kind == "IDENT" {
     return exprResult(exprAdvance(state), expr("Identifier", item.value, null, null))
+  }
+  if item.value == "[" {
+    return parseListExpr(exprAdvance(state))
+  }
+  if item.value == "{" {
+    return parseRecordExpr(exprAdvance(state))
   }
   if item.value == "(" {
     nested = parseOrExpr(exprAdvance(state))
