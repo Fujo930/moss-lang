@@ -145,6 +145,7 @@ print("stored:", dbGet("A-100").status)
 
 ```powershell
 moss check <file.moss>
+moss check --json <file.moss>
 moss run <file.moss>
 moss test <file.moss>
 moss tokens <file.moss>
@@ -158,6 +159,9 @@ moss studio
 ```
 
 `moss studio` opens a local HTTP editor at `http://127.0.0.1:8765`.
+
+`moss check --json` emits stable machine-readable diagnostics, source
+locations, and a declaration summary for CI, editors, and AI agents.
 
 `moss format` safely normalizes block indentation, trailing whitespace, and the
 final newline while preserving source tokens and comments. `--check` makes it

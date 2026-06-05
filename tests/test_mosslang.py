@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 import tempfile
+import json
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -48,6 +49,31 @@ class MossLanguageTests(unittest.TestCase):
             code = cli_main(["selfhost-compare", "examples"])
         self.assertEqual(code, 0)
         self.assertIn("examples\\match_demo.moss", output.getvalue().replace("/", "\\"))
+
+    def test_cli_check_json_emits_structured_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bad.moss"
+            path.write_text("fn broken() uses Missing {\n  return 1\n}\n", encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["check", "--json", str(path)])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 1)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["diagnostics"][0]["line"], 1)
+        self.assertEqual(payload["summary"]["callables"], 1)
+
+    def test_cli_check_json_reports_syntax_locations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bad.moss"
+            path.write_text("fn broken( {\n", encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["check", "--json", str(path)])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["diagnostics"][0]["line"], 1)
+        self.assertIsNone(payload["summary"])
 
     def test_cli_selfhost_compare_checks_recursive_body_structure(self) -> None:
         output = StringIO()

@@ -335,6 +335,9 @@ record field access, record updates, and union `match` coverage before running
 the program. Unknown values remain allowed instead of producing speculative
 errors.
 
+Tools and agents can use `moss check --json file.moss` to receive structured
+diagnostics with source locations and a declaration summary.
+
 ## Self-Hosting Sketches
 
 The `examples/self_host` folder contains the first Moss-written pieces of a

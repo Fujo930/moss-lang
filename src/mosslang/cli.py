@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import pprint
 import re
@@ -25,6 +26,8 @@ def main(argv: list[str] | None = None) -> int:
     for command in ("run", "check", "test", "tokens", "ast"):
         cmd = sub.add_parser(command)
         cmd.add_argument("file", type=Path)
+        if command == "check":
+            cmd.add_argument("--json", action="store_true", help="emit structured diagnostics and summary")
 
     format_cmd = sub.add_parser("format")
     format_cmd.add_argument("file", type=Path)
@@ -83,11 +86,23 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "check":
             diagnostics = check_program(program)
+            summary = summarize(program)
+            if args.json:
+                print(
+                    json.dumps(
+                        {
+                            "ok": not any(d.level == "error" for d in diagnostics),
+                            "file": str(args.file),
+                            "diagnostics": [diagnostic_json(item) for item in diagnostics],
+                            "summary": summary,
+                        }
+                    )
+                )
+                return 1 if any(d.level == "error" for d in diagnostics) else 0
             for diagnostic in diagnostics:
                 print(diagnostic.format())
             if any(d.level == "error" for d in diagnostics):
                 return 1
-            summary = summarize(program)
             print(
                 f"ok: {summary['effects']} effect block(s), {summary['imports']} import(s), "
                 f"{summary['types']} type(s), {summary['callables']} callable(s), {summary['tests']} test(s)"
@@ -121,6 +136,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"moss: {exc}", file=sys.stderr)
         return 1
     except MossError as exc:
+        if getattr(args, "command", None) == "check" and getattr(args, "json", False):
+            location = getattr(exc, "location", None)
+            diagnostic = {"level": "error", "message": getattr(exc, "message", str(exc))}
+            if location is not None:
+                diagnostic.update({"line": location.line, "column": location.column})
+            print(json.dumps({"ok": False, "file": str(args.file), "diagnostics": [diagnostic], "summary": None}))
+            return 1
         print(f"moss: {exc}", file=sys.stderr)
         return 1
 
@@ -133,6 +155,13 @@ def summarize(program):
         "callables": sum(1 for item in program.items if item.__class__.__name__ in {"RuleDecl", "FunctionDecl"}),
         "tests": sum(1 for item in program.items if item.__class__.__name__ == "TestDecl"),
     }
+
+
+def diagnostic_json(diagnostic) -> dict:
+    result = {"level": diagnostic.level, "message": diagnostic.message}
+    if diagnostic.location is not None:
+        result.update({"line": diagnostic.location.line, "column": diagnostic.location.column})
+    return result
 
 
 def run_selfhost_checks(quick: bool = False) -> int:

@@ -63,6 +63,7 @@ Implemented:
 - conservative local-binding and expression type inference
 - static callable argument, return, record-field access, and record-update checks
 - exhaustive union `match` checks and duplicate-case warnings
+- machine-readable `moss check --json` diagnostics and summaries
 
 High-value next steps:
 
