@@ -6,3 +6,5 @@ __pycache__/
 dist/
 build/
 installer/*.exe
+installer/*.zip
+installer/SHA256SUMS.txt

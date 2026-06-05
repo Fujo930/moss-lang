@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 $BuildRoot = Join-Path $Root "build\windows"
 $Icon = Join-Path $PSScriptRoot "moss.ico"
+$ReleaseRoot = Join-Path $Root "installer"
 
 python -m pip install --disable-pip-version-check pyinstaller pillow
 
@@ -43,9 +44,20 @@ python -m PyInstaller --noconfirm --clean --onedir --windowed `
   --specpath (Join-Path $Root "build") `
   (Join-Path $PSScriptRoot "moss_studio.py")
 
+python -m PyInstaller --noconfirm --clean --onedir --console `
+  --name "moss-lsp" --icon $Icon `
+  --paths (Join-Path $Root "src") `
+  --distpath (Join-Path $Root "build\lsp") `
+  --workpath (Join-Path $Root "build\pyinstaller-lsp") `
+  --specpath (Join-Path $Root "build") `
+  (Join-Path $PSScriptRoot "moss_lsp.py")
+
 $StudioRoot = Join-Path $Root "build\studio\Moss Studio"
 Copy-Item (Join-Path $StudioRoot "Moss Studio.exe") (Join-Path $BuildRoot "moss\Moss Studio.exe")
 Copy-Item (Join-Path $StudioRoot "_internal\*") (Join-Path $BuildRoot "moss\_internal") -Recurse -Force
+$LspRoot = Join-Path $Root "build\lsp\moss-lsp"
+Copy-Item (Join-Path $LspRoot "moss-lsp.exe") (Join-Path $BuildRoot "moss\moss-lsp.exe")
+Copy-Item (Join-Path $LspRoot "_internal\*") (Join-Path $BuildRoot "moss\_internal") -Recurse -Force
 
 $IsccCommand = Get-Command iscc -ErrorAction SilentlyContinue
 $Iscc = if ($IsccCommand) { $IsccCommand.Source } else { $null }
@@ -56,3 +68,19 @@ if (-not $Iscc) {
 if (-not $Iscc) { throw "Inno Setup compiler was not found." }
 
 & $Iscc (Join-Path $PSScriptRoot "moss.iss")
+
+$Portable = Join-Path $ReleaseRoot "Moss-0.5.0-Windows-Portable.zip"
+Remove-Item $Portable -Force -ErrorAction SilentlyContinue
+Compress-Archive -Path (Join-Path $BuildRoot "moss\*") -DestinationPath $Portable -CompressionLevel Optimal
+
+$Artifacts = @(
+  (Join-Path $ReleaseRoot "Moss-0.5.0-Windows-Setup.exe"),
+  $Portable,
+  (Join-Path $Root "dist\mosslang-0.5.0-py3-none-any.whl"),
+  (Join-Path $Root "dist\mosslang-0.5.0.tar.gz")
+)
+$Hashes = foreach ($Artifact in $Artifacts) {
+  $Hash = Get-FileHash $Artifact -Algorithm SHA256
+  "$($Hash.Hash.ToLower())  $([IO.Path]::GetFileName($Artifact))"
+}
+$Hashes | Set-Content (Join-Path $ReleaseRoot "SHA256SUMS.txt") -Encoding ascii
