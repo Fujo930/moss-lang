@@ -17,6 +17,6 @@
   "package": {
     "entry": "main.moss",
     "name": "moss-project-demo",
-    "version": "0.4.0-alpha"
+    "version": "0.5.0"
   }
 }

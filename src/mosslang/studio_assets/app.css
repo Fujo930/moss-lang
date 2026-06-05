@@ -358,6 +358,17 @@ pre {
   color: var(--muted);
 }
 
+#symbols {
+  display: grid;
+  gap: 6px;
+}
+
+.symbol {
+  width: 100%;
+  text-align: left;
+  color: var(--soft);
+}
+
 .okText {
   color: var(--ok);
 }

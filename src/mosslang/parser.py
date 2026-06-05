@@ -633,6 +633,8 @@ def format_type_text(parts: list[str]) -> str:
             text += part
         elif part == "|":
             text += " | "
+        elif text.endswith(" | "):
+            text += part
         else:
             text += " " + part
     return text.replace(", ", ", ")

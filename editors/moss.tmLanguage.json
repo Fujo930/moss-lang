@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Moss",
+  "scopeName": "source.moss",
+  "fileTypes": ["moss"],
+  "patterns": [
+    {"include": "#comments"},
+    {"include": "#strings"},
+    {"include": "#numbers"},
+    {"include": "#keywords"},
+    {"include": "#types"},
+    {"include": "#functions"}
+  ],
+  "repository": {
+    "comments": {"patterns": [{"name": "comment.line.number-sign.moss", "match": "#.*$"}]},
+    "strings": {"patterns": [{"name": "string.quoted.double.moss", "begin": "\"", "end": "\"", "patterns": [{"name": "constant.character.escape.moss", "match": "\\\\."}]}]},
+    "numbers": {"patterns": [{"name": "constant.numeric.moss", "match": "\\b\\d+(?:\\.\\d+)?(?:\\.[A-Za-z][A-Za-z0-9_]*)?\\b"}]},
+    "keywords": {"patterns": [{"name": "keyword.control.moss", "match": "\\b(effect|type|rule|fn|test|import|let|return|require|else|if|for|in|while|break|continue|match|uses|with|and|or|not)\\b"}, {"name": "constant.language.moss", "match": "\\b(true|false|null)\\b"}]},
+    "types": {"patterns": [{"name": "entity.name.type.moss", "match": "\\b[A-Z][A-Za-z0-9_]*\\b"}]},
+    "functions": {"patterns": [{"name": "entity.name.function.moss", "match": "\\b(?:fn|rule)\\s+([A-Za-z_][A-Za-z0-9_]*)", "captures": {"1": {"name": "entity.name.function.moss"}}}]}
+  }
+}

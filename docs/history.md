@@ -8,6 +8,23 @@ documented, committed, and pushed the current language prototype in
 collaboration with Fujo930. This history is intentionally part development log,
 part memory for future AI agents and human contributors.
 
+## 0.5.0 developer experience
+
+Moss now includes a stdio language server that publishes diagnostics and
+exposes document symbols and semantic tokens. A TextMate grammar provides a
+portable syntax-highlighting foundation for editors.
+
+Golden output files make whole-program behavior reviewable and deterministic.
+Generated Markdown documentation turns Moss effects, schemas, rules, and
+functions into an API reference without maintaining a second source of truth.
+
+Studio now exposes declaration symbols, project graphs, source-mapped traces,
+and host/self-host comparison controls through reusable JSON endpoints.
+
+Why it matters: Moss's compiler surfaces now serve humans, editors, CI, and AI
+agents through stable structures instead of requiring each tool to scrape CLI
+text independently.
+
 ## 0.4.0-alpha project foundation
 
 Moss now supports `moss.toml` package manifests, deterministic reachable import

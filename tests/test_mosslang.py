@@ -6,7 +6,7 @@ import json
 import threading
 from contextlib import redirect_stdout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 
 from mosslang.checker import check_program
@@ -15,11 +15,78 @@ from mosslang.errors import MossRuntimeError
 from mosslang.formatter import format_source
 from mosslang.parser import parse_source
 from mosslang.runtime import Runtime
-from mosslang.studio import analyze_source, resolve_workspace_path, workspace_root
+from mosslang.studio import analyze_source, analyze_trace, resolve_workspace_path, workspace_root
 from mosslang.values import Result, Variant
+from mosslang.tooling import SEMANTIC_TOKEN_TYPES, analyze_document
+from mosslang.lsp import run_server
+from mosslang.docsgen import generate_api_docs
 
 
 class MossLanguageTests(unittest.TestCase):
+    def test_tooling_document_analysis_emits_symbols_diagnostics_and_tokens(self) -> None:
+        result = analyze_document("type Order = Pending | Paid\nfn ship() uses Missing { return 1 }\n")
+        self.assertEqual([item["name"] for item in result["symbols"]], ["Order", "ship"])
+        self.assertTrue(any("undeclared effect" in item["message"] for item in result["diagnostics"]))
+        self.assertGreater(len(result["semanticTokens"]), 0)
+        self.assertIn("keyword", SEMANTIC_TOKEN_TYPES)
+
+    def test_tooling_keeps_parse_diagnostics_when_semantic_tokens_fail(self) -> None:
+        result = analyze_document('"unterminated')
+        self.assertIn("unterminated string literal", result["diagnostics"][0]["message"])
+        self.assertEqual(result["semanticTokens"], [])
+
+    def test_lsp_initializes_and_publishes_diagnostics(self) -> None:
+        messages = [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+            {
+                "jsonrpc": "2.0",
+                "method": "textDocument/didOpen",
+                "params": {"textDocument": {"uri": "file:///bad.moss", "text": "fn bad() uses Missing { return 1 }\n"}},
+            },
+            {"jsonrpc": "2.0", "id": 2, "method": "shutdown", "params": {}},
+            {"jsonrpc": "2.0", "method": "exit", "params": {}},
+        ]
+        reader = BytesIO()
+        for message in messages:
+            data = json.dumps(message).encode("utf-8")
+            reader.write(f"Content-Length: {len(data)}\r\n\r\n".encode("ascii") + data)
+        reader.seek(0)
+        writer = BytesIO()
+        self.assertEqual(run_server(reader, writer), 0)
+        text = writer.getvalue().decode("utf-8")
+        self.assertIn("semanticTokensProvider", text)
+        self.assertIn("publishDiagnostics", text)
+        self.assertIn("undeclared effect", text)
+
+    def test_golden_output_check_and_update(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.moss"
+            path.write_text('print("Moss")\n', encoding="utf-8")
+            self.assertEqual(cli_main(["golden", "--update", str(path)]), 0)
+            self.assertEqual(cli_main(["golden", str(path)]), 0)
+            path.write_text('print("changed")\n', encoding="utf-8")
+            self.assertEqual(cli_main(["golden", str(path)]), 1)
+
+    def test_generated_api_docs_include_types_rules_and_effects(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "api.moss"
+            path.write_text(
+                "effect Database\n"
+                "type Order =\n  id: Text\n"
+                "rule ready(order: Order) -> Bool = true\n"
+                "fn save(order: Order) -> Order uses Database { return order }\n",
+                encoding="utf-8",
+            )
+            rendered = generate_api_docs(path)
+        self.assertIn("## Effect: Database", rendered)
+        self.assertIn("| `id` | `Text` |", rendered)
+        self.assertIn("ready(order: Order) -> Bool", rendered)
+        self.assertIn("uses Database", rendered)
+
+    def test_union_type_text_has_canonical_spacing(self) -> None:
+        program = parse_source("type Status = Pending | Paid | Failed(Text)\n")
+        self.assertEqual(program.items[0].alias, "Pending | Paid | Failed(Text)")
+
     def run_source(self, source: str) -> tuple[Runtime, list[str]]:
         output: list[str] = []
         runtime = Runtime(output.append)
@@ -392,6 +459,14 @@ fn save(order) {
         result = analyze_source("fn broken() uses Missing {\n  return 1\n}\n", execute=False)
         self.assertEqual(result["diagnostics"][0]["line"], 1)
         self.assertEqual(result["diagnostics"][0]["column"], 1)
+
+    def test_studio_analysis_exposes_symbols_and_rule_trace(self) -> None:
+        source = "rule ready() -> Bool = true\nprint(ready())\n"
+        analysis = analyze_source(source, execute=False)
+        traced = analyze_trace(source)
+        self.assertEqual(analysis["symbols"][0]["name"], "ready")
+        self.assertEqual(traced["trace"][0]["rule"], "ready")
+        self.assertIn("ready -> true", traced["output"][0])
 
     def test_formatter_normalizes_indentation_and_preserves_comments(self) -> None:
         source = 'fn work() {\nlet x = "{"   \n# keep me\nif true {\nprint(x)\n}\n}\n\n'

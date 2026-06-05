@@ -92,20 +92,23 @@ Make Moss feel like a language for real systems:
 - explicit `Network` effect HTTP GET and JSON POST adapters
 - source-mapped rule evaluation traces through `moss trace`
 
-The manifest and project-command foundation is implemented. The remaining 0.4
-work focuses on stronger module boundaries, external package dependencies,
-migrations, custom capability implementations, adapters, and traces.
+The 0.4 product-engineering roadmap is implemented. Stronger module boundaries
+and external package dependencies remain longer-term work.
 
 ## Version 0.5: editor and playground
 
 Developer experience:
 
-- syntax highlighting grammar
-- language server diagnostics
-- source-located Studio diagnostics and host/self-host comparison controls
-- hosted browser playground built from the local Studio API shape
+- TextMate syntax highlighting grammar
+- stdio language server diagnostics, symbols, and semantic tokens
+- source-located Studio diagnostics, symbols, project graphs, traces, and
+  host/self-host comparison controls
+- reusable JSON Studio API shape ready for a hosted browser playground
 - test runner with golden output files
-- generated API and schema docs
+- generated Markdown API and schema docs
+
+Version 0.5 feature work is complete. The next milestone focuses on replacing
+host frontend stages with the verified Moss-written frontend.
 
 ## Research track
 

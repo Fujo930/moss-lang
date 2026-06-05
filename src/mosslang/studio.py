@@ -5,17 +5,21 @@ import json
 import os
 import pprint
 import sys
+from contextlib import redirect_stdout
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
 from typing import Any
+from io import StringIO
 
 from .checker import Diagnostic, check_program
 from .errors import MossError
 from .parser import parse_source
 from .runtime import Runtime
 from .tokens import tokenize
+from .tooling import analyze_document
+from .project import build_project_graph, find_manifest, load_manifest
 
 
 ASSET_TYPES = {
@@ -54,6 +58,8 @@ def analyze_source(
         "tokens": [],
         "ast": "",
         "summary": {"effects": 0, "imports": 0, "types": 0, "callables": 0, "tests": 0},
+        "symbols": [],
+        "semanticTokens": [],
     }
 
     try:
@@ -67,6 +73,9 @@ def analyze_source(
         ]
         response["ast"] = pprint.pformat(program, width=96)
         response["summary"] = summarize_program(program)
+        tooling = analyze_document(source)
+        response["symbols"] = tooling["symbols"]
+        response["semanticTokens"] = tooling["semanticTokens"]
 
         if any(d.level == "error" for d in diagnostics):
             return response
@@ -204,6 +213,12 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
             if self.path == "/api/file/write":
                 self.handle_file_write(payload)
                 return
+            if self.path == "/api/project/info":
+                self.handle_project_info(payload)
+                return
+            if self.path == "/api/selfhost/compare":
+                self.handle_selfhost_compare()
+                return
 
             source = str(payload.get("source", ""))
             path = str(payload.get("path", ""))
@@ -215,6 +230,9 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
                 return
             if self.path == "/api/test":
                 self.send_json(analyze_source(source, execute=True, test=True, path=path))
+                return
+            if self.path == "/api/trace":
+                self.send_json(analyze_trace(source, path=path))
                 return
             self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -240,6 +258,25 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
             except (OSError, ValueError) as exc:
                 self.send_json({"ok": False, "message": str(exc)}, status=400)
 
+        def handle_project_info(self, payload: dict[str, Any]) -> None:
+            try:
+                start = resolve_workspace_path(str(payload.get("path", ".")))
+                manifest_path = find_manifest(start)
+                if manifest_path is None:
+                    raise ValueError("no moss.toml found")
+                self.send_json({"ok": True, **build_project_graph(load_manifest(manifest_path)).as_json()})
+            except (OSError, ValueError, MossError) as exc:
+                self.send_json({"ok": False, "message": str(exc)}, status=400)
+
+        def handle_selfhost_compare(self) -> None:
+            from .cli import run_selfhost_compare
+
+            output = StringIO()
+            root = Path(__file__).resolve().parents[2]
+            with redirect_stdout(output):
+                code = run_selfhost_compare(root / "examples")
+            self.send_json({"ok": code == 0, "output": output.getvalue().splitlines()})
+
         def send_asset(self, name: str) -> None:
             data = asset_bytes(name)
             self.send_response(HTTPStatus.OK)
@@ -260,6 +297,22 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
             return
 
     return StudioHandler
+
+
+def analyze_trace(source: str, *, path: str | None = None) -> dict[str, Any]:
+    response = analyze_source(source, execute=False, path=path)
+    if not response["ok"]:
+        return response
+    output: list[str] = []
+    program = parse_source(source)
+    runtime = Runtime(output.append, base_path=analysis_base_path(path), trace_rules=True)
+    runtime.run(program)
+    response["output"] = [
+        f"{event.get('line', 1)}:{event.get('column', 1)} {event['rule']} -> {event['result']}"
+        for event in runtime.trace_events
+    ]
+    response["trace"] = runtime.trace_events
+    return response
 
 
 def run_studio(host: str = "127.0.0.1", port: int = 8765) -> None:

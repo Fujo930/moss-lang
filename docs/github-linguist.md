@@ -12,7 +12,7 @@ Local repository setup already done:
 
 - `.moss` files are marked detectable in `.gitattributes`
 - README shows a visible `Language: Moss` badge
-- README shows `Built by Codex` and `version 0.4.0-alpha` badges
+- README shows `Built by Codex` and `version 0.5.0` badges
 - README and Studio use the canonical branching M language mark
 - `examples/self_host` contains real Moss source samples for future Linguist
   fixtures

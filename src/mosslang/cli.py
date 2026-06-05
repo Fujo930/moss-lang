@@ -78,6 +78,14 @@ def main(argv: list[str] | None = None) -> int:
     project_format_cmd.add_argument("directory", type=Path)
     project_format_cmd.add_argument("--check", action="store_true", help="fail if any reachable module needs formatting")
 
+    golden_cmd = sub.add_parser("golden")
+    golden_cmd.add_argument("file", type=Path)
+    golden_cmd.add_argument("--update", action="store_true", help="write the current output as the golden file")
+
+    docs_cmd = sub.add_parser("docs")
+    docs_cmd.add_argument("file", type=Path)
+    docs_cmd.add_argument("--output", type=Path)
+
     sub.add_parser("repl", help="start an interactive multiline Moss session")
 
     studio_cmd = sub.add_parser("studio")
@@ -119,6 +127,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "project-format":
             return run_project_format(args.directory, check=args.check)
+
+        if args.command == "golden":
+            return run_golden(args.file, update=args.update)
+
+        if args.command == "docs":
+            return run_docs(args.file, output=args.output)
 
         if args.command == "repl":
             return run_repl()
@@ -480,6 +494,47 @@ def run_project_format(directory: Path, *, check: bool = False) -> int:
         print(f"{prefix}: {graph.relative(path)}")
     print(f"project format: {len(graph.programs)} module(s), {len(changed)} changed")
     return 1 if check and changed else 0
+
+
+def run_golden(path: Path, *, update: bool = False) -> int:
+    source = path.read_text(encoding="utf-8-sig")
+    program = parse_source(source)
+    diagnostics = check_program(program)
+    errors = [item for item in diagnostics if item.level == "error"]
+    if errors:
+        for diagnostic in diagnostics:
+            print(diagnostic.format(), file=sys.stderr)
+        return 1
+    output: list[str] = []
+    Runtime(output.append, base_path=path.parent).run(program)
+    actual = "\n".join(output) + ("\n" if output else "")
+    golden_path = path.with_suffix(path.suffix + ".golden")
+    if update:
+        golden_path.write_text(actual, encoding="utf-8")
+        print(f"updated: {golden_path}")
+        return 0
+    if not golden_path.is_file():
+        print(f"missing golden file: {golden_path}", file=sys.stderr)
+        return 1
+    expected = golden_path.read_text(encoding="utf-8")
+    if expected != actual:
+        print(f"golden output mismatch: {golden_path}", file=sys.stderr)
+        return 1
+    print(f"PASS {path}")
+    return 0
+
+
+def run_docs(path: Path, *, output: Path | None = None) -> int:
+    from .docsgen import generate_api_docs
+
+    rendered = generate_api_docs(path)
+    if output is None:
+        print(rendered, end="")
+    else:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered, encoding="utf-8")
+        print(f"generated: {output}")
+    return 0
 
 
 def run_repl(*, input_fn=input, output_fn=print) -> int:

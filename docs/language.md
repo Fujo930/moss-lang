@@ -5,7 +5,7 @@ prototype.
 
 Moss is AI-designed and AI-built. Codex designed, implemented, debugged,
 documented, committed, and pushed the current prototype in collaboration with
-Fujo930. The current public version is `0.4.0-alpha`, a self-hosting preview rather
+Fujo930. The current public version is `0.5.0`, a self-hosting preview rather
 than a finished self-hosted compiler.
 
 The language's public identity and supported project wording live in
@@ -388,7 +388,7 @@ The formatter normalizes block indentation, common expression spacing,
 trailing whitespace, and the final newline while preserving strings and
 comments.
 
-As of `0.4.0-alpha`, the Moss-written checker validates duplicate declarations,
+As of `0.5.0`, the Moss-written checker validates duplicate declarations,
 duplicate record fields, import shape, undeclared effects, parse errors, and
 simple type references in record fields, function signatures, and rule
 signatures. This is the start of self-hosting, not the end state.

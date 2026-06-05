@@ -52,6 +52,6 @@
   "package": {
     "entry": "examples/self_host/project_check.moss",
     "name": "moss-self-host",
-    "version": "0.4.0-alpha"
+    "version": "0.5.0"
   }
 }

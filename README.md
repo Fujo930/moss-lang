@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
-![Version: 0.4.0-alpha](https://img.shields.io/badge/version-0.4.0--alpha-4f7edb)
+![Version: 0.5.0](https://img.shields.io/badge/version-0.5.0-4f7edb)
 ![Built by Codex](https://img.shields.io/badge/built%20by-Codex-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -17,10 +17,11 @@ debugged, documented, committed, and pushed by Codex in collaboration with
 Fujo930. The project is public as a record of that process and as a runnable
 language prototype.
 
-Version `0.4.0-alpha` begins the product-engineering roadmap with project
-manifests, deterministic module graphs, project-wide checking, and project
-commands. Moss is not fully self-hosted yet, but its Moss-written frontend is
-now declared, checked, and tested as a Moss project.
+Version `0.5.0` completes the first developer-experience roadmap with a language
+server, TextMate grammar, golden output tests, generated API docs, and richer
+Studio project and self-host controls. Moss is not fully self-hosted yet, but
+its Moss-written frontend is declared, checked, tested, and compared as a Moss
+project.
 
 The branching M is Moss's language mark: two contributors meeting in a shared
 syntax tree. See `docs/identity.md` for the public description and identity
@@ -39,6 +40,8 @@ moss format --check examples/order.moss
 moss selfhost
 moss selfhost --quick
 moss selfhost-compare examples
+moss golden examples/order.moss
+moss docs examples/order.moss
 moss repl
 moss studio
 ```
@@ -96,6 +99,12 @@ The package exposes a console command named `moss`.
 - deterministic `moss.lock` files with module content hashes
 - project initialization, inspection, checking, running, and testing commands
 - project-wide checks for missing imports, cycles, and declaration conflicts
+- editor diagnostics, symbols, and semantic tokens through `moss-lsp`
+- TextMate syntax highlighting through `editors/moss.tmLanguage.json`
+- golden output checking and updating through `moss golden`
+- generated Markdown API and schema references through `moss docs`
+- Studio project graphs, declaration symbols, traces, and host/self-host
+  comparison controls
 - self-hosting sketches with structured token records, reusable lexer/parser
   cores, structured expression and recursive control-flow statement AST nodes,
   a top-level declaration parser, and a first checker sketch:
@@ -174,6 +183,9 @@ moss tokens <file.moss>
 moss ast <file.moss>
 moss trace <file.moss>
 moss trace --json <file.moss>
+moss golden <file.moss>
+moss golden --update <file.moss>
+moss docs <file.moss> [--output <path>]
 moss format <file.moss>
 moss format --check <file.moss>
 moss selfhost
@@ -181,6 +193,7 @@ moss selfhost --quick
 moss selfhost-compare examples
 moss repl
 moss studio
+moss-lsp
 ```
 
 `moss studio` opens a local HTTP editor at `http://127.0.0.1:8765`.
@@ -213,6 +226,15 @@ whitespace, and the final newline while preserving strings and comments.
 including arguments, result, source file, line, and column. Its JSON form is a
 stable input for audit tools and AI agents.
 
+`moss golden` compares program output with a neighboring `.golden` file.
+`moss golden --update` records an intentional new result.
+
+`moss docs` generates a Markdown reference from effects, records, unions,
+rules, functions, parameters, return types, and declared effects.
+
+`moss-lsp` starts the stdio language server used by compatible editors. It
+publishes diagnostics and exposes document symbols and semantic tokens.
+
 `moss selfhost --quick` runs the fast self-hosting sketches. `moss selfhost`
 also runs the slower Moss-written project check over `examples/self_host`.
 `moss selfhost-compare examples` compares Python-host and Moss-written parser
@@ -221,9 +243,9 @@ expression and match-pattern ASTs across all root example programs.
 
 ## Project status
 
-This is version `0.4.0-alpha`: a compact interpreter with real syntax, runtime
-semantics, project engineering tooling, a browser editor, and a verified
-Moss-written frontend.
+This is version `0.5.0`: a compact interpreter with real syntax, runtime
+semantics, deterministic project tooling, editor integrations, a browser
+workbench, and a verified Moss-written frontend.
 The repository is released under the MIT License.
 
 Suitable claims:
@@ -233,8 +255,8 @@ Suitable claims:
 - Moss has begun self-hosting.
 - Moss is still alpha software and should not be described as fully self-hosted.
 
-The current 0.4 work continues toward module boundaries, package dependencies,
-custom effects, adapters, traces, and frontend replacement.
+The next work continues toward replacing host frontend stages with Moss-written
+stages while strengthening module boundaries and package dependencies.
 
 GitHub's language bar is powered by Linguist. `.moss` files are marked
 detectable in `.gitattributes`, but GitHub will only show `Moss` as a first-class
@@ -243,7 +265,8 @@ language after Moss is accepted into the upstream Linguist language list.
 See `docs/language.md` for the current language surface,
 `docs/projects.md` for manifests and project commands,
 `docs/studio.md` for the browser editor,
+`docs/tooling.md` for editor and developer tooling,
 `docs/history.md` for a commit-by-commit feature guide, and
 `docs/roadmap.md` for the path from prototype to a serious implementation.
-See `docs/release.md` for the public `0.3.0-alpha` release notes and packaging
-checklist, and `docs/identity.md` for the Moss identity.
+See `docs/release-0.5.md` for the current release notes and packaging checklist,
+and `docs/identity.md` for the Moss identity.

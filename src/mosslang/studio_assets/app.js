@@ -12,6 +12,7 @@ const pathInput = document.querySelector("#pathInput");
 const fileInput = document.querySelector("#fileInput");
 const exampleSelect = document.querySelector("#exampleSelect");
 const diagnosticCount = document.querySelector("#diagnosticCount");
+const symbols = document.querySelector("#symbols");
 
 let currentName = "scratch.moss";
 let debounceId = 0;
@@ -101,6 +102,9 @@ function bindEvents() {
   document.querySelector("#runButton").addEventListener("click", runSource);
   document.querySelector("#testButton").addEventListener("click", testSource);
   document.querySelector("#checkButton").addEventListener("click", checkSource);
+  document.querySelector("#traceButton").addEventListener("click", traceSource);
+  document.querySelector("#projectButton").addEventListener("click", inspectProject);
+  document.querySelector("#compareButton").addEventListener("click", compareSelfhost);
   document.querySelector("#newButton").addEventListener("click", newFile);
   document.querySelector("#loadPathButton").addEventListener("click", loadWorkspacePath);
   document.querySelector("#savePathButton").addEventListener("click", saveWorkspacePath);
@@ -257,6 +261,42 @@ async function testSource() {
   }
 }
 
+async function traceSource() {
+  setBusy("Tracing");
+  activateTab("output");
+  try {
+    renderResult(await fetchJson("/api/trace", { source: editor.value, path: currentName }));
+  } catch (error) {
+    renderFailure(error);
+  }
+}
+
+async function inspectProject() {
+  setBusy("Inspecting");
+  activateTab("output");
+  try {
+    const result = await fetchJson("/api/project/info", { path: currentName });
+    output.textContent = `${result.package.name} ${result.package.version}\n` + result.modules.map(item => `${item.path} -> ${item.imports.join(", ") || "-"}`).join("\n");
+    health.textContent = "Project OK";
+    health.className = "okText";
+  } catch (error) {
+    renderFailure(error);
+  }
+}
+
+async function compareSelfhost() {
+  setBusy("Comparing");
+  activateTab("output");
+  try {
+    const result = await fetchJson("/api/selfhost/compare", {});
+    output.textContent = result.output.join("\n");
+    health.textContent = result.ok ? "Self-host OK" : "Mismatch";
+    health.className = result.ok ? "okText" : "errorText";
+  } catch (error) {
+    renderFailure(error);
+  }
+}
+
 async function loadWorkspacePath() {
   const path = pathInput.value.trim();
   if (!path) {
@@ -314,6 +354,7 @@ function renderResult(result) {
   ast.textContent = result.ast || "";
   renderDiagnostics(result.diagnostics, result.ok);
   renderTokens(result.tokens);
+  renderSymbols(result.symbols || []);
 }
 
 function renderFailure(error) {
@@ -377,6 +418,18 @@ function renderTokens(items) {
     grid.append(kind, value, loc);
   });
   tokens.appendChild(grid);
+}
+
+function renderSymbols(items) {
+  symbols.innerHTML = "";
+  items.forEach(item => {
+    const node = document.createElement("button");
+    node.className = "symbol";
+    node.textContent = item.name;
+    node.title = "Go to declaration";
+    node.addEventListener("click", () => focusLocation(item.range.start.line + 1, item.range.start.character + 1));
+    symbols.appendChild(node);
+  });
 }
 
 function setBusy(label) {

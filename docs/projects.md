@@ -1,6 +1,6 @@
 # Moss projects
 
-Moss `0.4.0-alpha` introduces a manifest-driven project workflow intended for
+Moss `0.5.0` includes a manifest-driven project workflow intended for
 long-lived codebases maintained by humans and AI agents.
 
 ## Create a project

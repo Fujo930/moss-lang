@@ -15,7 +15,7 @@
           <img class="mark" src="/moss-mark.svg" alt="" />
           <span class="brandName">Moss</span>
           <span class="brandSurface">Studio</span>
-          <span class="releaseTag" title="Moss 0.4.0 alpha project-engineering build">0.4 alpha</span>
+          <span class="releaseTag" title="Moss 0.5.0 developer-experience build">0.5</span>
         </div>
         <div class="toolbar">
           <div class="toolGroup sourceTools">
@@ -31,6 +31,9 @@
           </div>
           <div class="toolGroup actionTools" aria-label="Moss commands">
             <button id="checkButton" title="Check current source">Check</button>
+            <button id="traceButton" title="Trace rule evaluations">Trace</button>
+            <button id="projectButton" title="Inspect current Moss project">Project</button>
+            <button id="compareButton" title="Compare host and self-host frontends">Self-host</button>
             <button id="testButton" title="Run Moss test blocks">Test</button>
             <button id="runButton" class="primary" title="Run current source">Run</button>
           </div>
@@ -60,6 +63,7 @@
             <button class="tab" data-tab="diagnostics">Diagnostics <span id="diagnosticCount" class="tabCount">0</span></button>
             <button class="tab" data-tab="ast">AST</button>
             <button class="tab" data-tab="tokens">Tokens</button>
+            <button class="tab" data-tab="symbols">Symbols</button>
           </nav>
           <section id="outputPanel" class="panel active">
             <pre id="output"></pre>
@@ -72,6 +76,9 @@
           </section>
           <section id="tokensPanel" class="panel">
             <div id="tokens"></div>
+          </section>
+          <section id="symbolsPanel" class="panel">
+            <div id="symbols"></div>
           </section>
         </aside>
       </section>

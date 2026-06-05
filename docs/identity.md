@@ -12,7 +12,7 @@ Use this short description:
 > Moss is an AI-designed and AI-built programming language prototype for
 > long-lived AI-and-human software projects.
 
-Moss `0.4.0-alpha` is a project-aware self-hosting preview. Its Moss-written
+Moss `0.5.0` is a tooling-ready self-hosting preview. Its Moss-written
 frontend is recursively compared against the Python host frontend and is
 checked as a manifest-driven Moss project, while the active interpreter and
 CLI still run on Python.
