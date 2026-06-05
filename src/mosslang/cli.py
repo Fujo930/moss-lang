@@ -15,7 +15,14 @@ from .checker import check_program
 from .errors import MossError
 from .nodes import FunctionDecl, RuleDecl, TypeDecl
 from .parser import parse_source
-from .project import build_project_graph, find_manifest, initialize_project, load_manifest
+from .project import (
+    build_project_graph,
+    find_manifest,
+    initialize_project,
+    load_manifest,
+    verify_project_lock,
+    write_project_lock,
+)
 from .runtime import Runtime
 from .tokens import tokenize
 
@@ -44,12 +51,15 @@ def main(argv: list[str] | None = None) -> int:
     project_cmd = sub.add_parser("project-check")
     project_cmd.add_argument("directory", type=Path)
     project_cmd.add_argument("--json", action="store_true", help="emit one structured project result")
+    project_cmd.add_argument("--locked", action="store_true", help="fail if moss.lock does not match the project")
 
     project_run_cmd = sub.add_parser("project-run")
     project_run_cmd.add_argument("directory", type=Path)
+    project_run_cmd.add_argument("--locked", action="store_true", help="require a matching moss.lock")
 
     project_test_cmd = sub.add_parser("project-test")
     project_test_cmd.add_argument("directory", type=Path)
+    project_test_cmd.add_argument("--locked", action="store_true", help="require a matching moss.lock")
 
     project_info_cmd = sub.add_parser("project-info")
     project_info_cmd.add_argument("directory", type=Path)
@@ -58,6 +68,9 @@ def main(argv: list[str] | None = None) -> int:
     project_init_cmd = sub.add_parser("project-init")
     project_init_cmd.add_argument("directory", type=Path)
     project_init_cmd.add_argument("--name", help="package name; defaults to the directory name")
+
+    project_lock_cmd = sub.add_parser("project-lock")
+    project_lock_cmd.add_argument("directory", type=Path)
 
     sub.add_parser("repl", help="start an interactive multiline Moss session")
 
@@ -81,19 +94,22 @@ def main(argv: list[str] | None = None) -> int:
             return run_selfhost_compare(args.file)
 
         if args.command == "project-check":
-            return run_project_check(args.directory, json_output=args.json)
+            return run_project_check(args.directory, json_output=args.json, locked=args.locked)
 
         if args.command == "project-run":
-            return run_project_run(args.directory)
+            return run_project_run(args.directory, locked=args.locked)
 
         if args.command == "project-test":
-            return run_project_test(args.directory)
+            return run_project_test(args.directory, locked=args.locked)
 
         if args.command == "project-info":
             return run_project_info(args.directory, json_output=args.json)
 
         if args.command == "project-init":
             return run_project_init(args.directory, name=args.name)
+
+        if args.command == "project-lock":
+            return run_project_lock(args.directory)
 
         if args.command == "repl":
             return run_repl()
@@ -207,10 +223,10 @@ def diagnostic_json(diagnostic) -> dict:
     return result
 
 
-def run_project_check(directory: Path, *, json_output: bool = False) -> int:
+def run_project_check(directory: Path, *, json_output: bool = False, locked: bool = False) -> int:
     manifest_path = find_manifest(directory)
     if manifest_path is not None:
-        return run_manifest_project_check(manifest_path, json_output=json_output)
+        return run_manifest_project_check(manifest_path, json_output=json_output, locked=locked)
     paths = sorted(directory.rglob("*.moss"))
     results: list[dict] = []
     error_count = 0
@@ -257,11 +273,13 @@ def run_project_check(directory: Path, *, json_output: bool = False) -> int:
     return 1 if error_count else 0
 
 
-def run_manifest_project_check(manifest_path: Path, *, json_output: bool = False) -> int:
+def run_manifest_project_check(manifest_path: Path, *, json_output: bool = False, locked: bool = False) -> int:
     manifest = load_manifest(manifest_path)
     graph = build_project_graph(manifest)
     results: list[dict] = []
     diagnostics = list(graph.diagnostics)
+    if locked:
+        diagnostics.extend(verify_project_lock(graph))
 
     for path in sorted(graph.programs):
         program = graph.programs[path]
@@ -321,12 +339,14 @@ def run_project_info(directory: Path, *, json_output: bool = False) -> int:
     return 1 if any(item["level"] == "error" for item in graph.diagnostics) else 0
 
 
-def run_project_run(directory: Path) -> int:
+def run_project_run(directory: Path, *, locked: bool = False) -> int:
     manifest_path = find_manifest(directory)
     if manifest_path is None:
         raise ValueError(f"no moss.toml found from {directory}")
     manifest = load_manifest(manifest_path)
     graph = build_project_graph(manifest)
+    if locked:
+        graph.diagnostics.extend(verify_project_lock(graph))
     if graph.diagnostics:
         for diagnostic in graph.diagnostics:
             print(f"{diagnostic['file']}: {diagnostic['level']}: {diagnostic['message']}", file=sys.stderr)
@@ -342,12 +362,14 @@ def run_project_run(directory: Path) -> int:
     return 0
 
 
-def run_project_test(directory: Path) -> int:
+def run_project_test(directory: Path, *, locked: bool = False) -> int:
     manifest_path = find_manifest(directory)
     if manifest_path is None:
         raise ValueError(f"no moss.toml found from {directory}")
     manifest = load_manifest(manifest_path)
     graph = build_project_graph(manifest)
+    if locked:
+        graph.diagnostics.extend(verify_project_lock(graph))
     if graph.diagnostics:
         for diagnostic in graph.diagnostics:
             print(f"{diagnostic['file']}: {diagnostic['level']}: {diagnostic['message']}", file=sys.stderr)
@@ -374,6 +396,20 @@ def run_project_init(directory: Path, *, name: str | None = None) -> int:
     manifest = initialize_project(directory, package_name)
     print(f"created {manifest.name} at {manifest.root}")
     print(f"entry: {manifest.entry.relative_to(manifest.root).as_posix()}")
+    return 0
+
+
+def run_project_lock(directory: Path) -> int:
+    manifest_path = find_manifest(directory)
+    if manifest_path is None:
+        raise ValueError(f"no moss.toml found from {directory}")
+    graph = build_project_graph(load_manifest(manifest_path))
+    if graph.diagnostics:
+        for diagnostic in graph.diagnostics:
+            print(f"{diagnostic['file']}: {diagnostic['level']}: {diagnostic['message']}", file=sys.stderr)
+        return 1
+    path = write_project_lock(graph)
+    print(f"locked {len(graph.programs)} module(s): {path}")
     return 0
 
 

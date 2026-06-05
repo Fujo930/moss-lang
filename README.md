@@ -90,6 +90,7 @@ The package exposes a console command named `moss`.
   `listFiles`
 - top-level `import "path.moss"` declarations
 - `moss.toml` manifests, deterministic import graphs, and declared source roots
+- deterministic `moss.lock` files with module content hashes
 - project initialization, inspection, checking, running, and testing commands
 - project-wide checks for missing imports, cycles, and declaration conflicts
 - self-hosting sketches with structured token records, reusable lexer/parser
@@ -158,6 +159,7 @@ moss project-check <directory>
 moss project-check --json <directory>
 moss project-info <directory>
 moss project-info --json <directory>
+moss project-lock <directory>
 moss project-run <directory>
 moss project-test <directory>
 moss project-init <directory> [--name <package-name>]
@@ -188,6 +190,10 @@ graph and performs an additional package-wide static check.
 AI agents. `moss project-run` and `moss project-test` run the manifest entry
 with its declared source roots. `moss project-init` creates a minimal runnable
 project.
+
+`moss project-lock` writes the current module graph and SHA-256 source hashes to
+`moss.lock`. Use `moss project-check --locked`, `moss project-run --locked`, or
+`moss project-test --locked` in CI when project drift must be explicit.
 
 `moss format` normalizes block indentation, expression spacing, trailing
 whitespace, and the final newline while preserving strings and comments.

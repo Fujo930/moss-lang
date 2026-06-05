@@ -205,6 +205,53 @@ class MossLanguageTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(output.getvalue().strip(), "from lib")
 
+    def test_project_lock_detects_source_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "moss.toml").write_text(
+                '[package]\nname = "locked"\nversion = "0.4.0"\nentry = "main.moss"\n',
+                encoding="utf-8",
+            )
+            source = root / "main.moss"
+            source.write_text('print("first")\n', encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                lock_code = cli_main(["project-lock", str(root)])
+                clean_code = cli_main(["project-check", "--locked", str(root)])
+            source.write_text('print("changed")\n', encoding="utf-8")
+            with redirect_stdout(output):
+                drift_code = cli_main(["project-check", "--locked", str(root)])
+        self.assertEqual(lock_code, 0)
+        self.assertEqual(clean_code, 0)
+        self.assertEqual(drift_code, 1)
+        self.assertIn("module changed: main.moss", output.getvalue())
+
+    def test_project_locked_run_requires_lock_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "moss.toml").write_text(
+                '[package]\nname = "unlocked"\nversion = "0.4.0"\nentry = "main.moss"\n',
+                encoding="utf-8",
+            )
+            (root / "main.moss").write_text('print("hello")\n', encoding="utf-8")
+            code = cli_main(["project-run", "--locked", str(root)])
+        self.assertEqual(code, 1)
+
+    def test_project_locked_check_reports_invalid_lock_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "moss.toml").write_text(
+                '[package]\nname = "invalid-lock"\nversion = "0.4.0"\nentry = "main.moss"\n',
+                encoding="utf-8",
+            )
+            (root / "main.moss").write_text('print("hello")\n', encoding="utf-8")
+            (root / "moss.lock").write_text("[]\n", encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["project-check", "--locked", str(root)])
+        self.assertEqual(code, 1)
+        self.assertIn("invalid lock file: expected an object with modules", output.getvalue())
+
     def test_multiline_repl_keeps_runtime_state(self) -> None:
         lines = iter(["fn double(value: Number) -> Number {", "return value * 2", "}", "", "print(double(4))"])
         output: list[str] = []

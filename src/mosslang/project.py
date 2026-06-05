@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import tomllib
+import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -11,6 +13,7 @@ from .parser import parse_source
 
 
 MANIFEST_NAME = "moss.toml"
+LOCK_NAME = "moss.lock"
 
 
 @dataclass(frozen=True)
@@ -225,3 +228,54 @@ def initialize_project(directory: Path, name: str) -> ProjectManifest:
     )
     entry_path.write_text('print("Hello from Moss")\n', encoding="utf-8")
     return load_manifest(manifest_path)
+
+
+def project_lock_payload(graph: ProjectGraph) -> dict[str, Any]:
+    return {
+        "format": 1,
+        "package": graph.as_json()["package"],
+        "modules": [
+            {
+                "path": graph.relative(path),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "imports": [graph.relative(dependency) for dependency in graph.imports.get(path, [])],
+            }
+            for path in sorted(graph.programs)
+        ],
+    }
+
+
+def write_project_lock(graph: ProjectGraph) -> Path:
+    path = graph.manifest.root / LOCK_NAME
+    path.write_text(json.dumps(project_lock_payload(graph), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def verify_project_lock(graph: ProjectGraph) -> list[dict[str, Any]]:
+    path = graph.manifest.root / LOCK_NAME
+    if not path.is_file():
+        return [{"level": "error", "file": LOCK_NAME, "message": "lock file missing; run moss project-lock"}]
+    try:
+        locked = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [{"level": "error", "file": LOCK_NAME, "message": f"invalid lock file: {exc}"}]
+    if not isinstance(locked, dict) or not isinstance(locked.get("modules"), list):
+        return [{"level": "error", "file": LOCK_NAME, "message": "invalid lock file: expected an object with modules"}]
+    current = project_lock_payload(graph)
+    if locked == current:
+        return []
+    locked_modules = {item.get("path"): item for item in locked.get("modules", []) if isinstance(item, dict)}
+    current_modules = {item["path"]: item for item in current["modules"]}
+    messages: list[str] = []
+    for module in sorted(set(locked_modules) | set(current_modules)):
+        if module not in locked_modules:
+            messages.append(f"module added: {module}")
+        elif module not in current_modules:
+            messages.append(f"module removed: {module}")
+        elif locked_modules[module] != current_modules[module]:
+            messages.append(f"module changed: {module}")
+    if locked.get("package") != current["package"]:
+        messages.append("package metadata changed")
+    if locked.get("format") != current["format"]:
+        messages.append("lock format changed")
+    return [{"level": "error", "file": LOCK_NAME, "message": message} for message in messages or ["lock file changed"]]

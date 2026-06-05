@@ -35,6 +35,7 @@ moss project-info .
 moss project-info --json .
 moss project-check .
 moss project-check --json .
+moss project-lock .
 moss project-run .
 moss project-test .
 ```
@@ -47,6 +48,21 @@ project-boundary escapes, cycles, and cross-module declaration conflicts.
 `project-run` executes the entry module. `project-test` executes every test
 reachable through its imports.
 
+## Locked projects
+
+```powershell
+moss project-lock .
+moss project-check --locked .
+moss project-run --locked .
+moss project-test --locked .
+```
+
+`project-lock` writes a deterministic `moss.lock` containing package metadata,
+the reachable import graph, and a SHA-256 digest for every module. Locked
+commands fail when modules are added, removed, changed, or rewired. This gives
+CI and AI agents an explicit signal that the project they inspected is still
+the project being checked or executed.
+
 ## Moss checks Moss
 
 The repository root is itself a Moss project. Its entry is the Moss-written
@@ -54,8 +70,8 @@ self-host project checker:
 
 ```powershell
 moss project-info .
-moss project-check .
-moss project-test .
+moss project-check --locked .
+moss project-test --locked .
 ```
 
 This does not mean Moss is fully self-hosted. It means the 0.4 project system

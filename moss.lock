@@ -1,0 +1,57 @@
+{
+  "format": 1,
+  "modules": [
+    {
+      "imports": [
+        "examples/self_host/parser_core.moss"
+      ],
+      "path": "examples/self_host/checker_core.moss",
+      "sha256": "039c4186ae8d650be192f6593e4c80614dc5954db52d0e7bd4add6e8746dbd3e"
+    },
+    {
+      "imports": [
+        "examples/self_host/lexer_core.moss"
+      ],
+      "path": "examples/self_host/expression_core.moss",
+      "sha256": "5c062021c9d9a71f200afa41fe8cec24fd28df7cf39293352aaf9b25052065b1"
+    },
+    {
+      "imports": [
+        "examples/self_host/token_tools.moss"
+      ],
+      "path": "examples/self_host/lexer_core.moss",
+      "sha256": "4fb5633ff6de9f4e079cf4debfd0e3f35960cfb588936d341af4d53aadd9dce3"
+    },
+    {
+      "imports": [
+        "examples/self_host/statement_core.moss"
+      ],
+      "path": "examples/self_host/parser_core.moss",
+      "sha256": "2e13d3cd7f08d78b73684283d945b7553c03cdcfe69c89fc157c3658dad6e7ee"
+    },
+    {
+      "imports": [
+        "examples/self_host/checker_core.moss"
+      ],
+      "path": "examples/self_host/project_check.moss",
+      "sha256": "d1fb489ae19ea90d1c6ae1b70d519ee889049069b268a6d124c192e0b92e5f42"
+    },
+    {
+      "imports": [
+        "examples/self_host/expression_core.moss"
+      ],
+      "path": "examples/self_host/statement_core.moss",
+      "sha256": "638fac5320e1fa93002cab885f6e3cac5f7c8325bac1b2d152ac0126393ce01c"
+    },
+    {
+      "imports": [],
+      "path": "examples/self_host/token_tools.moss",
+      "sha256": "042ed7c52b45827477a2115c0b5f9c0108263b5286ec0ecc5de1bf4f9abeb183"
+    }
+  ],
+  "package": {
+    "entry": "examples/self_host/project_check.moss",
+    "name": "moss-self-host",
+    "version": "0.4.0-alpha"
+  }
+}

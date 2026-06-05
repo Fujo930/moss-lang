@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "modules": [
+    {
+      "imports": [
+        "modules/greeting.moss"
+      ],
+      "path": "main.moss",
+      "sha256": "cb83a4a036d20b92cbec77a1112f8a7a0da151b968bcf3c7ea2fad6e9cc8dffa"
+    },
+    {
+      "imports": [],
+      "path": "modules/greeting.moss",
+      "sha256": "3d594661d26677036a561c9f72b493daaf086d6be8632ca482a0926df69646b0"
+    }
+  ],
+  "package": {
+    "entry": "main.moss",
+    "name": "moss-project-demo",
+    "version": "0.4.0-alpha"
+  }
+}

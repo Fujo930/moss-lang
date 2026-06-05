@@ -84,6 +84,7 @@ Make Moss feel like a language for real systems:
 - package manifests with entry modules and source roots
 - project initialization, inspection, checking, running, and testing
 - project-wide checks for missing imports, cycles, and declaration conflicts
+- deterministic project lock files with module content hashes
 - schema migration declarations
 - effect definitions with custom capabilities
 - JSON and HTTP adapters

@@ -23,6 +23,11 @@ Why it matters: Moss can now reason about a codebase as a project rather than
 as isolated files, and its own Moss-written compiler work is the first real
 consumer of that model.
 
+Project lock files extend that model with a deterministic snapshot of reachable
+modules, import edges, and SHA-256 source hashes. Locked checks, runs, and tests
+fail on drift, giving both CI and AI agents a reliable boundary between
+inspection and execution.
+
 ## 0.3.0-alpha static confidence
 
 The static checker now merges local types learned independently by both sides
