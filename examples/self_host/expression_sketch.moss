@@ -55,4 +55,12 @@ test "expression sketch builds structured precedence tree" {
   assert(recordValue.expr.kind == "Record", "record literal should be structured")
   assert(mapHas(recordValue.expr.right, "id"), "record should capture id field")
   assert(mapGet(recordValue.expr.right, "id", missingExpr()).kind == "Field", "record field should retain expression")
+
+  updated = parseExpressionSource("order with status = Shipped")
+  assert(updated.expr.kind == "RecordUpdate", "record update should be structured")
+  assert(updated.expr.left.value == "order", "record update should retain base")
+  assert(mapGet(updated.expr.right, "status", missingExpr()).value == "Shipped", "record update should retain field")
+
+  trailing = parseExpressionSource("ready unexpected")
+  assert(len(trailing.state.errors) == 1, "unconsumed tokens should be reported")
 }

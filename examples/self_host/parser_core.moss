@@ -245,7 +245,7 @@ fn parseLet(state: ParseState) -> ParseState {
   }
 
   expressionTokens = listPush(expressionTokens, token("EOF", "", 0, 0))
-  parsed = parseOrExpr(exprState(expressionTokens))
+  parsed = parseExpressionTokens(expressionTokens)
   for error in parsed.state.errors {
     state = addError(state, "let " + name.value + ": " + error)
   }
@@ -264,7 +264,7 @@ fn parseExprLine(state: ParseState) -> ParseState {
     return state
   }
   expressionTokens = listPush(expressionTokens, token("EOF", "", 0, 0))
-  parsed = parseOrExpr(exprState(expressionTokens))
+  parsed = parseExpressionTokens(expressionTokens)
   for error in parsed.state.errors {
     state = addError(state, "expression: " + error)
   }
@@ -300,6 +300,10 @@ fn parseStatement(state: ParseState) -> ParseState {
 
   if item.kind == "IDENT" and item.value == "let" {
     return parseLet(state)
+  }
+
+  if item.kind == "IDENT" and (item.value == "if" or item.value == "for" or item.value == "while") {
+    return advanceToNextLine(state)
   }
 
   return parseExprLine(state)

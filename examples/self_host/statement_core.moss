@@ -19,7 +19,7 @@ fn stmtResult(value: MossStmt, errors: List<Text>) -> StmtParseResult {
 
 fn parseStatementExpression(tokens: List<MossToken>, start: Number) -> ExprParseResult {
   expressionTokens = listSlice(tokens, start, len(tokens))
-  return parseOrExpr(exprState(expressionTokens))
+  return parseExpressionTokens(expressionTokens)
 }
 
 fn parseStatementTokens(tokens: List<MossToken>) -> StmtParseResult {
@@ -55,8 +55,8 @@ fn parseStatementTokens(tokens: List<MossToken>) -> StmtParseResult {
     conditionTokens = listSlice(tokens, 1, elseIndex)
     conditionTokens = listPush(conditionTokens, token("EOF", "", 0, 0))
     errorTokens = listSlice(tokens, elseIndex + 1, len(tokens))
-    condition = parseOrExpr(exprState(conditionTokens))
-    errorValue = parseOrExpr(exprState(errorTokens))
+    condition = parseExpressionTokens(conditionTokens)
+    errorValue = parseExpressionTokens(errorTokens)
     errors = listConcat(condition.state.errors, errorValue.state.errors)
     return stmtResult(stmt("Require", "", { condition: condition.expr, error: errorValue.expr }), errors)
   }

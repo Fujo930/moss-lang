@@ -60,7 +60,7 @@ fn parseListExpr(state: ExprParseState) -> ExprParseResult {
   }
 
   while exprCurrent(state).kind != "EOF" {
-    parsed = parseOrExpr(state)
+    parsed = parseUpdateExpr(state)
     items = listPush(items, parsed.expr)
     state = parsed.state
 
@@ -101,7 +101,7 @@ fn parseRecordExpr(state: ExprParseState) -> ExprParseResult {
       return exprResult(state, expr("Record", "", null, fields))
     }
 
-    parsed = parseOrExpr(exprAdvance(state))
+    parsed = parseUpdateExpr(exprAdvance(state))
     fields = mapPut(fields, field.value, parsed.expr)
     state = parsed.state
 
@@ -141,7 +141,7 @@ fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
     return parseRecordExpr(exprAdvance(state))
   }
   if item.value == "(" {
-    nested = parseOrExpr(exprAdvance(state))
+    nested = parseUpdateExpr(exprAdvance(state))
     if exprCurrent(nested.state).value != ")" {
       failed = exprError(nested.state, "expected ) after expression")
       return exprResult(failed, nested.expr)
@@ -162,7 +162,7 @@ fn parseCallArguments(state: ExprParseState) -> ExprListParseResult {
   }
 
   while exprCurrent(state).kind != "EOF" {
-    parsed = parseOrExpr(state)
+    parsed = parseUpdateExpr(state)
     items = listPush(items, parsed.expr)
     state = parsed.state
 
@@ -201,7 +201,7 @@ fn parsePostfixExpr(state: ExprParseState) -> ExprParseResult {
         result = exprResult(exprAdvance(fieldState), expr("Field", field.value, result.expr, null))
       }
     } else {
-      index = parseOrExpr(exprAdvance(result.state))
+      index = parseUpdateExpr(exprAdvance(result.state))
       if exprCurrent(index.state).value != "]" {
         failed = exprError(index.state, "expected ] after index")
         result = exprResult(failed, expr("Index", "", result.expr, index.expr))
@@ -295,6 +295,66 @@ fn parseOrExpr(state: ExprParseState) -> ExprParseResult {
   return result
 }
 
+fn parseUpdateExpr(state: ExprParseState) -> ExprParseResult {
+  result = parseOrExpr(state)
+  if exprCurrent(result.state).value != "with" {
+    return result
+  }
+
+  state = exprAdvance(result.state)
+  updates = mapNew()
+  closeBrace = "}"
+  braced = false
+  if exprCurrent(state).value == "{" {
+    braced = true
+    state = exprAdvance(state)
+  }
+
+  while exprCurrent(state).kind != "EOF" {
+    field = exprCurrent(state)
+    if field.kind != "IDENT" {
+      state = exprError(state, "expected field name in record update")
+      return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+    }
+    state = exprAdvance(state)
+    if exprCurrent(state).value != "=" and exprCurrent(state).value != ":" {
+      state = exprError(state, "expected = after record update field")
+      return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+    }
+
+    value = parseOrExpr(exprAdvance(state))
+    updates = mapPut(updates, field.value, value.expr)
+    state = value.state
+
+    if not braced {
+      return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+    }
+    if exprCurrent(state).value == closeBrace {
+      return exprResult(exprAdvance(state), expr("RecordUpdate", "", result.expr, updates))
+    }
+    if exprCurrent(state).value != "," {
+      state = exprError(state, "expected comma or } after record update")
+      return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+    }
+    state = exprAdvance(state)
+    if exprCurrent(state).value == closeBrace {
+      return exprResult(exprAdvance(state), expr("RecordUpdate", "", result.expr, updates))
+    }
+  }
+
+  state = exprError(state, "expected } after record update")
+  return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+}
+
+fn parseExpressionTokens(tokens: List<MossToken>) -> ExprParseResult {
+  result = parseUpdateExpr(exprState(tokens))
+  if exprCurrent(result.state).kind != "EOF" {
+    failed = exprError(result.state, "unexpected token after expression: " + exprCurrent(result.state).value)
+    return exprResult(failed, result.expr)
+  }
+  return result
+}
+
 fn parseExpressionSource(source: Text) -> ExprParseResult {
-  return parseOrExpr(exprState(sketchTokens(source)))
+  return parseExpressionTokens(sketchTokens(source))
 }
