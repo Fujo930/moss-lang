@@ -308,6 +308,15 @@ pre {
   margin-top: 10px;
 }
 
+.diag.located {
+  cursor: pointer;
+}
+
+.diag.located:hover {
+  border-color: #526a5f;
+  background: #18231e;
+}
+
 .diag.error {
   border-left-color: var(--danger);
 }

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from .errors import SourceLocation
+
 
 @dataclass(frozen=True)
 class Param:
@@ -19,6 +21,7 @@ class Program:
 @dataclass(frozen=True)
 class EffectDecl:
     names: list[str]
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
@@ -31,6 +34,7 @@ class TypeDecl:
     name: str
     fields: dict[str, str]
     alias: str | None = None
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
@@ -39,6 +43,7 @@ class RuleDecl:
     params: list[Param]
     return_type: str | None
     expr: Any
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
@@ -48,6 +53,7 @@ class FunctionDecl:
     return_type: str | None
     uses: list[str]
     body: list[Any]
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)

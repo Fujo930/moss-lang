@@ -85,13 +85,22 @@ def analyze_source(
         response["ok"] = True
         return response
     except MossError as exc:
-        response["diagnostics"].append({"level": "error", "message": str(exc)})
+        diagnostic: dict[str, Any] = {"level": "error", "message": getattr(exc, "message", str(exc))}
+        location = getattr(exc, "location", None)
+        if location is not None:
+            diagnostic["line"] = location.line
+            diagnostic["column"] = location.column
+        response["diagnostics"].append(diagnostic)
         response["output"].append(f"moss: {exc}")
         return response
 
 
-def diagnostic_to_json(diagnostic: Diagnostic) -> dict[str, str]:
-    return {"level": diagnostic.level, "message": diagnostic.message}
+def diagnostic_to_json(diagnostic: Diagnostic) -> dict[str, Any]:
+    result: dict[str, Any] = {"level": diagnostic.level, "message": diagnostic.message}
+    if diagnostic.location is not None:
+        result["line"] = diagnostic.location.line
+        result["column"] = diagnostic.location.column
+    return result
 
 
 def summarize_program(program: Any) -> dict[str, int]:

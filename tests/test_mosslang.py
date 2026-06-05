@@ -9,6 +9,7 @@ from pathlib import Path
 from mosslang.checker import check_program
 from mosslang.cli import main as cli_main
 from mosslang.errors import MossRuntimeError
+from mosslang.formatter import format_source
 from mosslang.parser import parse_source
 from mosslang.runtime import Runtime
 from mosslang.studio import analyze_source, resolve_workspace_path, workspace_root
@@ -106,6 +107,28 @@ fn save(order) {
         )
         diagnostics = check_program(program)
         self.assertTrue(any("does not declare uses Database" in d.message for d in diagnostics))
+        self.assertEqual(diagnostics[0].location.format(), "4:1")
+
+    def test_studio_diagnostics_include_source_location(self) -> None:
+        result = analyze_source("fn broken() uses Missing {\n  return 1\n}\n", execute=False)
+        self.assertEqual(result["diagnostics"][0]["line"], 1)
+        self.assertEqual(result["diagnostics"][0]["column"], 1)
+
+    def test_formatter_normalizes_indentation_and_preserves_comments(self) -> None:
+        source = 'fn work() {\nlet x = "{"   \n# keep me\nif true {\nprint(x)\n}\n}\n\n'
+        expected = 'fn work() {\n  let x = "{"\n  # keep me\n  if true {\n    print(x)\n  }\n}\n'
+        self.assertEqual(format_source(source), expected)
+        self.assertEqual(format_source(expected), expected)
+        require_source = "fn work() {\n  require true\n    else Missing\n}\n"
+        self.assertEqual(format_source(require_source), require_source)
+
+    def test_cli_format_check_and_write(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.moss"
+            path.write_text("fn work() {\nreturn 1\n}\n", encoding="utf-8")
+            self.assertEqual(cli_main(["format", "--check", str(path)]), 1)
+            self.assertEqual(cli_main(["format", str(path)]), 0)
+            self.assertEqual(cli_main(["format", "--check", str(path)]), 0)
 
     def test_missing_database_effect_fails_at_runtime(self) -> None:
         source = """

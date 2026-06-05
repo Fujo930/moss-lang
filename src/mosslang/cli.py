@@ -21,6 +21,10 @@ def main(argv: list[str] | None = None) -> int:
         cmd = sub.add_parser(command)
         cmd.add_argument("file", type=Path)
 
+    format_cmd = sub.add_parser("format")
+    format_cmd.add_argument("file", type=Path)
+    format_cmd.add_argument("--check", action="store_true", help="report whether formatting would change the file")
+
     selfhost_cmd = sub.add_parser("selfhost")
     selfhost_cmd.add_argument("--quick", action="store_true", help="skip the slower project-level self-host check")
 
@@ -47,6 +51,20 @@ def main(argv: list[str] | None = None) -> int:
             return run_selfhost_compare(args.file)
 
         source = args.file.read_text(encoding="utf-8")
+        if args.command == "format":
+            from .formatter import format_source
+
+            formatted = format_source(source)
+            if args.check:
+                if formatted != source:
+                    print(f"needs formatting: {args.file}")
+                    return 1
+                print(f"formatted: {args.file}")
+                return 0
+            args.file.write_text(formatted, encoding="utf-8")
+            print(f"formatted: {args.file}")
+            return 0
+
         if args.command == "tokens":
             for token in tokenize(source):
                 print(repr(token))
@@ -61,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "check":
             diagnostics = check_program(program)
             for diagnostic in diagnostics:
-                print(f"{diagnostic.level}: {diagnostic.message}")
+                print(diagnostic.format())
             if any(d.level == "error" for d in diagnostics):
                 return 1
             summary = summarize(program)
@@ -76,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
             errors = [d for d in diagnostics if d.level == "error"]
             if errors:
                 for diagnostic in diagnostics:
-                    print(f"{diagnostic.level}: {diagnostic.message}", file=sys.stderr)
+                    print(diagnostic.format(), file=sys.stderr)
                 return 1
             runtime = Runtime(base_path=args.file.parent)
             if args.command == "run":
@@ -132,7 +150,7 @@ def run_selfhost_checks(quick: bool = False) -> int:
         if errors:
             failed = failed + 1
             for diagnostic in diagnostics:
-                print(f"{path}: {diagnostic.level}: {diagnostic.message}")
+                print(f"{path}: {diagnostic.format()}")
             continue
 
         runtime = Runtime(base_path=Path.cwd())

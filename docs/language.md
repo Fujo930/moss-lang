@@ -368,6 +368,17 @@ Compare the host parser and Moss-written parser across the bundled examples:
 moss selfhost-compare examples
 ```
 
+Format a Moss file in place, or check formatting without changing it:
+
+```powershell
+moss format examples/order.moss
+moss format --check examples/order.moss
+```
+
+The initial formatter is deliberately conservative: it normalizes block
+indentation, trailing whitespace, and the final newline while retaining source
+tokens and comments.
+
 As of `0.2.0`, the Moss-written checker validates duplicate declarations,
 duplicate record fields, import shape, undeclared effects, parse errors, and
 simple type references in record fields, function signatures, and rule

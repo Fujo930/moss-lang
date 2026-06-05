@@ -335,10 +335,26 @@ function renderDiagnostics(items, ok) {
     level.className = "diagLevel";
     level.textContent = item.level;
     const message = document.createElement("span");
-    message.textContent = item.message;
+    const location = item.line ? `${item.line}:${item.column || 1}: ` : "";
+    message.textContent = location + item.message;
+    if (item.line) {
+      node.classList.add("located");
+      node.title = "Go to source location";
+      node.addEventListener("click", () => focusLocation(item.line, item.column || 1));
+    }
     node.append(level, message);
     diagnostics.appendChild(node);
   });
+}
+
+function focusLocation(line, column) {
+  const lines = editor.value.split("\n");
+  const safeLine = Math.max(1, Math.min(line, lines.length));
+  const safeColumn = Math.max(1, Math.min(column, lines[safeLine - 1].length + 1));
+  const offset = lines.slice(0, safeLine - 1).reduce((total, value) => total + value.length + 1, 0) + safeColumn - 1;
+  editor.focus();
+  editor.setSelectionRange(offset, offset);
+  updateCursor();
 }
 
 function renderTokens(items) {

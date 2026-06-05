@@ -34,6 +34,7 @@ python -m pip install -e .
 moss check examples/order.moss
 moss run examples/order.moss
 moss test examples/order.moss
+moss format --check examples/order.moss
 moss selfhost
 moss selfhost --quick
 moss studio
@@ -135,6 +136,8 @@ moss run <file.moss>
 moss test <file.moss>
 moss tokens <file.moss>
 moss ast <file.moss>
+moss format <file.moss>
+moss format --check <file.moss>
 moss selfhost
 moss selfhost --quick
 moss selfhost-compare examples
@@ -142,6 +145,10 @@ moss studio
 ```
 
 `moss studio` opens a local HTTP editor at `http://127.0.0.1:8765`.
+
+`moss format` safely normalizes block indentation, trailing whitespace, and the
+final newline while preserving source tokens and comments. `--check` makes it
+suitable for CI.
 
 `moss selfhost --quick` runs the fast self-hosting sketches. `moss selfhost`
 also runs the slower Moss-written project check over `examples/self_host`.

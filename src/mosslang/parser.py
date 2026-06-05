@@ -75,12 +75,13 @@ class Parser:
         return Program(items)
 
     def parse_effect_decl(self) -> EffectDecl:
+        location = self.peek().location
         self.expect_value("effect")
         names = [self.expect_ident()]
         while self.match_value(","):
             names.append(self.expect_ident())
         self.consume_statement_end()
-        return EffectDecl(names)
+        return EffectDecl(names, location=location)
 
     def parse_import_decl(self) -> ImportDecl:
         self.expect_value("import")
@@ -91,6 +92,7 @@ class Parser:
         return ImportDecl(path)
 
     def parse_type_decl(self) -> TypeDecl:
+        location = self.peek().location
         self.expect_value("type")
         name = self.expect_ident()
         self.expect_value("=")
@@ -107,7 +109,7 @@ class Parser:
                 else:
                     self.skip_newlines()
             self.consume_statement_end()
-            return TypeDecl(name=name, fields=fields)
+            return TypeDecl(name=name, fields=fields, location=location)
 
         if self.match_kind("NEWLINE"):
             fields = {}
@@ -117,13 +119,14 @@ class Parser:
                 self.expect_value(":")
                 fields[field_name] = self.parse_type_text_until({"\n"})
                 self.consume_statement_end()
-            return TypeDecl(name=name, fields=fields)
+            return TypeDecl(name=name, fields=fields, location=location)
 
         alias = self.parse_type_text_until({"\n"})
         self.consume_statement_end()
-        return TypeDecl(name=name, fields={}, alias=alias)
+        return TypeDecl(name=name, fields={}, alias=alias, location=location)
 
     def parse_rule_decl(self) -> RuleDecl:
+        location = self.peek().location
         self.expect_value("rule")
         name = self.expect_ident()
         params = self.parse_params()
@@ -132,9 +135,10 @@ class Parser:
         self.skip_newlines()
         expr = self.parse_expression()
         self.consume_statement_end()
-        return RuleDecl(name=name, params=params, return_type=return_type, expr=expr)
+        return RuleDecl(name=name, params=params, return_type=return_type, expr=expr, location=location)
 
     def parse_function_decl(self) -> FunctionDecl:
+        location = self.peek().location
         self.expect_value("fn")
         name = self.expect_ident()
         params = self.parse_params()
@@ -146,7 +150,7 @@ class Parser:
                 uses.append(self.expect_ident())
         body = self.parse_block()
         self.consume_statement_end()
-        return FunctionDecl(name=name, params=params, return_type=return_type, uses=uses, body=body)
+        return FunctionDecl(name=name, params=params, return_type=return_type, uses=uses, body=body, location=location)
 
     def parse_test_decl(self) -> TestDecl:
         self.expect_value("test")

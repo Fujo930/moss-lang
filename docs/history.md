@@ -195,3 +195,14 @@ every bundled function and test body, in addition to declarations and names.
 Why it matters: two parsers can agree on declarations while disagreeing on the
 programs inside them. Moss now tests a deeper and more useful layer of
 self-hosting equivalence.
+
+## Located diagnostics and formatter
+
+Checker diagnostics now carry structured line and column locations through the
+CLI and Studio. Studio diagnostics can move the cursor directly to the reported
+declaration. Added conservative `moss format` and `moss format --check`
+commands that preserve comments and tokens while normalizing block indentation
+and whitespace.
+
+Why it matters: static confidence needs findings that lead back to source, and
+long-lived human/AI projects need one repeatable formatting gate.

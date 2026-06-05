@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .errors import SourceLocation
 from .nodes import (
     BinaryExpr,
     CallExpr,
@@ -35,6 +36,11 @@ from .nodes import (
 class Diagnostic:
     level: str
     message: str
+    location: SourceLocation | None = None
+
+    def format(self) -> str:
+        prefix = f"{self.location.format()}: " if self.location is not None else ""
+        return f"{self.level}: {prefix}{self.message}"
 
 
 BUILTIN_EFFECTS = {
@@ -57,22 +63,22 @@ def check_program(program: Program) -> list[Diagnostic]:
         if isinstance(item, EffectDecl):
             for name in item.names:
                 if name in effects:
-                    diagnostics.append(Diagnostic("warning", f"duplicate effect '{name}'"))
+                    diagnostics.append(Diagnostic("warning", f"duplicate effect '{name}'", item.location))
                 effects.add(name)
         elif isinstance(item, TypeDecl):
             if item.name in types:
-                diagnostics.append(Diagnostic("error", f"duplicate type '{item.name}'"))
+                diagnostics.append(Diagnostic("error", f"duplicate type '{item.name}'", item.location))
             types.add(item.name)
         elif isinstance(item, (FunctionDecl, RuleDecl)):
             if item.name in functions:
-                diagnostics.append(Diagnostic("error", f"duplicate callable '{item.name}'"))
+                diagnostics.append(Diagnostic("error", f"duplicate callable '{item.name}'", item.location))
             functions[item.name] = item
 
     for item in program.items:
         if isinstance(item, FunctionDecl):
             for effect in item.uses:
                 if effect not in effects:
-                    diagnostics.append(Diagnostic("error", f"{item.name} uses undeclared effect '{effect}'"))
+                    diagnostics.append(Diagnostic("error", f"{item.name} uses undeclared effect '{effect}'", item.location))
             check_effect_calls(item, functions, diagnostics)
 
     return diagnostics
@@ -87,13 +93,17 @@ def check_effect_calls(
     for call_name in collect_call_names(function.body):
         if call_name in BUILTIN_EFFECTS and BUILTIN_EFFECTS[call_name] not in allowed:
             effect = BUILTIN_EFFECTS[call_name]
-            diagnostics.append(Diagnostic("error", f"{function.name} calls {call_name} but does not declare uses {effect}"))
+            diagnostics.append(
+                Diagnostic("error", f"{function.name} calls {call_name} but does not declare uses {effect}", function.location)
+            )
         callee = functions.get(call_name)
         if isinstance(callee, FunctionDecl):
             missing = [effect for effect in callee.uses if effect not in allowed]
             if missing:
                 joined = ", ".join(missing)
-                diagnostics.append(Diagnostic("error", f"{function.name} calls {call_name} but is missing effect(s): {joined}"))
+                diagnostics.append(
+                    Diagnostic("error", f"{function.name} calls {call_name} but is missing effect(s): {joined}", function.location)
+                )
 
 
 def collect_call_names(nodes: list[Any]) -> list[str]:

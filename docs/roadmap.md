@@ -56,6 +56,8 @@ Implemented:
 - recursive Moss-written `if`/`else`, `for`, and `while` statement AST nodes
 - structured `break` and `continue` statements in the Moss-written frontend
 - host/self-host recursive function and test body statement-shape comparison
+- structured source locations in checker, CLI, and Studio diagnostics
+- conservative, idempotent `moss format` and CI-oriented `moss format --check`
 
 High-value next steps:
 
@@ -64,8 +66,8 @@ High-value next steps:
 - static type inference for local bindings
 - static field checks for records
 - exhaustive checks for union variants
-- richer diagnostic locations for parser and checker errors
-- formatter command
+- expression-level checker locations
+- formatter support for canonical expression spacing
 - multiline REPL
 
 ## Version 0.4: product engineering workflow
