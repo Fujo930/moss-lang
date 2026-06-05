@@ -1,0 +1,19 @@
+Moss 0.3.0-alpha for Windows
+
+Run Moss-0.3.0-alpha-Windows-Setup.exe to install the Moss compiler and Studio.
+
+Installed components:
+- moss.exe command-line compiler
+- Moss Studio desktop launcher
+- Start menu shortcuts
+- optional desktop shortcut
+- optional user PATH entry
+- Windows uninstall entry
+
+Default install folder:
+%LOCALAPPDATA%\Programs\Moss
+
+Default Studio workspace:
+%USERPROFILE%\Documents\Moss Workspace
+
+The installed application includes its own runtime and does not require Python.

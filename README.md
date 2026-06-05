@@ -53,6 +53,16 @@ python -m pip install build
 python -m build
 ```
 
+To build the standalone Windows compiler, Studio, and installer:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1
+```
+
+The Windows installer includes its own runtime, adds an optional `moss` PATH
+entry, creates Moss Studio shortcuts, and uses `Documents/Moss Workspace` as
+the editable Studio workspace.
+
 The package exposes a console command named `moss`.
 
 ## What works now

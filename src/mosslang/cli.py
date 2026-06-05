@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import os
 import pprint
 import sys
 from collections import Counter
 from pathlib import Path
 
+from . import __version__
 from .checker import check_program
 from .errors import MossError
 from .parser import parse_source
@@ -15,6 +17,7 @@ from .tokens import tokenize
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="moss", description="Moss language prototype")
+    parser.add_argument("--version", action="version", version=f"Moss {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     for command in ("run", "check", "test", "tokens", "ast"):
@@ -131,15 +134,25 @@ def summarize(program):
 
 
 def run_selfhost_checks(quick: bool = False) -> int:
+    root = installation_root()
+    previous_directory = Path.cwd()
+    try:
+        os.chdir(root)
+        return run_selfhost_checks_from_root(root, quick)
+    finally:
+        os.chdir(previous_directory)
+
+
+def run_selfhost_checks_from_root(root: Path, quick: bool) -> int:
     paths = [
-        Path("examples/self_host/tokenizer_sketch.moss"),
-        Path("examples/self_host/expression_sketch.moss"),
-        Path("examples/self_host/statement_sketch.moss"),
-        Path("examples/self_host/parser_sketch.moss"),
-        Path("examples/self_host/checker_sketch.moss"),
+        root / "examples/self_host/tokenizer_sketch.moss",
+        root / "examples/self_host/expression_sketch.moss",
+        root / "examples/self_host/statement_sketch.moss",
+        root / "examples/self_host/parser_sketch.moss",
+        root / "examples/self_host/checker_sketch.moss",
     ]
     if not quick:
-        paths.append(Path("examples/self_host/project_check.moss"))
+        paths.append(root / "examples/self_host/project_check.moss")
     failed = 0
 
     for path in paths:
@@ -150,19 +163,19 @@ def run_selfhost_checks(quick: bool = False) -> int:
         if errors:
             failed = failed + 1
             for diagnostic in diagnostics:
-                print(f"{path}: {diagnostic.format()}")
+                print(f"{display_installation_path(path, root)}: {diagnostic.format()}")
             continue
 
-        runtime = Runtime(base_path=Path.cwd())
+        runtime = Runtime(base_path=root)
         results = runtime.run_tests(program)
         test_failures = [r for r in results if r["status"] == "fail"]
         if test_failures:
             failed = failed + 1
             for result in test_failures:
                 detail = f": {result['message']}" if result["message"] else ""
-                print(f"FAIL {path} {result['name']}{detail}")
+                print(f"FAIL {display_installation_path(path, root)} {result['name']}{detail}")
         else:
-            print(f"PASS {path} ({len(results)} test(s))")
+            print(f"PASS {display_installation_path(path, root)} ({len(results)} test(s))")
 
     return 1 if failed else 0
 
@@ -184,7 +197,8 @@ def compare_selfhost_file(path: Path) -> bool:
     host_names = host_declaration_names(host_program)
     host_bodies = host_body_statement_kinds(host_program)
 
-    runtime = Runtime(base_path=Path.cwd())
+    root = installation_root()
+    runtime = Runtime(base_path=root)
     runtime.run(parse_source('import "examples/self_host/parser_core.moss"\n'))
     tokens = runtime.call(runtime.globals.get("sketchTokens"), [source])
     parsed = runtime.call(runtime.globals.get("parseProgram"), [tokens])
@@ -297,6 +311,20 @@ def count_selfhost_statements(statements: list[dict], counts: Counter[str]) -> N
             count_selfhost_statements(value.get("elseBody", []), counts)
         elif kind in {"For", "While"} and isinstance(value, dict):
             count_selfhost_statements(value.get("body", []), counts)
+
+
+def installation_root() -> Path:
+    frozen_root = getattr(sys, "_MEIPASS", None)
+    if frozen_root is not None:
+        return Path(frozen_root)
+    return Path.cwd()
+
+
+def display_installation_path(path: Path, root: Path) -> Path:
+    try:
+        return path.relative_to(root)
+    except ValueError:
+        return path
 
 
 if __name__ == "__main__":

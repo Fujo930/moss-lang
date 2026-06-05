@@ -181,6 +181,7 @@ class Runtime:
         self.output = output or print
         self.effect_stack: list[set[str]] = []
         self.base_path = Path(base_path) if base_path is not None else Path.cwd()
+        self.import_root = self.base_path
         self.imported_paths: set[Path] = set()
         self.install_builtins()
         self.tests: list[TestDecl] = []
@@ -275,7 +276,7 @@ class Runtime:
 
     def resolve_import_path(self, import_path: str) -> Path:
         path = Path(import_path)
-        candidates = [path] if path.is_absolute() else [self.base_path / path, Path.cwd() / path]
+        candidates = [path] if path.is_absolute() else [self.base_path / path, self.import_root / path, Path.cwd() / path]
         for candidate in candidates:
             if candidate.exists():
                 return candidate.resolve()

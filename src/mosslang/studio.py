@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import pprint
+import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
@@ -114,6 +116,11 @@ def summarize_program(program: Any) -> dict[str, int]:
 
 
 def workspace_root() -> Path:
+    configured = os.environ.get("MOSS_WORKSPACE")
+    if configured:
+        return Path(configured).expanduser()
+    if getattr(sys, "frozen", False):
+        return Path.home() / "Documents" / "Moss Workspace"
     return Path(__file__).resolve().parents[2]
 
 
@@ -153,7 +160,8 @@ def asset_bytes(name: str) -> bytes:
 
 
 def example_source(filename: str) -> str:
-    root = Path(__file__).resolve().parents[2]
+    frozen_root = getattr(sys, "_MEIPASS", None)
+    root = Path(frozen_root) if frozen_root is not None else Path(__file__).resolve().parents[2]
     return (root / "examples" / filename).read_text(encoding="utf-8")
 
 
