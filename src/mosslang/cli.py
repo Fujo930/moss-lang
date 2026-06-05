@@ -32,11 +32,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", action="version", version=f"Moss {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    for command in ("run", "check", "test", "tokens", "ast"):
+    for command in ("run", "check", "test", "tokens", "ast", "trace"):
         cmd = sub.add_parser(command)
         cmd.add_argument("file", type=Path)
         if command == "check":
             cmd.add_argument("--json", action="store_true", help="emit structured diagnostics and summary")
+        if command == "trace":
+            cmd.add_argument("--json", action="store_true", help="emit stable machine-readable rule trace events")
 
     format_cmd = sub.add_parser("format")
     format_cmd.add_argument("file", type=Path)
@@ -186,6 +188,26 @@ def main(argv: list[str] | None = None) -> int:
                 return 1 if failed else 0
             return 0
 
+        if args.command == "trace":
+            diagnostics = check_program(program)
+            errors = [d for d in diagnostics if d.level == "error"]
+            if errors:
+                for diagnostic in diagnostics:
+                    print(diagnostic.format(), file=sys.stderr)
+                return 1
+            runtime = Runtime(output=lambda _text: None, base_path=args.file.parent, trace_rules=True)
+            runtime.run(program, source_path=args.file.resolve())
+            events = [portable_trace_event(event) for event in runtime.trace_events]
+            if args.json:
+                print(json.dumps({"file": args.file.as_posix(), "events": events}))
+            else:
+                for event in events:
+                    location = f"{event.get('line')}:{event.get('column')} " if event.get("line") else ""
+                    arguments = ", ".join(f"{name}={value}" for name, value in event["arguments"].items())
+                    print(f"{location}{event['rule']}({arguments}) -> {event['result']}")
+                print(f"{len(events)} rule evaluation(s)")
+            return 0
+
         parser.error(f"unknown command {args.command}")
         return 2
     except OSError as exc:
@@ -220,6 +242,19 @@ def diagnostic_json(diagnostic) -> dict:
     result = {"level": diagnostic.level, "message": diagnostic.message}
     if diagnostic.location is not None:
         result.update({"line": diagnostic.location.line, "column": diagnostic.location.column})
+    return result
+
+
+def portable_trace_event(event: dict) -> dict:
+    result = dict(event)
+    if "file" not in result:
+        return result
+    path = Path(result["file"]).resolve()
+    try:
+        path = path.relative_to(Path.cwd().resolve())
+    except ValueError:
+        pass
+    result["file"] = path.as_posix()
     return result
 
 

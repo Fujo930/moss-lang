@@ -471,3 +471,17 @@ fn publish(url: Text, value: Any) -> Text uses Network {
 Both adapters accept only HTTP(S) URLs. `httpPostJson` uses the same
 deterministic JSON encoding as `jsonStringify`. Transport failures and
 non-success HTTP responses become Moss runtime errors.
+
+## Rule traces
+
+Rules are intended to express inspectable business decisions. `moss trace`
+executes a program while recording every rule evaluation:
+
+```powershell
+moss trace examples/order.moss
+moss trace --json examples/order.moss
+```
+
+Each event contains the rule name, formatted arguments, result, and the source
+file, line, and column where the rule is declared. Imported rules retain their
+own module source map.

@@ -77,6 +77,47 @@ class MossLanguageTests(unittest.TestCase):
         self.assertEqual(payload["diagnostics"][0]["line"], 1)
         self.assertIsNone(payload["summary"])
 
+    def test_cli_trace_json_emits_located_rule_evaluations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.moss"
+            path.write_text(
+                "rule double(value: Number) -> Number = value * 2\nprint(double(4))\n",
+                encoding="utf-8",
+            )
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["trace", "--json", str(path)])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            payload["events"],
+            [
+                {
+                    "rule": "double",
+                    "arguments": {"value": "4"},
+                    "result": "8",
+                    "line": 1,
+                    "column": 1,
+                    "file": path.resolve().as_posix(),
+                }
+            ],
+        )
+
+    def test_cli_trace_maps_imported_rules_to_source_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            helper = root / "helper.moss"
+            helper.write_text("rule ready() -> Bool = true\n", encoding="utf-8")
+            main = root / "main.moss"
+            main.write_text('import "helper.moss"\nprint(ready())\n', encoding="utf-8")
+            output = StringIO()
+            with redirect_stdout(output):
+                code = cli_main(["trace", "--json", str(main)])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["events"][0]["file"], helper.resolve().as_posix())
+        self.assertEqual(payload["events"][0]["line"], 1)
+
     def test_cli_project_check_json_aggregates_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

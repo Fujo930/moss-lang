@@ -170,6 +170,22 @@ class UserFunction:
 
         if self.return_type is not None:
             self.runtime.require_type(result, self.return_type, f"return value for {self.name}")
+        if self.is_rule and self.runtime.trace_rules:
+            location = self.decl.location
+            event = {
+                "rule": self.name,
+                "arguments": {
+                    param.name: format_value(arg)
+                    for param, arg in zip(self.decl.params, args)
+                },
+                "result": format_value(result),
+            }
+            if location is not None:
+                event.update({"line": location.line, "column": location.column})
+            source_path = self.runtime.declaration_sources.get(id(self.decl))
+            if source_path is not None:
+                event["file"] = str(source_path)
+            self.runtime.trace_events.append(event)
         return result
 
     def returns_result(self) -> bool:
@@ -182,6 +198,7 @@ class Runtime:
         output: Callable[[str], None] | None = None,
         base_path: str | Path | None = None,
         import_paths: list[str | Path] | None = None,
+        trace_rules: bool = False,
     ):
         self.effects: set[str] = set()
         self.types: dict[str, TypeDecl] = {}
@@ -192,6 +209,9 @@ class Runtime:
         self.base_path = Path(base_path) if base_path is not None else Path.cwd()
         self.import_root = self.base_path
         self.import_paths = [Path(path) for path in import_paths or []]
+        self.trace_rules = trace_rules
+        self.trace_events: list[dict[str, Any]] = []
+        self.declaration_sources: dict[int, Path] = {}
         self.imported_paths: set[Path] = set()
         self.install_builtins()
         self.tests: list[TestDecl] = []
@@ -239,7 +259,7 @@ class Runtime:
         self.globals.define("fileExists", BuiltinFunction("fileExists", self.builtin_file_exists, effect="FileSystem"))
         self.globals.define("listFiles", BuiltinFunction("listFiles", self.builtin_list_files, effect="FileSystem"))
 
-    def run(self, program: Program) -> Environment:
+    def run(self, program: Program, *, source_path: Path | None = None) -> Environment:
         statements: list[Any] = []
         for item in program.items:
             if isinstance(item, ImportDecl):
@@ -249,8 +269,12 @@ class Runtime:
             elif isinstance(item, TypeDecl):
                 self.types[item.name] = item
             elif isinstance(item, RuleDecl):
+                if source_path is not None:
+                    self.declaration_sources[id(item)] = source_path
                 self.globals.define(item.name, UserFunction(item, self, self.globals, is_rule=True))
             elif isinstance(item, FunctionDecl):
+                if source_path is not None:
+                    self.declaration_sources[id(item)] = source_path
                 self.globals.define(item.name, UserFunction(item, self, self.globals))
             elif isinstance(item, TestDecl):
                 self.tests.append(item)
@@ -284,7 +308,7 @@ class Runtime:
         previous_base = self.base_path
         self.base_path = resolved.parent
         try:
-            self.run(imported_program)
+            self.run(imported_program, source_path=resolved)
         finally:
             self.base_path = previous_base
 

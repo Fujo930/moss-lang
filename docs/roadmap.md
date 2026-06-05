@@ -89,7 +89,7 @@ Make Moss feel like a language for real systems:
 - effect definitions with custom capabilities
 - JSON adapter with deterministic serialization
 - explicit `Network` effect HTTP GET and JSON POST adapters
-- source maps for rule evaluation traces
+- source-mapped rule evaluation traces through `moss trace`
 
 The manifest and project-command foundation is implemented. The remaining 0.4
 work focuses on stronger module boundaries, external package dependencies,

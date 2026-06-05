@@ -170,6 +170,8 @@ moss run <file.moss>
 moss test <file.moss>
 moss tokens <file.moss>
 moss ast <file.moss>
+moss trace <file.moss>
+moss trace --json <file.moss>
 moss format <file.moss>
 moss format --check <file.moss>
 moss selfhost
@@ -201,6 +203,10 @@ project.
 `moss format` normalizes block indentation, expression spacing, trailing
 whitespace, and the final newline while preserving strings and comments.
 `--check` makes it suitable for CI.
+
+`moss trace` executes a program while recording every `rule` evaluation,
+including arguments, result, source file, line, and column. Its JSON form is a
+stable input for audit tools and AI agents.
 
 `moss selfhost --quick` runs the fast self-hosting sketches. `moss selfhost`
 also runs the slower Moss-written project check over `examples/self_host`.

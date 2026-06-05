@@ -38,6 +38,10 @@ explicit `Network` effect, accept only HTTP(S) URLs, report transport and HTTP
 status failures, and use the deterministic JSON representation for request
 bodies.
 
+`moss trace` adds source-mapped rule evaluation events. Each event records the
+rule name, formatted arguments, result, source module, line, and column, with a
+stable JSON mode for audit tools and AI agents.
+
 ## 0.3.0-alpha static confidence
 
 The static checker now merges local types learned independently by both sides
