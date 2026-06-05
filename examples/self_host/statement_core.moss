@@ -43,6 +43,24 @@ fn parseStatementTokens(tokens: List<MossToken>) -> StmtParseResult {
     return stmtResult(stmt("Return", "", parsed.expr), parsed.state.errors)
   }
 
+  if first.value == "require" {
+    elseIndex = 1
+    while elseIndex < len(tokens) and listGet(tokens, elseIndex, token("EOF", "", 0, 0)).value != "else" {
+      elseIndex = elseIndex + 1
+    }
+    if elseIndex >= len(tokens) or listGet(tokens, elseIndex, token("EOF", "", 0, 0)).value != "else" {
+      return stmtResult(stmt("Missing", "", null), ["expected else after require condition"])
+    }
+
+    conditionTokens = listSlice(tokens, 1, elseIndex)
+    conditionTokens = listPush(conditionTokens, token("EOF", "", 0, 0))
+    errorTokens = listSlice(tokens, elseIndex + 1, len(tokens))
+    condition = parseOrExpr(exprState(conditionTokens))
+    errorValue = parseOrExpr(exprState(errorTokens))
+    errors = listConcat(condition.state.errors, errorValue.state.errors)
+    return stmtResult(stmt("Require", "", { condition: condition.expr, error: errorValue.expr }), errors)
+  }
+
   if first.kind == "IDENT" and second.value == "=" {
     parsed = parseStatementExpression(tokens, 2)
     return stmtResult(stmt("Assign", first.value, parsed.expr), parsed.state.errors)

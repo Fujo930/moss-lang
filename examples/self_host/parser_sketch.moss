@@ -35,10 +35,11 @@ test "parser sketch summarizes declarations" {
       orderFunction = item
     }
   }
-  assert(len(orderFunction.data) == 3, "function should retain simple body statements")
-  assert(orderFunction.data[0].kind == "Assign", "function assignment should be structured")
-  assert(orderFunction.data[1].kind == "Expr", "function call should be structured")
-  assert(orderFunction.data[2].kind == "Return", "function return should be structured")
+  assert(len(orderFunction.data) == 4, "function should retain simple body statements")
+  assert(orderFunction.data[0].kind == "Require", "function require should be structured")
+  assert(orderFunction.data[1].kind == "Assign", "function assignment should be structured")
+  assert(orderFunction.data[2].kind == "Expr", "function call should be structured")
+  assert(orderFunction.data[3].kind == "Return", "function return should be structured")
 
   typeSource = ""
   typeSource = typeSource + "type Person =\n"

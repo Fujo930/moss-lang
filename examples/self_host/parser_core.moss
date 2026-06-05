@@ -141,8 +141,18 @@ fn parseBlockStatements(state: ParseState) -> BlockParseResult {
     }
 
     first = listGet(lineTokens, 0, token("EOF", "", 0, 0))
+    if startDepth == 1 and state.depth == 1 and first.value == "require" {
+      nextLine = skipNewlines(state)
+      if currentToken(nextLine).value == "else" {
+        while currentToken(nextLine).kind != "EOF" and currentToken(nextLine).kind != "NEWLINE" {
+          lineTokens = listPush(lineTokens, currentToken(nextLine))
+          nextLine = advance(nextLine)
+        }
+        state = nextLine
+      }
+    }
     lineTokens = listPush(lineTokens, token("EOF", "", 0, 0))
-    if startDepth == 1 and state.depth == 1 and first.value != "require" and first.value != "else" and first.value != "if" and first.value != "for" and first.value != "while" and first.value != "}" {
+    if startDepth == 1 and state.depth == 1 and first.value != "else" and first.value != "if" and first.value != "for" and first.value != "while" and first.value != "}" {
       parsed = parseStatementTokens(lineTokens)
       if len(parsed.errors) == 0 {
         statements = listPush(statements, parsed.stmt)
