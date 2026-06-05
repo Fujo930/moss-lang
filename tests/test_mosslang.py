@@ -938,6 +938,25 @@ accept(bad)
         with self.assertRaisesRegex(MossRuntimeError, "expected Map<Text, Number>"):
             self.run_source(source)
 
+    def test_json_parse_and_stringify_preserve_moss_values(self) -> None:
+        source = """
+let payload = jsonParse("{\\"name\\":\\"Moss\\",\\"count\\":4,\\"values\\":[1.5,true,null]}")
+print(payload.name)
+print(payload.count + 1)
+print(payload.values[0])
+print(jsonStringify({ count: payload.count, name: payload.name }))
+"""
+        _, output = self.run_source(source)
+        self.assertEqual(output, ["Moss", "5", "1.5", '{"count":4,"name":"Moss"}'])
+
+    def test_json_parse_reports_location(self) -> None:
+        with self.assertRaisesRegex(MossRuntimeError, "jsonParse failed at line 1, column 8"):
+            self.run_source('jsonParse("{\\"bad\\":}")\n')
+
+    def test_json_stringify_rejects_non_json_values(self) -> None:
+        with self.assertRaisesRegex(MossRuntimeError, "is not JSON-compatible"):
+            self.run_source("jsonStringify(Ok(1))\n")
+
     def test_imports_load_moss_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

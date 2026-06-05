@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+import json
 from pathlib import Path
 from typing import Any, Callable
 
@@ -222,6 +223,8 @@ class Runtime:
         self.globals.define("textStartsWith", BuiltinFunction("textStartsWith", self.builtin_text_starts_with))
         self.globals.define("textEndsWith", BuiltinFunction("textEndsWith", self.builtin_text_ends_with))
         self.globals.define("pathJoin", BuiltinFunction("pathJoin", self.builtin_path_join))
+        self.globals.define("jsonParse", BuiltinFunction("jsonParse", self.builtin_json_parse))
+        self.globals.define("jsonStringify", BuiltinFunction("jsonStringify", self.builtin_json_stringify))
         self.globals.define("Ok", BuiltinFunction("Ok", lambda value=None: Result(True, value)))
         self.globals.define("Err", BuiltinFunction("Err", lambda value=None: Result(False, value)))
         self.globals.define("dbPut", BuiltinFunction("dbPut", self.builtin_db_put, effect="Database"))
@@ -683,6 +686,19 @@ class Runtime:
             require_text(part, "pathJoin")
         return str(Path(parts[0]).joinpath(*parts[1:]))
 
+    def builtin_json_parse(self, text: Any) -> Any:
+        require_text(text, "jsonParse")
+        try:
+            return json.loads(text, parse_int=Decimal, parse_float=Decimal)
+        except json.JSONDecodeError as exc:
+            raise MossRuntimeError(f"jsonParse failed at line {exc.lineno}, column {exc.colno}: {exc.msg}") from exc
+
+    def builtin_json_stringify(self, value: Any) -> str:
+        try:
+            return json.dumps(json_value(value), ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        except (TypeError, ValueError) as exc:
+            raise MossRuntimeError(f"jsonStringify failed: {exc}") from exc
+
     def builtin_db_put(self, key: Any, value: Any) -> Any:
         self.db[str(key)] = value
         return value
@@ -780,6 +796,20 @@ def truthy(value: Any) -> bool:
     if isinstance(value, Result):
         return value.ok
     return True
+
+
+def json_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, bool, int, float)):
+        return value
+    if isinstance(value, Decimal):
+        return int(value) if value == value.to_integral_value() else float(value)
+    if isinstance(value, list):
+        return [json_value(item) for item in value]
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise TypeError("JSON object keys must be Text")
+        return {key: json_value(item) for key, item in value.items()}
+    raise TypeError(f"{type(value).__name__} is not JSON-compatible")
 
 
 def add_values(left: Any, right: Any) -> Any:

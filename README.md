@@ -86,6 +86,8 @@ The package exposes a console command named `moss`.
 - Text helpers: `textChars`, `textJoin`, `textSplit`, `textTrim`, `textSlice`,
   `textContains`, `textIndexOf`, `textReplace`, `textStartsWith`, and
   `textEndsWith`
+- deterministic JSON parsing and serialization through `jsonParse` and
+  `jsonStringify`
 - `FileSystem` effect builtins: `readText`, `writeText`, `fileExists`, and
   `listFiles`
 - top-level `import "path.moss"` declarations

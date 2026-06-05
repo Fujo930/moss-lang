@@ -102,6 +102,8 @@ BUILTIN_RETURN_TYPES = {
     "textEndsWith": "Bool",
     "fileExists": "Bool",
     "readText": "Text",
+    "jsonParse": "Any",
+    "jsonStringify": "Text",
 }
 
 

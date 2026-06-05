@@ -87,7 +87,8 @@ Make Moss feel like a language for real systems:
 - deterministic project lock files with module content hashes
 - schema migration declarations
 - effect definitions with custom capabilities
-- JSON and HTTP adapters
+- JSON adapter with deterministic serialization
+- HTTP adapter
 - source maps for rule evaluation traces
 
 The manifest and project-command foundation is implemented. The remaining 0.4

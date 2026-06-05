@@ -1,0 +1,12 @@
+let payload = jsonParse("{\"name\":\"Moss\",\"versions\":[3,4],\"ready\":true}")
+
+print(payload.name)
+print(payload.versions[1])
+print(jsonStringify({ language: payload.name, ready: payload.ready }))
+
+test "JSON round trips project metadata" {
+  encoded = jsonStringify({ name: "Moss", version: 4 })
+  decoded = jsonParse(encoded)
+  assert(decoded.name == "Moss", "name should survive")
+  assert(decoded.version == 4, "number should survive")
+}

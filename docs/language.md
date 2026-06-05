@@ -433,3 +433,20 @@ moss project-test my-service
 The graph is deterministic and rejects missing imports, imports outside the
 project root, cycles, and cross-module declaration conflicts. See
 `docs/projects.md` for the complete current workflow.
+
+## JSON
+
+`jsonParse(text)` converts JSON objects, arrays, strings, booleans, nulls, and
+numbers into ordinary Moss values. JSON numbers become Moss `Number` values.
+Malformed input reports a runtime error with its JSON line and column.
+
+`jsonStringify(value)` produces compact JSON with deterministically sorted
+object keys. It accepts records, lists, Text, Bool, Number, and null, and
+rejects values such as functions, variants, and results that do not have an
+unambiguous JSON representation.
+
+```moss
+let payload = jsonParse("{\"name\":\"Moss\",\"version\":4}")
+print(payload.name)
+print(jsonStringify({ version: payload.version, name: payload.name }))
+```
