@@ -60,6 +60,7 @@ Implemented:
   metadata comparison
 - structured source locations in checker, CLI, and Studio diagnostics
 - conservative, idempotent `moss format` and CI-oriented `moss format --check`
+- canonical expression operator, comma, and colon spacing
 - conservative local-binding and expression type inference
 - static callable argument, return, record-field access, and record-update checks
 - exhaustive union `match` checks and duplicate-case warnings
@@ -74,7 +75,6 @@ High-value next steps:
 - structured match-pattern comparison
 - compare complete expression AST output against the Python host frontend
 - expression-level checker locations
-- formatter support for canonical expression spacing
 
 ## Version 0.4: product engineering workflow
 

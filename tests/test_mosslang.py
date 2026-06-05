@@ -168,6 +168,14 @@ fn save(order) {
         require_source = "fn work() {\n  require true\n    else Missing\n}\n"
         self.assertEqual(format_source(require_source), require_source)
 
+    def test_formatter_normalizes_expression_spacing_without_touching_strings(self) -> None:
+        source = 'fn add(a:Number,b:Number)->Number {\n return a+b*2 # a+b stays here\n}\nlet text="a+b"\n'
+        formatted = format_source(source)
+        self.assertIn("fn add(a: Number, b: Number)->Number {", formatted)
+        self.assertIn("return a + b * 2 # a+b stays here", formatted)
+        self.assertIn('let text = "a+b"', formatted)
+        self.assertEqual(format_source(formatted), formatted)
+
     def test_cli_format_check_and_write(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "sample.moss"

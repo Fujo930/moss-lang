@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from .tokens import tokenize
 
 
@@ -10,7 +12,7 @@ def format_source(source: str) -> str:
     previous_content = ""
 
     for raw_line in source.splitlines():
-        content = raw_line.strip()
+        content = canonical_spacing(raw_line.strip())
         if not content:
             formatted.append("")
             continue
@@ -38,3 +40,48 @@ def format_source(source: str) -> str:
     while formatted and formatted[-1] == "":
         formatted.pop()
     return "\n".join(formatted) + "\n"
+
+
+def canonical_spacing(content: str) -> str:
+    code, protected = protect_literals_and_comment(content)
+    code = code.replace("->", "\x01")
+    code = re.sub(r"\s*(==|!=|>=|<=|[=+*/<>|])\s*", r" \1 ", code)
+    code = re.sub(r"\s*-\s*", " - ", code)
+    code = re.sub(r"\s*,\s*", ", ", code)
+    code = re.sub(r"\s*:\s*", ": ", code)
+    code = re.sub(r"([\[(])\s+", r"\1", code)
+    code = re.sub(r"\s+([\])}])", r"\1", code)
+    code = re.sub(r"[ \t]+", " ", code).strip().replace("\x01", "->")
+    for marker, original in protected:
+        code = code.replace(marker, original)
+    return code
+
+
+def protect_literals_and_comment(content: str) -> tuple[str, list[tuple[str, str]]]:
+    protected: list[tuple[str, str]] = []
+    output: list[str] = []
+    index = 0
+    while index < len(content):
+        if content[index] == '"':
+            end = index + 1
+            while end < len(content):
+                if content[end] == "\\":
+                    end += 2
+                    continue
+                if content[end] == '"':
+                    end += 1
+                    break
+                end += 1
+            marker = f"\x02{len(protected)}\x03"
+            protected.append((marker, content[index:end]))
+            output.append(marker)
+            index = end
+            continue
+        if content[index] == "#" or content[index : index + 2] == "//":
+            marker = f"\x02{len(protected)}\x03"
+            protected.append((marker, content[index:]))
+            output.append(marker)
+            break
+        output.append(content[index])
+        index += 1
+    return "".join(output), protected
