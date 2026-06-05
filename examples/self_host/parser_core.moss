@@ -1,4 +1,4 @@
-import "examples/self_host/expression_core.moss"
+import "examples/self_host/statement_core.moss"
 
 type MossNode =
   kind: Text
@@ -12,6 +12,10 @@ type ParseState =
   depth: Number
   nodes: List<MossNode>
   errors: List<Text>
+
+type BlockParseResult =
+  state: ParseState
+  statements: List<Any>
 
 fn node(kind: Text, name: Text, value: Text, data) -> MossNode {
   return { kind: kind, name: name, value: value, data: data }
@@ -123,6 +127,34 @@ fn typeFieldText(state: ParseState) -> Text {
   return fields
 }
 
+fn parseBlockStatements(state: ParseState) -> BlockParseResult {
+  statements = []
+  state = skipNewlines(state)
+
+  while currentToken(state).kind != "EOF" and state.depth > 0 {
+    startDepth = state.depth
+    lineTokens = []
+
+    while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
+      lineTokens = listPush(lineTokens, currentToken(state))
+      state = advance(state)
+    }
+
+    first = listGet(lineTokens, 0, token("EOF", "", 0, 0))
+    lineTokens = listPush(lineTokens, token("EOF", "", 0, 0))
+    if startDepth == 1 and state.depth == 1 and first.value != "require" and first.value != "else" and first.value != "if" and first.value != "for" and first.value != "while" and first.value != "}" {
+      parsed = parseStatementTokens(lineTokens)
+      if len(parsed.errors) == 0 {
+        statements = listPush(statements, parsed.stmt)
+      }
+    }
+
+    state = skipNewlines(state)
+  }
+
+  return { state: state, statements: statements }
+}
+
 fn parseImport(state: ParseState) -> ParseState {
   state = advance(state)
   path = currentToken(state)
@@ -163,11 +195,17 @@ fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
   state = advance(state)
   value = lineText(state)
   state = advanceToNextLine(state)
+  data = null
   if kind == "Type" and textTrim(value) == "=" {
     value = typeFieldText(state)
     state = skipTypeContinuation(state)
   }
-  return addNode(state, node(kind, name.value, value, null))
+  if kind == "Function" or kind == "Test" {
+    block = parseBlockStatements(state)
+    state = block.state
+    data = block.statements
+  }
+  return addNode(state, node(kind, name.value, value, data))
 }
 
 fn parseLet(state: ParseState) -> ParseState {
