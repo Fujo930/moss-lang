@@ -122,6 +122,79 @@ fn parseRecordExpr(state: ExprParseState) -> ExprParseResult {
   return exprResult(state, expr("Record", "", null, fields))
 }
 
+fn parsePatternExpr(state: ExprParseState) -> ExprParseResult {
+  item = exprCurrent(state)
+  if item.value == "_" {
+    return exprResult(exprAdvance(state), expr("PatternWildcard", "", null, null))
+  }
+  if item.kind == "STRING" or item.kind == "NUMBER" or item.value == "true" or item.value == "false" or item.value == "null" {
+    return exprResult(exprAdvance(state), expr("PatternLiteral", item.value, null, null))
+  }
+  if item.kind != "IDENT" {
+    return exprResult(exprError(state, "expected pattern"), expr("PatternMissing", "", null, null))
+  }
+
+  name = item.value
+  state = exprAdvance(state)
+  while exprCurrent(state).value == "." {
+    state = exprAdvance(state)
+    name = name + "." + exprCurrent(state).value
+    state = exprAdvance(state)
+  }
+
+  payload = []
+  if exprCurrent(state).value == "(" {
+    state = exprAdvance(state)
+    while exprCurrent(state).value != ")" and exprCurrent(state).kind != "EOF" {
+      parsed = parsePatternExpr(state)
+      payload = listPush(payload, parsed.expr)
+      state = parsed.state
+      if exprCurrent(state).value == "," {
+        state = exprAdvance(state)
+      }
+    }
+    if exprCurrent(state).value == ")" {
+      state = exprAdvance(state)
+    } else {
+      state = exprError(state, "expected ) after pattern payload")
+    }
+  }
+
+  first = textSlice(name, 0, 1)
+  if len(payload) == 0 and not textContains(name, ".") and textContains("abcdefghijklmnopqrstuvwxyz", first) {
+    return exprResult(state, expr("PatternBinding", name, null, null))
+  }
+  return exprResult(state, expr("PatternVariant", name, null, payload))
+}
+
+fn parseMatchExpr(state: ExprParseState) -> ExprParseResult {
+  subject = parseUpdateExpr(state)
+  state = subject.state
+  cases = []
+  if exprCurrent(state).value != "{" {
+    return exprResult(exprError(state, "expected { after match subject"), expr("Match", "", subject.expr, cases))
+  }
+  state = exprAdvance(state)
+
+  while exprCurrent(state).value != "}" and exprCurrent(state).kind != "EOF" {
+    pattern = parsePatternExpr(state)
+    state = pattern.state
+    if exprCurrent(state).value != "->" {
+      return exprResult(exprError(state, "expected -> after match pattern"), expr("Match", "", subject.expr, cases))
+    }
+    value = parseUpdateExpr(exprAdvance(state))
+    cases = listPush(cases, { pattern: pattern.expr, expression: value.expr })
+    state = value.state
+    if exprCurrent(state).value == "," or exprCurrent(state).value == ";" {
+      state = exprAdvance(state)
+    }
+  }
+  if exprCurrent(state).value != "}" {
+    return exprResult(exprError(state, "expected } after match cases"), expr("Match", "", subject.expr, cases))
+  }
+  return exprResult(exprAdvance(state), expr("Match", "", subject.expr, cases))
+}
+
 fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
   item = exprCurrent(state)
 
@@ -130,6 +203,15 @@ fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
   }
   if item.kind == "STRING" {
     return exprResult(exprAdvance(state), expr("Text", item.value, null, null))
+  }
+  if item.value == "true" or item.value == "false" {
+    return exprResult(exprAdvance(state), expr("Bool", item.value, null, null))
+  }
+  if item.value == "null" {
+    return exprResult(exprAdvance(state), expr("Null", item.value, null, null))
+  }
+  if item.value == "match" {
+    return parseMatchExpr(exprAdvance(state))
   }
   if item.kind == "IDENT" {
     return exprResult(exprAdvance(state), expr("Identifier", item.value, null, null))

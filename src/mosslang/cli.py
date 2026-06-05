@@ -10,6 +10,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import __version__
+from . import nodes as ast_nodes
 from .checker import check_program
 from .errors import MossError
 from .nodes import FunctionDecl, RuleDecl, TypeDecl
@@ -350,6 +351,7 @@ def compare_selfhost_file(path: Path) -> bool:
     selfhost_names = selfhost_declaration_names(nodes)
     selfhost_bodies = selfhost_body_statement_kinds(nodes)
     selfhost_metadata = selfhost_declaration_metadata(nodes)
+    expression_error = compare_expression_asts(host_program, runtime)
 
     print(f"{path}:")
     print(f"  host: {host}")
@@ -376,8 +378,191 @@ def compare_selfhost_file(path: Path) -> bool:
         print(f"  selfhost metadata: {selfhost_metadata}")
         print("  selfhost declaration-metadata comparison failed")
         return False
+    if expression_error is not None:
+        print(f"  expression AST comparison failed: {expression_error}")
+        return False
     print("  selfhost comparison passed")
     return True
+
+
+def compare_expression_asts(program, runtime: Runtime) -> str | None:
+    for expression in program_expressions(program):
+        source = render_expr(expression)
+        parsed = runtime.call(runtime.globals.get("parseExpressionSource"), [source])
+        if parsed["state"]["errors"]:
+            return f"{source}: {parsed['state']['errors'][0]}"
+        host = normalize_host_expr(expression)
+        selfhost = normalize_selfhost_expr(parsed["expr"])
+        if host != selfhost:
+            return f"{source}: host={host!r}, selfhost={selfhost!r}"
+    return None
+
+
+def program_expressions(program) -> list[object]:
+    result: list[object] = []
+    for item in program.items:
+        if isinstance(item, ast_nodes.RuleDecl):
+            result.append(item.expr)
+        elif isinstance(item, (ast_nodes.FunctionDecl, ast_nodes.TestDecl)):
+            result.extend(statement_expressions(item.body))
+        elif isinstance(item, (ast_nodes.LetStmt, ast_nodes.AssignStmt, ast_nodes.ReturnStmt, ast_nodes.ExprStmt)):
+            result.append(item.expr)
+        elif isinstance(item, ast_nodes.RequireStmt):
+            result.extend([item.condition, item.else_expr])
+    return result
+
+
+def statement_expressions(statements) -> list[object]:
+    result: list[object] = []
+    for statement in statements:
+        if isinstance(statement, (ast_nodes.LetStmt, ast_nodes.AssignStmt, ast_nodes.ReturnStmt, ast_nodes.ExprStmt)):
+            result.append(statement.expr)
+        elif isinstance(statement, ast_nodes.RequireStmt):
+            result.extend([statement.condition, statement.else_expr])
+        elif isinstance(statement, ast_nodes.IfStmt):
+            result.append(statement.condition)
+            result.extend(statement_expressions(statement.then_body))
+            result.extend(statement_expressions(statement.else_body))
+        elif isinstance(statement, ast_nodes.ForStmt):
+            result.append(statement.iterable)
+            result.extend(statement_expressions(statement.body))
+        elif isinstance(statement, ast_nodes.WhileStmt):
+            result.append(statement.condition)
+            result.extend(statement_expressions(statement.body))
+    return result
+
+
+def render_expr(expr) -> str:
+    if isinstance(expr, ast_nodes.Literal):
+        if expr.value is None:
+            return "null"
+        if isinstance(expr.value, bool):
+            return "true" if expr.value else "false"
+        return json.dumps(expr.value)
+    if isinstance(expr, ast_nodes.NumberLiteral):
+        return str(expr.value)
+    if isinstance(expr, ast_nodes.Identifier):
+        return expr.name
+    if isinstance(expr, ast_nodes.RecordLiteral):
+        return "{ " + ", ".join(f"{name}: {render_expr(value)}" for name, value in expr.fields.items()) + " }"
+    if isinstance(expr, ast_nodes.ListLiteral):
+        return "[" + ", ".join(render_expr(item) for item in expr.items) + "]"
+    if isinstance(expr, ast_nodes.RecordUpdate):
+        return f"{render_expr(expr.base)} with {{ " + ", ".join(
+            f"{name} = {render_expr(value)}" for name, value in expr.updates.items()
+        ) + " }"
+    if isinstance(expr, ast_nodes.UnaryExpr):
+        return f"({expr.op} {render_expr(expr.right)})"
+    if isinstance(expr, ast_nodes.BinaryExpr):
+        return f"({render_expr(expr.left)} {expr.op} {render_expr(expr.right)})"
+    if isinstance(expr, ast_nodes.CallExpr):
+        return f"{render_expr(expr.callee)}(" + ", ".join(render_expr(arg) for arg in expr.args) + ")"
+    if isinstance(expr, ast_nodes.FieldAccess):
+        return f"{render_expr(expr.target)}.{expr.field}"
+    if isinstance(expr, ast_nodes.IndexAccess):
+        return f"{render_expr(expr.target)}[{render_expr(expr.index)}]"
+    if isinstance(expr, ast_nodes.TryExpr):
+        return f"{render_expr(expr.expr)}?"
+    if isinstance(expr, ast_nodes.MatchExpr):
+        cases = ", ".join(f"{render_pattern(case.pattern)} -> {render_expr(case.expr)}" for case in expr.cases)
+        return f"match {render_expr(expr.subject)} {{ {cases} }}"
+    raise TypeError(f"cannot render {type(expr).__name__}")
+
+
+def render_pattern(pattern) -> str:
+    if isinstance(pattern, ast_nodes.WildcardPattern):
+        return "_"
+    if isinstance(pattern, ast_nodes.BindingPattern):
+        return pattern.name
+    if isinstance(pattern, ast_nodes.LiteralPattern):
+        if pattern.value is None:
+            return "null"
+        if isinstance(pattern.value, bool):
+            return "true" if pattern.value else "false"
+        return json.dumps(pattern.value) if isinstance(pattern.value, str) else str(pattern.value)
+    if isinstance(pattern, ast_nodes.VariantPattern):
+        if not pattern.payload:
+            return pattern.name
+        return f"{pattern.name}(" + ", ".join(render_pattern(item) for item in pattern.payload) + ")"
+    raise TypeError(f"cannot render pattern {type(pattern).__name__}")
+
+
+def normalize_host_expr(expr):
+    if isinstance(expr, ast_nodes.Literal):
+        return ("Null", "") if expr.value is None else ("Bool", str(expr.value).lower()) if isinstance(expr.value, bool) else ("Text", expr.value)
+    if isinstance(expr, ast_nodes.NumberLiteral):
+        return ("Number", str(expr.value))
+    if isinstance(expr, ast_nodes.Identifier):
+        return ("Identifier", expr.name)
+    if isinstance(expr, ast_nodes.RecordLiteral):
+        return ("Record", tuple(sorted((key, normalize_host_expr(value)) for key, value in expr.fields.items())))
+    if isinstance(expr, ast_nodes.ListLiteral):
+        return ("List", tuple(normalize_host_expr(item) for item in expr.items))
+    if isinstance(expr, ast_nodes.RecordUpdate):
+        return ("RecordUpdate", normalize_host_expr(expr.base), tuple(sorted((key, normalize_host_expr(value)) for key, value in expr.updates.items())))
+    if isinstance(expr, ast_nodes.UnaryExpr):
+        return ("Unary", expr.op, normalize_host_expr(expr.right))
+    if isinstance(expr, ast_nodes.BinaryExpr):
+        return ("Binary", expr.op, normalize_host_expr(expr.left), normalize_host_expr(expr.right))
+    if isinstance(expr, ast_nodes.CallExpr):
+        return ("Call", normalize_host_expr(expr.callee), tuple(normalize_host_expr(arg) for arg in expr.args))
+    if isinstance(expr, ast_nodes.FieldAccess):
+        return ("Field", expr.field, normalize_host_expr(expr.target))
+    if isinstance(expr, ast_nodes.IndexAccess):
+        return ("Index", normalize_host_expr(expr.target), normalize_host_expr(expr.index))
+    if isinstance(expr, ast_nodes.TryExpr):
+        return ("Try", normalize_host_expr(expr.expr))
+    if isinstance(expr, ast_nodes.MatchExpr):
+        return ("Match", normalize_host_expr(expr.subject), tuple((normalize_host_pattern(case.pattern), normalize_host_expr(case.expr)) for case in expr.cases))
+    raise TypeError(type(expr).__name__)
+
+
+def normalize_host_pattern(pattern):
+    if isinstance(pattern, ast_nodes.WildcardPattern):
+        return ("PatternWildcard", "")
+    if isinstance(pattern, ast_nodes.BindingPattern):
+        return ("PatternBinding", pattern.name)
+    if isinstance(pattern, ast_nodes.LiteralPattern):
+        value = "null" if pattern.value is None else str(pattern.value).lower() if isinstance(pattern.value, bool) else str(pattern.value)
+        return ("PatternLiteral", value)
+    if isinstance(pattern, ast_nodes.VariantPattern):
+        return ("PatternVariant", pattern.name, tuple(normalize_host_pattern(item) for item in pattern.payload))
+    raise TypeError(type(pattern).__name__)
+
+
+def normalize_selfhost_expr(expr):
+    kind = expr["kind"]
+    if kind in {"Number", "Text", "Bool", "Null", "Identifier"}:
+        return (kind, expr["value"])
+    if kind == "Record":
+        return (kind, tuple(sorted((key, normalize_selfhost_expr(value)) for key, value in expr["right"].items())))
+    if kind == "List":
+        return (kind, tuple(normalize_selfhost_expr(item) for item in expr["right"]))
+    if kind == "RecordUpdate":
+        return (kind, normalize_selfhost_expr(expr["left"]), tuple(sorted((key, normalize_selfhost_expr(value)) for key, value in expr["right"].items())))
+    if kind == "Unary":
+        return (kind, expr["value"], normalize_selfhost_expr(expr["right"]))
+    if kind == "Binary":
+        return (kind, expr["value"], normalize_selfhost_expr(expr["left"]), normalize_selfhost_expr(expr["right"]))
+    if kind == "Call":
+        return (kind, normalize_selfhost_expr(expr["left"]), tuple(normalize_selfhost_expr(arg) for arg in expr["right"]))
+    if kind == "Field":
+        return (kind, expr["value"], normalize_selfhost_expr(expr["left"]))
+    if kind == "Index":
+        return (kind, normalize_selfhost_expr(expr["left"]), normalize_selfhost_expr(expr["right"]))
+    if kind == "Try":
+        return (kind, normalize_selfhost_expr(expr["left"]))
+    if kind == "Match":
+        return (kind, normalize_selfhost_expr(expr["left"]), tuple((normalize_selfhost_pattern(case["pattern"]), normalize_selfhost_expr(case["expression"])) for case in expr["right"]))
+    raise ValueError(f"unknown self-host expression kind {kind}")
+
+
+def normalize_selfhost_pattern(pattern):
+    if pattern["kind"] in {"PatternWildcard", "PatternBinding", "PatternLiteral"}:
+        return (pattern["kind"], pattern["value"])
+    if pattern["kind"] == "PatternVariant":
+        return (pattern["kind"], pattern["value"], tuple(normalize_selfhost_pattern(item) for item in pattern["right"]))
+    raise ValueError(f"unknown self-host pattern kind {pattern['kind']}")
 
 
 def host_declaration_names(program) -> dict[str, list[str]]:

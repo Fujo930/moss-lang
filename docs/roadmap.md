@@ -70,11 +70,11 @@ Implemented:
 - machine-readable `moss check --json` diagnostics and summaries
 - recursive text and JSON project checking through `moss project-check`
 - persistent multiline interactive sessions through `moss repl`
+- Moss-written structured `match` expressions and recursive patterns
+- host/self-host complete recursive expression and match-pattern AST comparison
 
-High-value next steps:
-
-- structured match-pattern comparison
-- compare complete expression AST output against the Python host frontend
+Version 0.3 feature work is complete. Remaining work belongs to the 0.4
+product-engineering track or the longer self-hosting replacement track.
 
 ## Version 0.4: product engineering workflow
 

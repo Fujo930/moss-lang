@@ -61,6 +61,14 @@ test "expression sketch builds structured precedence tree" {
   assert(updated.expr.left.value == "order", "record update should retain base")
   assert(mapGet(updated.expr.right, "status", missingExpr()).value == "Shipped", "record update should retain field")
 
+  matched = parseExpressionSource("match result { Ok(value) -> value, Err(_) -> null }")
+  assert(len(matched.state.errors) == 0, "match expression should parse")
+  assert(matched.expr.kind == "Match", "match should produce structured expression")
+  assert(len(matched.expr.right) == 2, "match should retain cases")
+  assert(matched.expr.right[0].pattern.kind == "PatternVariant", "variant pattern should be structured")
+  assert(matched.expr.right[0].pattern.right[0].kind == "PatternBinding", "payload binding should be structured")
+  assert(matched.expr.right[1].pattern.right[0].kind == "PatternWildcard", "wildcard payload should be structured")
+
   trailing = parseExpressionSource("ready unexpected")
   assert(len(trailing.state.errors) == 1, "unconsumed tokens should be reported")
 }

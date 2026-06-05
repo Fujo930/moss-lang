@@ -24,6 +24,15 @@ unreachable by an earlier catch-all.
 Why it matters: exhaustive matching is only trustworthy when every accepted
 case actually belongs to the union and can bind the payload it claims.
 
+The Moss-written expression frontend now parses structured match expressions
+and recursive patterns. `selfhost-compare` renders every host expression,
+parses it through the Moss frontend, and compares the complete recursive AST,
+including match patterns.
+
+Why it matters: declaration counts and statement shapes can hide parser
+disagreements. Expression equivalence makes the self-host frontend a much
+stronger candidate for replacing the Python frontend.
+
 ## efeb3d1 Initial Moss language prototype
 
 Started the executable Moss prototype: a tokenizer, parser, AST, interpreter,
