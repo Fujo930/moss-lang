@@ -28,6 +28,12 @@ test "statement sketch builds structured statements" {
   assert(required.stmt.value.condition.value == "ready", "require condition should be captured")
   assert(required.stmt.value.error.value == "NotReady", "require error should be captured")
 
+  stopped = parseStatementSource("break")
+  assert(stopped.stmt.kind == "Break", "break should be recognized")
+
+  continued = parseStatementSource("continue")
+  assert(continued.stmt.kind == "Continue", "continue should be recognized")
+
   broken = parseStatementSource("let = 1")
   assert(len(broken.errors) == 1, "malformed let should report an error")
 }

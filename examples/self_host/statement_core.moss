@@ -61,6 +61,14 @@ fn parseStatementTokens(tokens: List<MossToken>) -> StmtParseResult {
     return stmtResult(stmt("Require", "", { condition: condition.expr, error: errorValue.expr }), errors)
   }
 
+  if first.value == "break" {
+    return stmtResult(stmt("Break", "", null), [])
+  }
+
+  if first.value == "continue" {
+    return stmtResult(stmt("Continue", "", null), [])
+  }
+
   if first.kind == "IDENT" and second.value == "=" {
     parsed = parseStatementExpression(tokens, 2)
     return stmtResult(stmt("Assign", first.value, parsed.expr), parsed.state.errors)

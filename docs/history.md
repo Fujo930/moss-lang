@@ -184,3 +184,14 @@ labels.
 
 Why it matters: Moss now has a recognizable public face without hiding its
 alpha status, and the editor remains focused on repeated programming work.
+
+## Recursive self-host control flow
+
+The Moss-written parser now recursively retains `if`/`else`, `for`, and `while`
+bodies, including structured `break` and `continue` statements. The
+`selfhost-compare` gate now compares recursive statement-kind counts inside
+every bundled function and test body, in addition to declarations and names.
+
+Why it matters: two parsers can agree on declarations while disagreeing on the
+programs inside them. Moss now tests a deeper and more useful layer of
+self-hosting equivalence.

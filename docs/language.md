@@ -339,9 +339,11 @@ Moss frontend:
 - `tokenizer_sketch.moss` runs the lexer against a Moss file
 - `expression_core.moss` parses structured expression AST nodes, including
   precedence, calls, field/index access, lists, records, record updates, and `?`
-- `statement_core.moss` parses simple structured statements such as `let`,
-  assignment, `return`, expression statements, and `require`
+- `statement_core.moss` parses structured statements such as `let`,
+  assignment, `return`, expression statements, `require`, `break`, and
+  `continue`
 - `parser_core.moss` consumes those tokens into simple top-level AST nodes
+  and recursively preserves `if`/`else`, `for`, and `while` bodies
 - `parser_sketch.moss` runs the parser against a Moss file
   and summarizes declarations such as `effect`, `type`, `rule`, `fn`, and `test`
 - `checker_core.moss` performs the first Moss-written declaration checks
@@ -372,6 +374,7 @@ simple type references in record fields, function signatures, and rule
 signatures. This is the start of self-hosting, not the end state.
 
 The Moss-written parser also preserves declaration names and builds structured
-nodes for expressions and simple statements. `moss selfhost-compare examples`
-currently checks declaration counts and names; complete AST equivalence remains
-a future milestone.
+nodes for expressions and recursive control-flow statements.
+`moss selfhost-compare examples` checks declaration counts, names, and recursive
+function/test body statement shapes; complete expression AST equivalence
+remains a future milestone.

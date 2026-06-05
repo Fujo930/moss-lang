@@ -51,9 +51,15 @@ This version is public-ready as an alpha. It should be described as
 
 ## Version 0.3: static confidence
 
+Implemented:
+
+- recursive Moss-written `if`/`else`, `for`, and `while` statement AST nodes
+- structured `break` and `continue` statements in the Moss-written frontend
+- host/self-host recursive function and test body statement-shape comparison
+
 High-value next steps:
 
-- recursive control-flow and match AST nodes
+- structured match-pattern comparison
 - compare complete Moss-written AST output against the Python host frontend
 - static type inference for local bindings
 - static field checks for records

@@ -48,6 +48,13 @@ class MossLanguageTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("examples\\match_demo.moss", output.getvalue().replace("/", "\\"))
 
+    def test_cli_selfhost_compare_checks_recursive_body_structure(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            code = cli_main(["selfhost-compare", "examples/text_fs_demo.moss"])
+        self.assertEqual(code, 0)
+        self.assertNotIn("body-structure comparison failed", output.getvalue())
+
     def test_order_example_ships_and_stores(self) -> None:
         source = """
 effect Database

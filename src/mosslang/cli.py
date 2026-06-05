@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import pprint
 import sys
+from collections import Counter
 from pathlib import Path
 
 from .checker import check_program
@@ -163,6 +164,7 @@ def compare_selfhost_file(path: Path) -> bool:
     host_program = parse_source(source)
     host = summarize(host_program)
     host_names = host_declaration_names(host_program)
+    host_bodies = host_body_statement_kinds(host_program)
 
     runtime = Runtime(base_path=Path.cwd())
     runtime.run(parse_source('import "examples/self_host/parser_core.moss"\n'))
@@ -178,6 +180,7 @@ def compare_selfhost_file(path: Path) -> bool:
         "tests": sum(1 for item in nodes if item["kind"] == "Test"),
     }
     selfhost_names = selfhost_declaration_names(nodes)
+    selfhost_bodies = selfhost_body_statement_kinds(nodes)
 
     print(f"{path}:")
     print(f"  host: {host}")
@@ -193,6 +196,11 @@ def compare_selfhost_file(path: Path) -> bool:
         print(f"  host names: {host_names}")
         print(f"  selfhost names: {selfhost_names}")
         print("  selfhost declaration-name comparison failed")
+        return False
+    if host_bodies != selfhost_bodies:
+        print(f"  host body statements: {host_bodies}")
+        print(f"  selfhost body statements: {selfhost_bodies}")
+        print("  selfhost body-structure comparison failed")
         return False
     print("  selfhost comparison passed")
     return True
@@ -223,6 +231,54 @@ def selfhost_declaration_names(nodes: list[dict]) -> dict[str, list[str]]:
         if target is not None:
             result[target].append(item["value"] if item["kind"] == "Import" else item["name"])
     return {key: sorted(values) for key, values in result.items()}
+
+
+def host_body_statement_kinds(program) -> dict[str, dict[str, int]]:
+    result: dict[str, dict[str, int]] = {}
+    for item in program.items:
+        kind = item.__class__.__name__
+        if kind not in {"FunctionDecl", "TestDecl"}:
+            continue
+        label = ("fn:" if kind == "FunctionDecl" else "test:") + item.name
+        counts: Counter[str] = Counter()
+        count_host_statements(item.body, counts)
+        result[label] = dict(sorted(counts.items()))
+    return result
+
+
+def count_host_statements(statements, counts: Counter[str]) -> None:
+    for statement in statements:
+        kind = statement.__class__.__name__.removesuffix("Stmt")
+        counts[kind] += 1
+        if kind == "If":
+            count_host_statements(statement.then_body, counts)
+            count_host_statements(statement.else_body, counts)
+        elif kind in {"For", "While"}:
+            count_host_statements(statement.body, counts)
+
+
+def selfhost_body_statement_kinds(nodes: list[dict]) -> dict[str, dict[str, int]]:
+    result: dict[str, dict[str, int]] = {}
+    for item in nodes:
+        if item["kind"] not in {"Function", "Test"}:
+            continue
+        label = ("fn:" if item["kind"] == "Function" else "test:") + item["name"]
+        counts: Counter[str] = Counter()
+        count_selfhost_statements(item["data"] or [], counts)
+        result[label] = dict(sorted(counts.items()))
+    return result
+
+
+def count_selfhost_statements(statements: list[dict], counts: Counter[str]) -> None:
+    for statement in statements:
+        kind = statement["kind"]
+        counts[kind] += 1
+        value = statement.get("value")
+        if kind == "If" and isinstance(value, dict):
+            count_selfhost_statements(value.get("thenBody", []), counts)
+            count_selfhost_statements(value.get("elseBody", []), counts)
+        elif kind in {"For", "While"} and isinstance(value, dict):
+            count_selfhost_statements(value.get("body", []), counts)
 
 
 if __name__ == "__main__":

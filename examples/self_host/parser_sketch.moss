@@ -69,4 +69,26 @@ test "parser sketch summarizes declarations" {
   assert(firstLet.data.kind == "Binary", "let should retain structured expression")
   assert(firstLet.data.value == "+", "let expression should retain precedence tree")
   assert(firstLet.data.right.value == "*", "nested multiplication should be structured")
+
+  controlSource = ""
+  controlSource = controlSource + "fn walk(items: List<Text>) {\n"
+  controlSource = controlSource + "  for item in items {\n"
+  controlSource = controlSource + "    if item == \"stop\" {\n"
+  controlSource = controlSource + "      break\n"
+  controlSource = controlSource + "    } else {\n"
+  controlSource = controlSource + "      print(item)\n"
+  controlSource = controlSource + "    }\n"
+  controlSource = controlSource + "  }\n"
+  controlSource = controlSource + "}\n"
+  controlParsed = parseProgram(sketchTokens(controlSource))
+  controlFunction = listGet(controlParsed.nodes, 0, node("Missing", "", "", null))
+  loop = listGet(controlFunction.data, 0, stmt("Missing", "", null))
+  branch = listGet(loop.value.body, 0, stmt("Missing", "", null))
+  stopped = listGet(branch.value.thenBody, 0, stmt("Missing", "", null))
+  printed = listGet(branch.value.elseBody, 0, stmt("Missing", "", null))
+  assert(loop.kind == "For", "for should be a structured statement")
+  assert(loop.name == "item", "for should retain its binding")
+  assert(branch.kind == "If", "nested if should be structured")
+  assert(stopped.kind == "Break", "break should remain in the then body")
+  assert(printed.kind == "Expr", "else body should retain statements")
 }

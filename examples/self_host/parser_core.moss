@@ -17,6 +17,15 @@ type BlockParseResult =
   state: ParseState
   statements: List<Any>
 
+type LineParseResult =
+  state: ParseState
+  tokens: List<MossToken>
+
+type BlockStepResult =
+  state: ParseState
+  stmt: MossStmt
+  errors: List<Text>
+
 fn node(kind: Text, name: Text, value: Text, data) -> MossNode {
   return { kind: kind, name: name, value: value, data: data }
 }
@@ -127,38 +136,103 @@ fn typeFieldText(state: ParseState) -> Text {
   return fields
 }
 
+fn readLineTokens(state: ParseState) -> LineParseResult {
+  tokens = []
+  while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
+    tokens = listPush(tokens, currentToken(state))
+    state = advance(state)
+  }
+  return { state: state, tokens: tokens }
+}
+
+fn parseControlExpression(tokens: List<MossToken>, start: Number, end: Number) -> ExprParseResult {
+  expressionTokens = listSlice(tokens, start, end)
+  expressionTokens = listPush(expressionTokens, token("EOF", "", 0, 0))
+  return parseExpressionTokens(expressionTokens)
+}
+
+fn parseIfBlock(state: ParseState, conditionStart: Number) -> BlockStepResult {
+  line = readLineTokens(state)
+  condition = parseControlExpression(line.tokens, conditionStart, len(line.tokens) - 1)
+  body = parseBlockStatements(line.state)
+  state = skipNewlines(body.state)
+  elseBody = []
+  errors = condition.state.errors
+
+  if currentToken(state).value == "else" {
+    elseLine = readLineTokens(state)
+    if listGet(elseLine.tokens, 1, token("EOF", "", 0, 0)).value == "if" {
+      nested = parseIfBlock(state, 2)
+      state = nested.state
+      elseBody = [nested.stmt]
+      errors = listConcat(errors, nested.errors)
+    } else {
+      parsedElse = parseBlockStatements(elseLine.state)
+      state = parsedElse.state
+      elseBody = parsedElse.statements
+    }
+  }
+
+  value = { condition: condition.expr, thenBody: body.statements, elseBody: elseBody }
+  return { state: state, stmt: stmt("If", "", value), errors: errors }
+}
+
+fn parseLoopBlock(state: ParseState, kind: Text) -> BlockStepResult {
+  line = readLineTokens(state)
+  start = 1
+  name = ""
+  if kind == "For" {
+    name = listGet(line.tokens, 1, token("EOF", "", 0, 0)).value
+    start = 3
+  }
+  expression = parseControlExpression(line.tokens, start, len(line.tokens) - 1)
+  body = parseBlockStatements(line.state)
+  value = { expression: expression.expr, body: body.statements }
+  return { state: body.state, stmt: stmt(kind, name, value), errors: expression.state.errors }
+}
+
 fn parseBlockStatements(state: ParseState) -> BlockParseResult {
   statements = []
   state = skipNewlines(state)
+  blockDepth = state.depth
 
-  while currentToken(state).kind != "EOF" and state.depth > 0 {
-    startDepth = state.depth
-    lineTokens = []
-
-    while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
-      lineTokens = listPush(lineTokens, currentToken(state))
+  while currentToken(state).kind != "EOF" and state.depth >= blockDepth {
+    if currentToken(state).value == "}" and state.depth == blockDepth {
       state = advance(state)
+      return { state: state, statements: statements }
     }
 
-    first = listGet(lineTokens, 0, token("EOF", "", 0, 0))
-    if startDepth == 1 and state.depth == 1 and first.value == "require" {
-      nextLine = skipNewlines(state)
-      if currentToken(nextLine).value == "else" {
-        while currentToken(nextLine).kind != "EOF" and currentToken(nextLine).kind != "NEWLINE" {
-          lineTokens = listPush(lineTokens, currentToken(nextLine))
-          nextLine = advance(nextLine)
+    first = currentToken(state)
+    if first.value == "if" {
+      parsedIf = parseIfBlock(state, 1)
+      state = parsedIf.state
+      statements = listPush(statements, parsedIf.stmt)
+    } else if first.value == "for" {
+      parsedFor = parseLoopBlock(state, "For")
+      state = parsedFor.state
+      statements = listPush(statements, parsedFor.stmt)
+    } else if first.value == "while" {
+      parsedWhile = parseLoopBlock(state, "While")
+      state = parsedWhile.state
+      statements = listPush(statements, parsedWhile.stmt)
+    } else {
+      line = readLineTokens(state)
+      lineTokens = line.tokens
+      state = line.state
+      if first.value == "require" {
+        nextLine = skipNewlines(state)
+        if currentToken(nextLine).value == "else" {
+          continuation = readLineTokens(nextLine)
+          lineTokens = listConcat(lineTokens, continuation.tokens)
+          state = continuation.state
         }
-        state = nextLine
       }
-    }
-    lineTokens = listPush(lineTokens, token("EOF", "", 0, 0))
-    if startDepth == 1 and state.depth == 1 and first.value != "else" and first.value != "if" and first.value != "for" and first.value != "while" and first.value != "}" {
+      lineTokens = listPush(lineTokens, token("EOF", "", 0, 0))
       parsed = parseStatementTokens(lineTokens)
       if len(parsed.errors) == 0 {
         statements = listPush(statements, parsed.stmt)
       }
     }
-
     state = skipNewlines(state)
   }
 

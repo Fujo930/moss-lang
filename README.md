@@ -76,8 +76,8 @@ The package exposes a console command named `moss`.
   `listFiles`
 - top-level `import "path.moss"` declarations
 - self-hosting sketches with structured token records, reusable lexer/parser
-  cores, structured expression and statement AST nodes, a top-level declaration
-  parser, and a first checker sketch:
+  cores, structured expression and recursive control-flow statement AST nodes,
+  a top-level declaration parser, and a first checker sketch:
   `examples/self_host/tokenizer_sketch.moss` and
   `examples/self_host/expression_sketch.moss` and
   `examples/self_host/statement_sketch.moss` and
@@ -146,7 +146,8 @@ moss studio
 `moss selfhost --quick` runs the fast self-hosting sketches. `moss selfhost`
 also runs the slower Moss-written project check over `examples/self_host`.
 `moss selfhost-compare examples` compares Python-host and Moss-written parser
-declaration counts and names across all root example programs.
+declaration counts, names, and recursive function/test body statement shapes
+across all root example programs.
 
 ## Project status
 
@@ -161,8 +162,8 @@ Suitable claims:
 - Moss has begun self-hosting.
 - Moss is still alpha software and should not be described as fully self-hosted.
 
-The next useful steps are recursive control-flow AST nodes, richer diagnostics,
-a formatter, and deeper host/self-host AST comparison.
+The next useful steps are richer diagnostics, a formatter, static local type
+inference, and deeper host/self-host expression AST comparison.
 
 GitHub's language bar is powered by Linguist. `.moss` files are marked
 detectable in `.gitattributes`, but GitHub will only show `Moss` as a first-class
