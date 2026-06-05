@@ -28,6 +28,16 @@ Use `src/mosslang/studio_assets/moss-mark.svg` as the canonical asset. Keep its
 shape and colors intact, leave clear space around it, and do not place text
 inside the mark.
 
+## Social preview
+
+Use `docs/assets/moss-social-preview.png` as the repository social preview,
+release announcement cover, and wide introductory image. It presents the
+branching M beside Moss's explainable-rule, explicit-effect, deterministic
+module, and source-mapped trace concepts.
+
+Keep the original `1280x640` aspect ratio and do not add competing text or
+logos over the image.
+
 ## Colors
 
 - Moss green `#71D6A2`: language and successful analysis

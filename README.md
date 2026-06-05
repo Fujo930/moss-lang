@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/mosslang/studio_assets/moss-mark.svg" width="88" alt="Moss branching M mark">
+  <img src="docs/assets/moss-social-preview.png" width="100%" alt="Moss: Explainable software for humans and AI">
 </p>
 
 # Moss language prototype
