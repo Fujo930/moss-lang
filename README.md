@@ -274,3 +274,14 @@ See `docs/language.md` for the current language surface,
 `docs/roadmap.md` for the path from prototype to a serious implementation.
 See `docs/release-0.5.md` for the current release notes and packaging checklist,
 and `docs/identity.md` for the Moss identity.
+
+## Participate
+
+Moss `0.5.0` is ready for early technical feedback, especially from people
+interested in programming-language design, self-hosting, explicit effects, and
+human/AI software maintenance.
+
+- Read `CONTRIBUTING.md` for approachable first contributions.
+- Use GitHub Issues for reproducible bugs, focused proposals, and platform
+  installation reports.
+- Read `docs/ecosystem.md` for the adoption and external-language strategy.

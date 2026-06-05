@@ -1,0 +1,54 @@
+name: Bug report
+description: Report reproducible incorrect Moss behavior
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping Moss become more dependable.
+  - type: input
+    id: version
+    attributes:
+      label: Moss version
+      placeholder: Output from moss --version
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Parser or syntax
+        - Checker or diagnostics
+        - Runtime
+        - Project tooling
+        - Studio or LSP
+        - Self-hosting
+        - Packaging or installation
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Include the smallest Moss program and command that reproduce the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and Python version

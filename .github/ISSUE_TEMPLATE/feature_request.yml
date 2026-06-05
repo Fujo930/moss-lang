@@ -1,0 +1,39 @@
+name: Feature request
+description: Propose a focused improvement to Moss
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What real workflow is difficult or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Show a small Moss example when possible.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: roadmap
+    attributes:
+      label: Related roadmap area
+      options:
+        - Adoption and installation
+        - Self-hosting
+        - Language design
+        - Tooling and editor support
+        - Packages and ecosystem
+        - Python or Node integration
+        - Runtime and VM
+        - Other
+    validations:
+      required: true
