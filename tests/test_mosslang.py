@@ -297,6 +297,40 @@ fn work() -> List<Number> {
         diagnostics = check_program(program)
         self.assertFalse(any("assignment to result" in item.message for item in diagnostics))
 
+    def test_static_checker_merges_matching_branch_types(self) -> None:
+        program = parse_source(
+            """
+fn choose(flag: Bool) -> Number {
+  result = null
+  if flag {
+    result = 1
+  } else {
+    result = 2
+  }
+  return result
+}
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertFalse(any("return from choose" in item.message for item in diagnostics))
+
+    def test_static_checker_does_not_merge_disagreeing_branch_types(self) -> None:
+        program = parse_source(
+            """
+fn choose(flag: Bool) -> Number {
+  result = null
+  if flag {
+    result = 1
+  } else {
+    result = "two"
+  }
+  return result
+}
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertTrue(any("return from choose" in item.message for item in diagnostics))
+
     def test_static_checker_checks_call_argument_types(self) -> None:
         program = parse_source(
             """

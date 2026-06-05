@@ -158,8 +158,14 @@ def check_statement_types(
             infer_expr_type(statement.else_expr, env, functions, types, diagnostics, function.location)
         elif isinstance(statement, IfStmt):
             infer_expr_type(statement.condition, env, functions, types, diagnostics, function.location)
-            check_statement_types(statement.then_body, dict(env), functions, types, diagnostics, function)
-            check_statement_types(statement.else_body, dict(env), functions, types, diagnostics, function)
+            then_env = dict(env)
+            else_env = dict(env)
+            check_statement_types(statement.then_body, then_env, functions, types, diagnostics, function)
+            check_statement_types(statement.else_body, else_env, functions, types, diagnostics, function)
+            if statement.else_body:
+                for name in set(then_env) & set(else_env):
+                    if then_env[name] == else_env[name]:
+                        env[name] = then_env[name]
         elif isinstance(statement, ForStmt):
             iterable = infer_expr_type(statement.iterable, env, functions, types, diagnostics, function.location)
             loop_env = dict(env)

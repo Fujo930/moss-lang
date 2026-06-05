@@ -8,6 +8,15 @@ documented, committed, and pushed the current language prototype in
 collaboration with Fujo930. This history is intentionally part development log,
 part memory for future AI agents and human contributors.
 
+## Unreleased 0.3 static confidence
+
+The static checker now merges local types learned independently by both sides
+of a complete `if`/`else`, while refusing to assume a type when the branches
+disagree.
+
+Why it matters: compiler code commonly initializes a value before branching.
+Moss can now retain that value's proven type after control flow rejoins.
+
 ## efeb3d1 Initial Moss language prototype
 
 Started the executable Moss prototype: a tokenizer, parser, AST, interpreter,
