@@ -11,6 +11,7 @@ const fileName = document.querySelector("#fileName");
 const pathInput = document.querySelector("#pathInput");
 const fileInput = document.querySelector("#fileInput");
 const exampleSelect = document.querySelector("#exampleSelect");
+const diagnosticCount = document.querySelector("#diagnosticCount");
 
 let currentName = "scratch.moss";
 let debounceId = 0;
@@ -324,6 +325,8 @@ function renderFailure(error) {
 
 function renderDiagnostics(items, ok) {
   diagnostics.innerHTML = "";
+  diagnosticCount.textContent = String(items.length);
+  diagnosticCount.classList.toggle("hasIssues", items.length > 0);
   const list = items.length ? items : [{ level: ok ? "ok" : "warning", message: ok ? "No diagnostics" : "No result" }];
   list.forEach(item => {
     const node = document.createElement("div");

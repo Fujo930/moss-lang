@@ -173,3 +173,14 @@ The next self-hosting milestones are:
 - parse recursive control flow and match expressions into structured AST nodes
 - compare full Moss-written AST output against the Python host frontend
 - gradually replace host pieces only after the Moss version is tested
+
+## Language identity and Studio refresh
+
+Added the branching M as Moss's reusable language mark, documented the public
+identity, and refreshed Studio around the same green, gold, blue, and ink
+palette. Studio now groups commands by purpose, exposes its preview status,
+counts diagnostics, uses the mark as its favicon, and has clearer accessible
+labels.
+
+Why it matters: Moss now has a recognizable public face without hiding its
+alpha status, and the editor remains focused on repeated programming work.

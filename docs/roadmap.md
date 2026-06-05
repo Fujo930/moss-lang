@@ -44,6 +44,7 @@ Implemented:
   function parameter and return types, and rule parameter and return types
 - text helpers needed by compiler code: `textIndexOf` and `textReplace`
 - release metadata for a public alpha package as `0.2.0`
+- branching M language identity and a refreshed, denser Moss Studio
 
 This version is public-ready as an alpha. It should be described as
 "self-hosting started" or "self-hosting preview", not "fully self-hosted".
@@ -78,7 +79,8 @@ Developer experience:
 
 - syntax highlighting grammar
 - language server diagnostics
-- browser playground
+- source-located Studio diagnostics and host/self-host comparison controls
+- hosted browser playground built from the local Studio API shape
 - test runner with golden output files
 - generated API and schema docs
 

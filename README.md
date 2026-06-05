@@ -1,7 +1,11 @@
+<p align="center">
+  <img src="src/mosslang/studio_assets/moss-mark.svg" width="88" alt="Moss branching M mark">
+</p>
+
 # Moss language prototype
 
-![Language: Moss](https://img.shields.io/badge/language-Moss-42c4a3)
-![Self-hosting: started](https://img.shields.io/badge/self--hosting-started-efb85c)
+![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
+![Self-hosting: started](https://img.shields.io/badge/self--hosting-started-f2c14e)
 ![Version: 0.2.0](https://img.shields.io/badge/version-0.2.0-4f7edb)
 ![Built by Codex](https://img.shields.io/badge/built%20by-Codex-222222)
 
@@ -16,6 +20,10 @@ language prototype.
 Version `0.2.0` is a self-hosting preview. Moss is not fully self-hosted yet,
 but Moss-written lexer, parser, checker, and project-check sketches already run
 against Moss source.
+
+The branching M is Moss's language mark: two contributors meeting in a shared
+syntax tree. See `docs/identity.md` for the public description and identity
+rules.
 
 ## Quick start
 
@@ -165,4 +173,4 @@ See `docs/language.md` for the current language surface,
 `docs/history.md` for a commit-by-commit feature guide, and
 `docs/roadmap.md` for the path from prototype to a serious implementation.
 See `docs/release.md` for the public `0.2.0` release notes and packaging
-checklist.
+checklist, and `docs/identity.md` for the Moss identity.

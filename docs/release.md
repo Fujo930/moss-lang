@@ -19,6 +19,10 @@ Use this wording carefully:
 - Avoid: "fully self-hosted."
 - Avoid: "production ready."
 
+The release also introduces the branching M language mark and a refreshed Moss
+Studio. The mark, colors, and supported public wording are documented in
+`docs/identity.md`.
+
 ## Install from the repository
 
 ```powershell
@@ -51,6 +55,13 @@ The build command creates a source distribution and wheel under `dist/`.
 - The Moss-written frontend is a checked self-hosting sketch, not the active
   compiler frontend.
 - The self-host parser currently focuses on top-level declarations and simple
-  signature/type metadata.
+  signature/type metadata, plus structured expressions and simple statements.
 - Diagnostics are useful but still early.
 - GitHub will not show `Moss` as a first-class language until Linguist adds it.
+
+## Included developer surfaces
+
+- CLI checking, running, testing, token inspection, and AST inspection
+- host/self-host declaration comparison across bundled examples
+- Moss Studio with workspace-relative open/save, examples, live checking,
+  execution, tests, diagnostics, AST, and tokens

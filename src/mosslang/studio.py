@@ -20,6 +20,7 @@ ASSET_TYPES = {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
 }
 
 EXAMPLES = {
@@ -160,6 +161,9 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
                 return
             if self.path == "/app.js":
                 self.send_asset("app.js")
+                return
+            if self.path == "/moss-mark.svg":
+                self.send_asset("moss-mark.svg")
                 return
             if self.path == "/api/examples":
                 examples = []

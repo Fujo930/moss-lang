@@ -13,6 +13,7 @@ Local repository setup already done:
 - `.moss` files are marked detectable in `.gitattributes`
 - README shows a visible `Language: Moss` badge
 - README shows `Built by Codex` and `version 0.2.0` badges
+- README and Studio use the canonical branching M language mark
 - `examples/self_host` contains real Moss source samples for future Linguist
   fixtures
 
@@ -25,3 +26,7 @@ Upstream checklist:
 
 Until then, GitHub may classify most of the repository as Python because the
 host interpreter is written in Python. That is expected.
+
+The language mark does not make GitHub recognize a language. Linguist support
+still requires an upstream language definition, extension registration, and
+representative public sample files.

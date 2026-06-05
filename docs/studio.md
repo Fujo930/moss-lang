@@ -27,11 +27,21 @@ http://127.0.0.1:8765
 - runs `check` automatically after edits
 - runs the program on demand
 - runs top-level `test` blocks
-- shows output, diagnostics, AST, and tokens
+- shows output, diagnostics with a live issue count, AST, and tokens
 - opens browser-selected `.moss` files and downloads the current buffer
 - opens and saves workspace-relative paths inside the Moss repository
 - can open the self-hosting sketches so users can inspect Moss code that checks
   Moss code
+
+The toolbar is grouped into source selection, file commands, and Moss commands.
+The status bar summarizes imports, effects, types, callables, and tests. The
+branching M mark and green/gold/blue palette follow `docs/identity.md`.
+
+## Keyboard
+
+- `Ctrl+Enter` or `Cmd+Enter`: run the current source
+- `Ctrl+S` or `Cmd+S`: save the current workspace path
+- `Tab`: insert two spaces
 
 ## Implementation
 
@@ -51,3 +61,7 @@ Each API accepts or returns plain JSON so a future desktop app, VS Code panel,
 or hosted playground can reuse the same backend shape.
 
 File read/write requests are constrained to the repository workspace.
+
+Studio is deliberately a small workbench rather than a separate compiler. Its
+next useful upgrades are syntax highlighting, source-located diagnostics, and
+running host/self-host comparisons from the same result surface.

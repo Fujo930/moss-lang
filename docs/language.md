@@ -8,6 +8,9 @@ documented, committed, and pushed the current prototype in collaboration with
 Fujo930. The current public version is `0.2.0`, a self-hosting preview rather
 than a finished self-hosted compiler.
 
+The language's public identity and supported project wording live in
+`docs/identity.md`.
+
 ## Design center
 
 Moss is for long-lived product software. The prototype keeps three ideas visible:
@@ -367,3 +370,8 @@ As of `0.2.0`, the Moss-written checker validates duplicate declarations,
 duplicate record fields, import shape, undeclared effects, parse errors, and
 simple type references in record fields, function signatures, and rule
 signatures. This is the start of self-hosting, not the end state.
+
+The Moss-written parser also preserves declaration names and builds structured
+nodes for expressions and simple statements. `moss selfhost-compare examples`
+currently checks declaration counts and names; complete AST equivalence remains
+a future milestone.
