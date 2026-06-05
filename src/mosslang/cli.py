@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import pprint
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 from . import __version__
 from .checker import check_program
 from .errors import MossError
+from .nodes import FunctionDecl, RuleDecl, TypeDecl
 from .parser import parse_source
 from .runtime import Runtime
 from .tokens import tokenize
@@ -196,6 +198,7 @@ def compare_selfhost_file(path: Path) -> bool:
     host = summarize(host_program)
     host_names = host_declaration_names(host_program)
     host_bodies = host_body_statement_kinds(host_program)
+    host_metadata = host_declaration_metadata(host_program)
 
     root = installation_root()
     runtime = Runtime(base_path=root)
@@ -213,6 +216,7 @@ def compare_selfhost_file(path: Path) -> bool:
     }
     selfhost_names = selfhost_declaration_names(nodes)
     selfhost_bodies = selfhost_body_statement_kinds(nodes)
+    selfhost_metadata = selfhost_declaration_metadata(nodes)
 
     print(f"{path}:")
     print(f"  host: {host}")
@@ -233,6 +237,11 @@ def compare_selfhost_file(path: Path) -> bool:
         print(f"  host body statements: {host_bodies}")
         print(f"  selfhost body statements: {selfhost_bodies}")
         print("  selfhost body-structure comparison failed")
+        return False
+    if host_metadata != selfhost_metadata:
+        print(f"  host metadata: {host_metadata}")
+        print(f"  selfhost metadata: {selfhost_metadata}")
+        print("  selfhost declaration-metadata comparison failed")
         return False
     print("  selfhost comparison passed")
     return True
@@ -311,6 +320,88 @@ def count_selfhost_statements(statements: list[dict], counts: Counter[str]) -> N
             count_selfhost_statements(value.get("elseBody", []), counts)
         elif kind in {"For", "While"} and isinstance(value, dict):
             count_selfhost_statements(value.get("body", []), counts)
+
+
+def host_declaration_metadata(program) -> dict[str, dict]:
+    result: dict[str, dict] = {}
+    for item in program.items:
+        if isinstance(item, TypeDecl):
+            result[f"type:{item.name}"] = {
+                "fields": {name: normalize_type_text(value) for name, value in sorted(item.fields.items())},
+                "alias": normalize_type_text(item.alias or ""),
+            }
+        elif isinstance(item, (RuleDecl, FunctionDecl)):
+            result[f"{'rule' if isinstance(item, RuleDecl) else 'fn'}:{item.name}"] = {
+                "params": [(param.name, normalize_type_text(param.type_name or "")) for param in item.params],
+                "return": normalize_type_text(item.return_type or ""),
+                "uses": sorted(item.uses) if isinstance(item, FunctionDecl) else [],
+            }
+    return result
+
+
+def selfhost_declaration_metadata(nodes: list[dict]) -> dict[str, dict]:
+    result: dict[str, dict] = {}
+    for item in nodes:
+        if item["kind"] == "Type":
+            fields: dict[str, str] = {}
+            alias = ""
+            if item["value"].startswith("="):
+                alias = normalize_type_text(item["value"][1:])
+            else:
+                for field in item["value"].split(";"):
+                    if ":" in field:
+                        name, value = field.split(":", 1)
+                        fields[name.strip()] = normalize_type_text(value)
+            result[f"type:{item['name']}"] = {"fields": dict(sorted(fields.items())), "alias": alias}
+        elif item["kind"] in {"Rule", "Function"}:
+            result[f"{'rule' if item['kind'] == 'Rule' else 'fn'}:{item['name']}"] = parse_selfhost_signature(item["value"])
+    return result
+
+
+def parse_selfhost_signature(text: str) -> dict:
+    params: list[tuple[str, str]] = []
+    match = re.search(r"\((.*?)\)", text)
+    if match:
+        for part in split_signature_parts(match.group(1)):
+            if ":" in part:
+                name, type_name = part.split(":", 1)
+                params.append((name.strip(), normalize_type_text(type_name)))
+            elif part.strip():
+                params.append((part.strip(), ""))
+
+    return_type = ""
+    return_match = re.search(r"->(.*?)(?:\buses\b|\{|=|$)", text)
+    if return_match:
+        return_type = normalize_type_text(return_match.group(1))
+    uses: list[str] = []
+    uses_match = re.search(r"\buses\b(.*?)(?:\{|$)", text)
+    if uses_match:
+        uses = sorted(part.strip() for part in uses_match.group(1).split(",") if part.strip())
+    return {"params": params, "return": return_type, "uses": uses}
+
+
+def split_signature_parts(text: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    for index, char in enumerate(text):
+        if char == "<":
+            depth += 1
+        elif char == ">":
+            depth = max(0, depth - 1)
+        elif char == "," and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+    parts.append(text[start:])
+    return parts
+
+
+def normalize_type_text(text: str) -> str:
+    parts = text.strip().split()
+    normalized = " ".join(parts)
+    normalized = re.sub(r"\s*([<>,.])\s*", r"\1", normalized)
+    normalized = re.sub(r"\s*\|\s*", " | ", normalized)
+    return normalized
 
 
 def installation_root() -> Path:

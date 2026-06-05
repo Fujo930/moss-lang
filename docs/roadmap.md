@@ -56,6 +56,8 @@ Implemented:
 - recursive Moss-written `if`/`else`, `for`, and `while` statement AST nodes
 - structured `break` and `continue` statements in the Moss-written frontend
 - host/self-host recursive function and test body statement-shape comparison
+- host/self-host record field, alias, parameter, return type, and effect
+  metadata comparison
 - structured source locations in checker, CLI, and Studio diagnostics
 - conservative, idempotent `moss format` and CI-oriented `moss format --check`
 - conservative local-binding and expression type inference
@@ -65,7 +67,7 @@ Implemented:
 High-value next steps:
 
 - structured match-pattern comparison
-- compare complete Moss-written AST output against the Python host frontend
+- compare complete expression AST output against the Python host frontend
 - flow-sensitive branch type merging
 - payload-aware union pattern checking
 - expression-level checker locations

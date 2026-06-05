@@ -167,7 +167,8 @@ suitable for CI.
 also runs the slower Moss-written project check over `examples/self_host`.
 `moss selfhost-compare examples` compares Python-host and Moss-written parser
 declaration counts, names, and recursive function/test body statement shapes
-across all root example programs.
+across all root example programs. It also compares record fields, aliases,
+callable parameters, return types, and declared effects.
 
 ## Project status
 

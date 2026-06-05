@@ -217,3 +217,13 @@ variants and duplicate cases.
 Why it matters: Moss now catches useful domain-model mistakes without requiring
 every intermediate value to carry an annotation or pretending unknown values
 are errors.
+
+## Declaration metadata equivalence
+
+The host/self-host comparison now checks record fields, aliases, callable
+parameters, return types, and declared effects in addition to names and
+recursive statement shapes.
+
+Why it matters: the Moss-written frontend must preserve the contracts that
+tools, checkers, and future code generation depend on, not merely recognize
+that a declaration exists.
