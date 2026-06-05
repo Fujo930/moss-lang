@@ -59,6 +59,7 @@ Implemented:
 - host/self-host record field, alias, parameter, return type, and effect
   metadata comparison
 - structured source locations in checker, CLI, and Studio diagnostics
+- expression-level source locations for static type diagnostics
 - conservative, idempotent `moss format` and CI-oriented `moss format --check`
 - canonical expression operator, comma, and colon spacing
 - conservative local-binding and expression type inference
@@ -74,7 +75,6 @@ High-value next steps:
 
 - structured match-pattern comparison
 - compare complete expression AST output against the Python host frontend
-- expression-level checker locations
 
 ## Version 0.4: product engineering workflow
 

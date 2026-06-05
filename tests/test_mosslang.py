@@ -361,6 +361,21 @@ fn work() -> Text {
         diagnostics = check_program(program)
         self.assertTrue(any("argument name to greet" in item.message for item in diagnostics))
 
+    def test_static_checker_reports_expression_level_location(self) -> None:
+        program = parse_source(
+            """
+fn accept(value: Number) -> Number {
+  return value
+}
+fn work() -> Number {
+  return accept("wrong")
+}
+"""
+        )
+        diagnostics = check_program(program)
+        mismatch = next(item for item in diagnostics if "argument value to accept" in item.message)
+        self.assertEqual(mismatch.location.format(), "6:10")
+
     def test_static_checker_requires_exhaustive_union_match(self) -> None:
         program = parse_source(
             """

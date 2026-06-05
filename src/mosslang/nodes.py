@@ -123,38 +123,45 @@ class ExprStmt:
 @dataclass(frozen=True)
 class Literal:
     value: Any
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
 class NumberLiteral:
     value: Decimal
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
 class Identifier:
     name: str
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
 class RecordLiteral:
     fields: dict[str, Any]
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
 class ListLiteral:
     items: list[Any]
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
 class RecordUpdate:
     base: Any
     updates: dict[str, Any]
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
 class UnaryExpr:
     op: str
     right: Any
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
@@ -162,29 +169,34 @@ class BinaryExpr:
     left: Any
     op: str
     right: Any
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
 class CallExpr:
     callee: Any
     args: list[Any]
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
 class FieldAccess:
     target: Any
     field: str
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
 class IndexAccess:
     target: Any
     index: Any
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
 class TryExpr:
     expr: Any
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
@@ -197,6 +209,7 @@ class MatchCase:
 class MatchExpr:
     subject: Any
     cases: list[MatchCase]
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)

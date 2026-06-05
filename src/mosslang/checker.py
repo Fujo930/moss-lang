@@ -184,6 +184,7 @@ def infer_expr_type(
     diagnostics: list[Diagnostic],
     location: SourceLocation | None,
 ) -> str:
+    location = getattr(expr, "location", None) or location
     if isinstance(expr, Literal):
         if isinstance(expr.value, bool):
             return "Bool"

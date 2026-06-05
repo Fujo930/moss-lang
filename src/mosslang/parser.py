@@ -325,7 +325,7 @@ class Parser:
                     if self.match_value(","):
                         self.skip_newlines()
                         if self.match_value("}"):
-                            return RecordUpdate(expr, updates)
+                            return RecordUpdate(expr, updates, getattr(expr, "location", None))
                     else:
                         self.skip_newlines()
             else:
@@ -336,7 +336,7 @@ class Parser:
                     field = self.expect_ident()
                     self.expect_value("=")
                     updates[field] = self.parse_expression()
-            return RecordUpdate(expr, updates)
+            return RecordUpdate(expr, updates, getattr(expr, "location", None))
         return expr
 
     def parse_or(self) -> object:
@@ -344,7 +344,7 @@ class Parser:
         while self.match_value("or"):
             op = self.previous().value
             right = self.parse_and()
-            expr = BinaryExpr(expr, op, right)
+            expr = BinaryExpr(expr, op, right, getattr(expr, "location", None))
         return expr
 
     def parse_and(self) -> object:
@@ -352,7 +352,7 @@ class Parser:
         while self.match_value("and"):
             op = self.previous().value
             right = self.parse_equality()
-            expr = BinaryExpr(expr, op, right)
+            expr = BinaryExpr(expr, op, right, getattr(expr, "location", None))
         return expr
 
     def parse_equality(self) -> object:
@@ -360,7 +360,7 @@ class Parser:
         while self.match_value("==") or self.match_value("!="):
             op = self.previous().value
             right = self.parse_comparison()
-            expr = BinaryExpr(expr, op, right)
+            expr = BinaryExpr(expr, op, right, getattr(expr, "location", None))
         return expr
 
     def parse_comparison(self) -> object:
@@ -368,7 +368,7 @@ class Parser:
         while self.match_value(">") or self.match_value(">=") or self.match_value("<") or self.match_value("<="):
             op = self.previous().value
             right = self.parse_term()
-            expr = BinaryExpr(expr, op, right)
+            expr = BinaryExpr(expr, op, right, getattr(expr, "location", None))
         return expr
 
     def parse_term(self) -> object:
@@ -376,7 +376,7 @@ class Parser:
         while self.match_value("+") or self.match_value("-"):
             op = self.previous().value
             right = self.parse_factor()
-            expr = BinaryExpr(expr, op, right)
+            expr = BinaryExpr(expr, op, right, getattr(expr, "location", None))
         return expr
 
     def parse_factor(self) -> object:
@@ -384,18 +384,20 @@ class Parser:
         while self.match_value("*") or self.match_value("/"):
             op = self.previous().value
             right = self.parse_unary()
-            expr = BinaryExpr(expr, op, right)
+            expr = BinaryExpr(expr, op, right, getattr(expr, "location", None))
         return expr
 
     def parse_unary(self) -> object:
         if self.check_kind("IDENT") and self.match_value("not"):
+            location = self.previous().location
             op = self.previous().value
             right = self.parse_unary()
-            return UnaryExpr(op, right)
+            return UnaryExpr(op, right, location)
         if self.check_kind("OP") and self.match_value("-"):
+            location = self.previous().location
             op = self.previous().value
             right = self.parse_unary()
-            return UnaryExpr(op, right)
+            return UnaryExpr(op, right, location)
         return self.parse_postfix()
 
     def parse_postfix(self) -> object:
@@ -414,47 +416,47 @@ class Parser:
                             continue
                         break
                 self.expect_value(")")
-                expr = CallExpr(expr, args)
+                expr = CallExpr(expr, args, getattr(expr, "location", None))
                 continue
 
             if self.match_value("."):
                 field = self.expect_ident()
-                expr = FieldAccess(expr, field)
+                expr = FieldAccess(expr, field, getattr(expr, "location", None))
                 continue
 
             if self.match_value("["):
                 index = self.parse_expression()
                 self.expect_value("]")
-                expr = IndexAccess(expr, index)
+                expr = IndexAccess(expr, index, getattr(expr, "location", None))
                 continue
 
             if self.match_value("?"):
-                expr = TryExpr(expr)
+                expr = TryExpr(expr, getattr(expr, "location", None))
                 continue
 
             return expr
 
     def parse_primary(self) -> object:
         if self.match_kind("NUMBER"):
-            return NumberLiteral(Decimal(self.previous().value))
+            return NumberLiteral(Decimal(self.previous().value), self.previous().location)
 
         if self.match_kind("STRING"):
-            return Literal(self.previous().value)
+            return Literal(self.previous().value, self.previous().location)
 
         if self.match_value("true"):
-            return Literal(True)
+            return Literal(True, self.previous().location)
 
         if self.match_value("false"):
-            return Literal(False)
+            return Literal(False, self.previous().location)
 
         if self.match_value("null"):
-            return Literal(None)
+            return Literal(None, self.previous().location)
 
         if self.match_value("match"):
-            return self.parse_match_expr()
+            return self.parse_match_expr(self.previous().location)
 
         if self.match_kind("IDENT"):
-            return Identifier(self.previous().value)
+            return Identifier(self.previous().value, self.previous().location)
 
         if self.match_value("("):
             expr = self.parse_expression()
@@ -462,6 +464,7 @@ class Parser:
             return expr
 
         if self.match_value("{"):
+            location = self.previous().location
             fields: dict[str, object] = {}
             self.skip_newlines()
             while not self.match_value("}"):
@@ -471,12 +474,13 @@ class Parser:
                 if self.match_value(","):
                     self.skip_newlines()
                     if self.match_value("}"):
-                        return RecordLiteral(fields)
+                        return RecordLiteral(fields, location)
                     continue
                 self.skip_newlines()
-            return RecordLiteral(fields)
+            return RecordLiteral(fields, location)
 
         if self.match_value("["):
+            location = self.previous().location
             items: list[object] = []
             self.skip_newlines()
             if not self.check_value("]"):
@@ -489,11 +493,11 @@ class Parser:
                         continue
                     break
             self.expect_value("]")
-            return ListLiteral(items)
+            return ListLiteral(items, location)
 
         raise self.error("expected expression")
 
-    def parse_match_expr(self) -> MatchExpr:
+    def parse_match_expr(self, location) -> MatchExpr:
         subject = self.parse_expression()
         self.expect_value("{")
         cases: list[MatchCase] = []
@@ -507,7 +511,7 @@ class Parser:
                 self.skip_newlines()
             else:
                 self.skip_newlines()
-        return MatchExpr(subject, cases)
+        return MatchExpr(subject, cases, location)
 
     def parse_pattern(self) -> object:
         if self.match_value("_"):
