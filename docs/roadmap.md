@@ -58,14 +58,16 @@ Implemented:
 - host/self-host recursive function and test body statement-shape comparison
 - structured source locations in checker, CLI, and Studio diagnostics
 - conservative, idempotent `moss format` and CI-oriented `moss format --check`
+- conservative local-binding and expression type inference
+- static callable argument, return, record-field access, and record-update checks
+- exhaustive union `match` checks and duplicate-case warnings
 
 High-value next steps:
 
 - structured match-pattern comparison
 - compare complete Moss-written AST output against the Python host frontend
-- static type inference for local bindings
-- static field checks for records
-- exhaustive checks for union variants
+- flow-sensitive branch type merging
+- payload-aware union pattern checking
 - expression-level checker locations
 - formatter support for canonical expression spacing
 - multiline REPL

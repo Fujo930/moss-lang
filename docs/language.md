@@ -329,6 +329,12 @@ types.
 `Result<Order, ShipError>` checks both branches: `Ok(...)` must contain an
 `Order`, and `Err(...)` must contain a value matching `ShipError`.
 
+The 0.3 checker also performs conservative static inference. When a type is
+known, `moss check` validates local assignments, callable arguments, returns,
+record field access, record updates, and union `match` coverage before running
+the program. Unknown values remain allowed instead of producing speculative
+errors.
+
 ## Self-Hosting Sketches
 
 The `examples/self_host` folder contains the first Moss-written pieces of a

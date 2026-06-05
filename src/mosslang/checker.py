@@ -6,6 +6,7 @@ from typing import Any
 from .errors import SourceLocation
 from .nodes import (
     BinaryExpr,
+    BindingPattern,
     CallExpr,
     EffectDecl,
     AssignStmt,
@@ -20,6 +21,8 @@ from .nodes import (
     WhileStmt,
     ListLiteral,
     MatchExpr,
+    Literal,
+    NumberLiteral,
     Program,
     RecordLiteral,
     RecordUpdate,
@@ -29,6 +32,8 @@ from .nodes import (
     TryExpr,
     TypeDecl,
     UnaryExpr,
+    VariantPattern,
+    WildcardPattern,
 )
 
 
@@ -81,7 +86,253 @@ def check_program(program: Program) -> list[Diagnostic]:
                     diagnostics.append(Diagnostic("error", f"{item.name} uses undeclared effect '{effect}'", item.location))
             check_effect_calls(item, functions, diagnostics)
 
+    check_static_types(program, functions, diagnostics)
     return diagnostics
+
+
+BUILTIN_RETURN_TYPES = {
+    "len": "Number",
+    "textTrim": "Text",
+    "textSlice": "Text",
+    "textJoin": "Text",
+    "textReplace": "Text",
+    "textIndexOf": "Number",
+    "textContains": "Bool",
+    "textStartsWith": "Bool",
+    "textEndsWith": "Bool",
+    "fileExists": "Bool",
+    "readText": "Text",
+}
+
+
+def check_static_types(
+    program: Program,
+    functions: dict[str, FunctionDecl | RuleDecl],
+    diagnostics: list[Diagnostic],
+) -> None:
+    types = {item.name: item for item in program.items if isinstance(item, TypeDecl)}
+    globals_env: dict[str, str] = {}
+
+    for item in program.items:
+        if isinstance(item, LetStmt):
+            globals_env[item.name] = infer_expr_type(item.expr, globals_env, functions, types, diagnostics, None)
+
+    for item in program.items:
+        if not isinstance(item, FunctionDecl):
+            if isinstance(item, RuleDecl):
+                env = dict(globals_env)
+                env.update({param.name: param.type_name or "Unknown" for param in item.params})
+                actual = infer_expr_type(item.expr, env, functions, types, diagnostics, item.location)
+                report_mismatch(item.return_type or "Unknown", actual, f"return from {item.name}", diagnostics, item.location)
+            continue
+        env = dict(globals_env)
+        env.update({param.name: param.type_name or "Unknown" for param in item.params})
+        check_statement_types(item.body, env, functions, types, diagnostics, item)
+
+
+def check_statement_types(
+    statements: list[Any],
+    env: dict[str, str],
+    functions: dict[str, FunctionDecl | RuleDecl],
+    types: dict[str, TypeDecl],
+    diagnostics: list[Diagnostic],
+    function: FunctionDecl,
+) -> None:
+    for statement in statements:
+        if isinstance(statement, LetStmt):
+            env[statement.name] = infer_expr_type(statement.expr, env, functions, types, diagnostics, function.location)
+        elif isinstance(statement, AssignStmt):
+            actual = infer_expr_type(statement.expr, env, functions, types, diagnostics, function.location)
+            expected = env.get(statement.name, "Unknown")
+            report_mismatch(expected, actual, f"assignment to {statement.name}", diagnostics, function.location)
+            if expected == "Unknown":
+                env[statement.name] = actual
+        elif isinstance(statement, ReturnStmt):
+            actual = infer_expr_type(statement.expr, env, functions, types, diagnostics, function.location)
+            report_mismatch(function.return_type or "Unknown", actual, f"return from {function.name}", diagnostics, function.location)
+        elif isinstance(statement, ExprStmt):
+            infer_expr_type(statement.expr, env, functions, types, diagnostics, function.location)
+        elif isinstance(statement, RequireStmt):
+            infer_expr_type(statement.condition, env, functions, types, diagnostics, function.location)
+            infer_expr_type(statement.else_expr, env, functions, types, diagnostics, function.location)
+        elif isinstance(statement, IfStmt):
+            infer_expr_type(statement.condition, env, functions, types, diagnostics, function.location)
+            check_statement_types(statement.then_body, dict(env), functions, types, diagnostics, function)
+            check_statement_types(statement.else_body, dict(env), functions, types, diagnostics, function)
+        elif isinstance(statement, ForStmt):
+            iterable = infer_expr_type(statement.iterable, env, functions, types, diagnostics, function.location)
+            loop_env = dict(env)
+            loop_env[statement.name] = generic_argument(iterable, "List") or "Unknown"
+            check_statement_types(statement.body, loop_env, functions, types, diagnostics, function)
+        elif isinstance(statement, WhileStmt):
+            infer_expr_type(statement.condition, env, functions, types, diagnostics, function.location)
+            check_statement_types(statement.body, dict(env), functions, types, diagnostics, function)
+
+
+def infer_expr_type(
+    expr: Any,
+    env: dict[str, str],
+    functions: dict[str, FunctionDecl | RuleDecl],
+    types: dict[str, TypeDecl],
+    diagnostics: list[Diagnostic],
+    location: SourceLocation | None,
+) -> str:
+    if isinstance(expr, Literal):
+        if isinstance(expr.value, bool):
+            return "Bool"
+        if isinstance(expr.value, str):
+            return "Text"
+        if expr.value is None:
+            return "Null"
+    if isinstance(expr, NumberLiteral):
+        return "Number"
+    if isinstance(expr, Identifier):
+        return env.get(expr.name, variant_owner(expr.name, types) or "Unknown")
+    if isinstance(expr, ListLiteral):
+        item_types = {infer_expr_type(item, env, functions, types, diagnostics, location) for item in expr.items}
+        known = {item for item in item_types if item != "Unknown"}
+        return f"List<{known.pop()}>" if len(known) == 1 else "List<Any>"
+    if isinstance(expr, RecordLiteral):
+        fields = {name: infer_expr_type(value, env, functions, types, diagnostics, location) for name, value in expr.fields.items()}
+        matches = [
+            declaration.name
+            for declaration in types.values()
+            if declaration.fields and set(declaration.fields) == set(fields)
+            and all(types_compatible(declaration.fields[name], fields[name]) for name in fields)
+        ]
+        return matches[0] if len(matches) == 1 else "Record"
+    if isinstance(expr, RecordUpdate):
+        base = infer_expr_type(expr.base, env, functions, types, diagnostics, location)
+        declaration = types.get(base)
+        if declaration is not None:
+            for field, value in expr.updates.items():
+                if field not in declaration.fields:
+                    diagnostics.append(Diagnostic("error", f"{base} has no field '{field}'", location))
+                else:
+                    actual = infer_expr_type(value, env, functions, types, diagnostics, location)
+                    report_mismatch(declaration.fields[field], actual, f"{base}.{field}", diagnostics, location)
+        return base
+    if isinstance(expr, FieldAccess):
+        target = infer_expr_type(expr.target, env, functions, types, diagnostics, location)
+        if target == "Number" and len(expr.field) == 3:
+            return "Money"
+        declaration = types.get(target)
+        if declaration is not None:
+            if expr.field not in declaration.fields:
+                diagnostics.append(Diagnostic("error", f"{target} has no field '{expr.field}'", location))
+                return "Unknown"
+            return declaration.fields[expr.field]
+        return "Unknown"
+    if isinstance(expr, IndexAccess):
+        target = infer_expr_type(expr.target, env, functions, types, diagnostics, location)
+        infer_expr_type(expr.index, env, functions, types, diagnostics, location)
+        return generic_argument(target, "List") or "Unknown"
+    if isinstance(expr, CallExpr):
+        name = dotted_name(expr.callee)
+        arg_types = [infer_expr_type(arg, env, functions, types, diagnostics, location) for arg in expr.args]
+        if name == "range":
+            return "List<Number>"
+        if name in {"listPush", "listSet", "listSlice", "listInsert", "listRemove"} and arg_types:
+            if name == "listPush" and arg_types[0] == "List<Any>" and len(arg_types) > 1:
+                return f"List<{arg_types[1]}>"
+            return arg_types[0]
+        if name == "listConcat" and arg_types:
+            return arg_types[0]
+        if name in BUILTIN_RETURN_TYPES:
+            return BUILTIN_RETURN_TYPES[name]
+        declaration = functions.get(name or "")
+        if declaration is not None:
+            for param, actual in zip(declaration.params, arg_types):
+                report_mismatch(param.type_name or "Unknown", actual, f"argument {param.name} to {declaration.name}", diagnostics, location)
+            return declaration.return_type or "Unknown"
+        return "Unknown"
+    if isinstance(expr, BinaryExpr):
+        left = infer_expr_type(expr.left, env, functions, types, diagnostics, location)
+        right = infer_expr_type(expr.right, env, functions, types, diagnostics, location)
+        if expr.op in {"==", "!=", ">", ">=", "<", "<=", "and", "or"}:
+            return "Bool"
+        return left if left == right else "Unknown"
+    if isinstance(expr, UnaryExpr):
+        return "Bool" if expr.op == "not" else infer_expr_type(expr.right, env, functions, types, diagnostics, location)
+    if isinstance(expr, TryExpr):
+        return generic_argument(infer_expr_type(expr.expr, env, functions, types, diagnostics, location), "Result") or "Unknown"
+    if isinstance(expr, MatchExpr):
+        subject_type = infer_expr_type(expr.subject, env, functions, types, diagnostics, location)
+        check_match_coverage(expr, subject_type, types, diagnostics, location)
+        results = {infer_expr_type(case.expr, env, functions, types, diagnostics, location) for case in expr.cases}
+        known = {item for item in results if item != "Unknown"}
+        return known.pop() if len(known) == 1 else "Unknown"
+    return "Unknown"
+
+
+def report_mismatch(
+    expected: str,
+    actual: str,
+    context: str,
+    diagnostics: list[Diagnostic],
+    location: SourceLocation | None,
+) -> None:
+    if not types_compatible(expected, actual):
+        diagnostics.append(Diagnostic("error", f"type mismatch for {context}: expected {expected}, got {actual}", location))
+
+
+def types_compatible(expected: str, actual: str) -> bool:
+    if expected in {"Any", "Unknown"} or actual in {"Any", "Unknown"}:
+        return True
+    if "|" in expected:
+        return any(types_compatible(part.strip(), actual) for part in expected.split("|"))
+    expected_list = generic_argument(expected, "List")
+    actual_list = generic_argument(actual, "List")
+    if expected_list is not None and actual_list is not None:
+        return types_compatible(expected_list, actual_list)
+    return expected == actual
+
+
+def generic_argument(type_name: str, container: str) -> str | None:
+    prefix = container + "<"
+    if not type_name.startswith(prefix) or not type_name.endswith(">"):
+        return None
+    return type_name[len(prefix) : -1].split(",", 1)[0].strip()
+
+
+def variant_owner(name: str, types: dict[str, TypeDecl]) -> str | None:
+    matches = [
+        declaration.name
+        for declaration in types.values()
+        if declaration.alias and name in {part.strip() for part in declaration.alias.split("|")}
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def check_match_coverage(
+    expr: MatchExpr,
+    subject_type: str,
+    types: dict[str, TypeDecl],
+    diagnostics: list[Diagnostic],
+    location: SourceLocation | None,
+) -> None:
+    declaration = types.get(subject_type)
+    union_text = declaration.alias if declaration is not None else subject_type if "|" in subject_type else None
+    if not union_text:
+        return
+
+    expected = {part.strip().split("(", 1)[0] for part in union_text.split("|")}
+    covered: set[str] = set()
+    catches_all = False
+    for case in expr.cases:
+        pattern = case.pattern
+        if isinstance(pattern, (WildcardPattern, BindingPattern)):
+            catches_all = True
+            continue
+        if isinstance(pattern, VariantPattern):
+            name = pattern.name.split(".")[-1]
+            if name in covered:
+                diagnostics.append(Diagnostic("warning", f"duplicate match case '{name}'", location))
+            covered.add(name)
+
+    missing = sorted(expected - covered)
+    if missing and not catches_all:
+        diagnostics.append(Diagnostic("error", f"non-exhaustive match for {subject_type}; missing: {', '.join(missing)}", location))
 
 
 def check_effect_calls(

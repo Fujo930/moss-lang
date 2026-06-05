@@ -204,6 +204,92 @@ accept(bad)
         with self.assertRaisesRegex(MossRuntimeError, "expected Order"):
             self.run_source(source)
 
+    def test_static_checker_rejects_unknown_record_field(self) -> None:
+        program = parse_source(
+            """
+type Person =
+  name: Text
+
+fn greet(person: Person) -> Text {
+  return person.missing
+}
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertTrue(any("Person has no field 'missing'" in item.message for item in diagnostics))
+
+    def test_static_checker_rejects_record_update_field_type(self) -> None:
+        program = parse_source(
+            """
+type Person =
+  name: Text
+
+fn rename(person: Person) -> Person {
+  return person with name = 42
+}
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertTrue(any("expected Text, got Number" in item.message for item in diagnostics))
+
+    def test_static_checker_tracks_local_assignment_type(self) -> None:
+        program = parse_source(
+            """
+fn work() -> Number {
+  total = 1
+  total = "wrong"
+  return total
+}
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertTrue(any("assignment to total" in item.message for item in diagnostics))
+
+    def test_static_checker_checks_call_argument_types(self) -> None:
+        program = parse_source(
+            """
+fn greet(name: Text) -> Text {
+  return name
+}
+
+fn work() -> Text {
+  return greet(42)
+}
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertTrue(any("argument name to greet" in item.message for item in diagnostics))
+
+    def test_static_checker_requires_exhaustive_union_match(self) -> None:
+        program = parse_source(
+            """
+type Status = Pending | Paid | Shipped
+
+rule label(status: Status) -> Text =
+  match status {
+    Pending -> "waiting"
+    Paid -> "ready"
+  }
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertTrue(any("non-exhaustive match for Status" in item.message for item in diagnostics))
+
+    def test_static_checker_accepts_exhaustive_union_match(self) -> None:
+        program = parse_source(
+            """
+type Status = Pending | Paid
+
+rule label(status: Status) -> Text =
+  match status {
+    Pending -> "waiting"
+    Paid -> "ready"
+  }
+"""
+        )
+        diagnostics = check_program(program)
+        self.assertFalse(any("non-exhaustive match" in item.message for item in diagnostics))
+
     def test_match_expression_matches_result_payloads(self) -> None:
         source = """
 fn ship(status) -> Result<Text, ShipError> {

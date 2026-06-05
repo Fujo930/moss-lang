@@ -103,6 +103,9 @@ The package exposes a console command named `moss`.
 - `require condition else value`, which returns `Err(value)` from `Result`
   functions
 - runtime type contracts for function arguments and return values
+- conservative static inference for local bindings, assignments, calls, returns,
+  and list element types
+- static record-field access/update checks and exhaustive union `match` checks
 - `List<T>`, `Map<K, V>`, and `Option<T>` runtime type contracts
 - a tiny in-memory database through `dbPut` and `dbGet`, guarded by the
   `Database` effect inside functions

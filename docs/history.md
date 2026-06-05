@@ -206,3 +206,14 @@ and whitespace.
 
 Why it matters: static confidence needs findings that lead back to source, and
 long-lived human/AI projects need one repeatable formatting gate.
+
+## Conservative static type environment
+
+Added static inference for local bindings, assignments, list operations,
+callable arguments, and returns. Known record types now reject missing fields
+and invalid record updates before execution. Union matches report missing
+variants and duplicate cases.
+
+Why it matters: Moss now catches useful domain-model mistakes without requiring
+every intermediate value to carry an annotation or pretending unknown values
+are errors.
