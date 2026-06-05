@@ -8,7 +8,7 @@ from io import StringIO
 from pathlib import Path
 
 from mosslang.checker import check_program
-from mosslang.cli import main as cli_main
+from mosslang.cli import main as cli_main, run_repl
 from mosslang.errors import MossRuntimeError
 from mosslang.formatter import format_source
 from mosslang.parser import parse_source
@@ -87,6 +87,13 @@ class MossLanguageTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(payload["summary"]["files"], 2)
         self.assertEqual(payload["summary"]["errors"], 1)
+
+    def test_multiline_repl_keeps_runtime_state(self) -> None:
+        lines = iter(["fn double(value: Number) -> Number {", "return value * 2", "}", "", "print(double(4))"])
+        output: list[str] = []
+        code = run_repl(input_fn=lambda _prompt: next(lines), output_fn=output.append)
+        self.assertEqual(code, 0)
+        self.assertIn("8", output)
 
     def test_cli_selfhost_compare_checks_recursive_body_structure(self) -> None:
         output = StringIO()

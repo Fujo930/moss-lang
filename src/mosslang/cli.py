@@ -43,6 +43,8 @@ def main(argv: list[str] | None = None) -> int:
     project_cmd.add_argument("directory", type=Path)
     project_cmd.add_argument("--json", action="store_true", help="emit one structured project result")
 
+    sub.add_parser("repl", help="start an interactive multiline Moss session")
+
     studio_cmd = sub.add_parser("studio")
     studio_cmd.add_argument("--host", default="127.0.0.1")
     studio_cmd.add_argument("--port", type=int, default=8765)
@@ -64,6 +66,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "project-check":
             return run_project_check(args.directory, json_output=args.json)
+
+        if args.command == "repl":
+            return run_repl()
 
         source = args.file.read_text(encoding="utf-8")
         if args.command == "format":
@@ -216,6 +221,51 @@ def run_project_check(directory: Path, *, json_output: bool = False) -> int:
                 print(f"{result['file']}: {diagnostic['level']}: {location}{diagnostic['message']}")
         print(f"project: {len(paths)} file(s), {warning_count} warning(s), {error_count} error(s)")
     return 1 if error_count else 0
+
+
+def run_repl(*, input_fn=input, output_fn=print) -> int:
+    runtime = Runtime(output_fn)
+    buffer: list[str] = []
+    depth = 0
+    output_fn(f"Moss {__version__} REPL. Submit a blank line to run; Ctrl-D to exit.")
+
+    while True:
+        try:
+            line = input_fn("... " if buffer else "moss> ")
+        except (EOFError, KeyboardInterrupt, StopIteration):
+            output_fn("")
+            return 0
+
+        if not line.strip() and buffer:
+            depth = 0
+        else:
+            buffer.append(line)
+            depth += brace_delta(line)
+            if depth > 0 or line.strip().endswith(("=", "else")):
+                continue
+
+        if not buffer:
+            continue
+        source = "\n".join(buffer) + "\n"
+        buffer = []
+        try:
+            program = parse_source(source)
+            diagnostics = check_program(program)
+            errors = [item for item in diagnostics if item.level == "error"]
+            for diagnostic in diagnostics:
+                output_fn(diagnostic.format())
+            if not errors:
+                runtime.run(program)
+        except MossError as exc:
+            output_fn(f"error: {exc}")
+
+
+def brace_delta(line: str) -> int:
+    try:
+        tokens = tokenize(line + "\n")
+    except MossError:
+        return 0
+    return sum(1 if token.value == "{" else -1 if token.value == "}" else 0 for token in tokens)
 
 
 def run_selfhost_checks(quick: bool = False) -> int:

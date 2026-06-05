@@ -67,6 +67,7 @@ Implemented:
 - flow-sensitive type merging across complete `if`/`else` branches
 - machine-readable `moss check --json` diagnostics and summaries
 - recursive text and JSON project checking through `moss project-check`
+- persistent multiline interactive sessions through `moss repl`
 
 High-value next steps:
 
@@ -74,7 +75,6 @@ High-value next steps:
 - compare complete expression AST output against the Python host frontend
 - expression-level checker locations
 - formatter support for canonical expression spacing
-- multiline REPL
 
 ## Version 0.4: product engineering workflow
 
