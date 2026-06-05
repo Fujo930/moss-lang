@@ -3,7 +3,9 @@ from __future__ import annotations
 import unittest
 import tempfile
 import json
+import threading
 from contextlib import redirect_stdout
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import StringIO
 from pathlib import Path
 
@@ -956,6 +958,66 @@ print(jsonStringify({ count: payload.count, name: payload.name }))
     def test_json_stringify_rejects_non_json_values(self) -> None:
         with self.assertRaisesRegex(MossRuntimeError, "is not JSON-compatible"):
             self.run_source("jsonStringify(Ok(1))\n")
+
+    def test_http_adapters_require_network_effect_and_exchange_json(self) -> None:
+        requests: list[str] = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"language":"Moss"}')
+
+            def do_POST(self) -> None:
+                length = int(self.headers.get("Content-Length", "0"))
+                requests.append(self.rfile.read(length).decode("utf-8"))
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"accepted":true}')
+
+            def log_message(self, _format: str, *_args: object) -> None:
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}"
+            source = f'''
+effect Network
+
+fn fetch() -> Text uses Network {{
+  return httpGet("{url}")
+}}
+
+fn send() -> Text uses Network {{
+  return httpPostJson("{url}", {{ language: "Moss", version: 4 }})
+}}
+
+print(jsonParse(fetch()).language)
+print(jsonParse(send()).accepted)
+'''
+            _, output = self.run_source(source)
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(output, ["Moss", "true"])
+        self.assertEqual(requests, ['{"language":"Moss","version":4}'])
+
+    def test_http_adapter_without_network_effect_is_checked(self) -> None:
+        diagnostics = check_program(parse_source('fn fetch() -> Text { return httpGet("http://localhost") }\n'))
+        self.assertTrue(any("does not declare uses Network" in item.message for item in diagnostics))
+
+    def test_http_adapter_rejects_non_http_protocols(self) -> None:
+        source = """
+effect Network
+fn fetch() -> Text uses Network {
+  return httpGet("file:///private.txt")
+}
+fetch()
+"""
+        with self.assertRaisesRegex(MossRuntimeError, "URL must use http or https"):
+            self.run_source(source)
 
     def test_imports_load_moss_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -88,6 +88,7 @@ The package exposes a console command named `moss`.
   `textEndsWith`
 - deterministic JSON parsing and serialization through `jsonParse` and
   `jsonStringify`
+- explicit `Network` effect adapters through `httpGet` and `httpPostJson`
 - `FileSystem` effect builtins: `readText`, `writeText`, `fileExists`, and
   `listFiles`
 - top-level `import "path.moss"` declarations

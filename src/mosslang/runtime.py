@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 import json
+from urllib import error as url_error
+from urllib import parse as url_parse
+from urllib import request as url_request
 from pathlib import Path
 from typing import Any, Callable
 
@@ -225,6 +228,8 @@ class Runtime:
         self.globals.define("pathJoin", BuiltinFunction("pathJoin", self.builtin_path_join))
         self.globals.define("jsonParse", BuiltinFunction("jsonParse", self.builtin_json_parse))
         self.globals.define("jsonStringify", BuiltinFunction("jsonStringify", self.builtin_json_stringify))
+        self.globals.define("httpGet", BuiltinFunction("httpGet", self.builtin_http_get, effect="Network"))
+        self.globals.define("httpPostJson", BuiltinFunction("httpPostJson", self.builtin_http_post_json, effect="Network"))
         self.globals.define("Ok", BuiltinFunction("Ok", lambda value=None: Result(True, value)))
         self.globals.define("Err", BuiltinFunction("Err", lambda value=None: Result(False, value)))
         self.globals.define("dbPut", BuiltinFunction("dbPut", self.builtin_db_put, effect="Database"))
@@ -698,6 +703,38 @@ class Runtime:
             return json.dumps(json_value(value), ensure_ascii=False, separators=(",", ":"), sort_keys=True)
         except (TypeError, ValueError) as exc:
             raise MossRuntimeError(f"jsonStringify failed: {exc}") from exc
+
+    def builtin_http_get(self, url: Any) -> str:
+        require_text(url, "httpGet URL")
+        return self.http_request(url, method="GET")
+
+    def builtin_http_post_json(self, url: Any, value: Any) -> str:
+        require_text(url, "httpPostJson URL")
+        try:
+            body = json.dumps(json_value(value), ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        except (TypeError, ValueError) as exc:
+            raise MossRuntimeError(f"httpPostJson failed: {exc}") from exc
+        return self.http_request(url, method="POST", body=body, headers={"Content-Type": "application/json"})
+
+    def http_request(
+        self,
+        url: str,
+        *,
+        method: str,
+        body: bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> str:
+        if url_parse.urlparse(url).scheme not in {"http", "https"}:
+            raise MossRuntimeError(f"{method} URL must use http or https")
+        request = url_request.Request(url, data=body, headers=headers or {}, method=method)
+        try:
+            with url_request.urlopen(request, timeout=15) as response:
+                charset = response.headers.get_content_charset() or "utf-8"
+                return response.read().decode(charset)
+        except url_error.HTTPError as exc:
+            raise MossRuntimeError(f"{method} {url} failed with HTTP {exc.code}") from exc
+        except (url_error.URLError, TimeoutError, UnicodeDecodeError) as exc:
+            raise MossRuntimeError(f"{method} {url} failed: {exc}") from exc
 
     def builtin_db_put(self, key: Any, value: Any) -> Any:
         self.db[str(key)] = value

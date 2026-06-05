@@ -33,6 +33,11 @@ numbers retain Moss `Number` behavior, object output is deterministically
 sorted, malformed input reports its line and column, and unsupported runtime
 values fail explicitly.
 
+The first HTTP adapter adds `httpGet` and `httpPostJson`. Both require an
+explicit `Network` effect, accept only HTTP(S) URLs, report transport and HTTP
+status failures, and use the deterministic JSON representation for request
+bodies.
+
 ## 0.3.0-alpha static confidence
 
 The static checker now merges local types learned independently by both sides

@@ -88,7 +88,7 @@ Make Moss feel like a language for real systems:
 - schema migration declarations
 - effect definitions with custom capabilities
 - JSON adapter with deterministic serialization
-- HTTP adapter
+- explicit `Network` effect HTTP GET and JSON POST adapters
 - source maps for rule evaluation traces
 
 The manifest and project-command foundation is implemented. The remaining 0.4

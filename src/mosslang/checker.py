@@ -55,6 +55,8 @@ BUILTIN_EFFECTS = {
     "writeText": "FileSystem",
     "fileExists": "FileSystem",
     "listFiles": "FileSystem",
+    "httpGet": "Network",
+    "httpPostJson": "Network",
 }
 
 
@@ -104,6 +106,8 @@ BUILTIN_RETURN_TYPES = {
     "readText": "Text",
     "jsonParse": "Any",
     "jsonStringify": "Text",
+    "httpGet": "Text",
+    "httpPostJson": "Text",
 }
 
 

@@ -450,3 +450,24 @@ let payload = jsonParse("{\"name\":\"Moss\",\"version\":4}")
 print(payload.name)
 print(jsonStringify({ version: payload.version, name: payload.name }))
 ```
+
+## HTTP and the Network effect
+
+HTTP access is an explicit capability. A function must declare `uses Network`
+before calling `httpGet(url)` or `httpPostJson(url, value)`:
+
+```moss
+effect Network
+
+fn loadStatus(url: Text) -> Text uses Network {
+  return httpGet(url)
+}
+
+fn publish(url: Text, value: Any) -> Text uses Network {
+  return httpPostJson(url, value)
+}
+```
+
+Both adapters accept only HTTP(S) URLs. `httpPostJson` uses the same
+deterministic JSON encoding as `jsonStringify`. Transport failures and
+non-success HTTP responses become Moss runtime errors.
