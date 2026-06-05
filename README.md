@@ -29,6 +29,11 @@ rules.
 
 ## Quick start
 
+Windows users can download the standalone compiler, language server, and Studio
+from the [`v0.5.0` release](https://github.com/Fujo930/moss-lang/releases/tag/v0.5.0).
+Choose the installer or portable ZIP; neither requires a separate Python
+installation.
+
 From this folder:
 
 ```powershell
