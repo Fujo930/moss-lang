@@ -4,6 +4,16 @@ Moss is an AI-designed and AI-built language prototype. Codex has designed,
 implemented, repaired, documented, committed, and pushed the current repository
 in collaboration with Fujo930.
 
+## Visual roadmap
+
+Chinese:
+
+![Moss roadmap in Chinese](assets/moss-roadmap-zh.png)
+
+English:
+
+![Moss roadmap in English](assets/moss-roadmap-en.png)
+
 ## Version 0.1: executable sketch
 
 Implemented:
