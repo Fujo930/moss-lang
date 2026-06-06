@@ -19,6 +19,10 @@ reusing Python, Node, and other command-line ecosystems before typed FFI.
 GitHub Actions now run unit, locked-project, formatting, self-host, golden, and
 host/self-host comparison checks.
 
+The first Linux CI run exposed that project lock hashes depended on checkout
+line endings. Lock hashing now canonicalizes Moss source to UTF-8 with LF line
+endings, so Windows and Unix checkouts agree on the same project snapshot.
+
 Why it matters: Moss can begin integrating mature ecosystems without hiding
 the capability or accepting shell injection as an API design, while new users
 receive purposeful projects instead of an empty file.

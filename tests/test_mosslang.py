@@ -16,6 +16,7 @@ from mosslang.errors import MossRuntimeError
 from mosslang.formatter import format_source
 from mosslang.parser import parse_source
 from mosslang.runtime import Runtime
+from mosslang.project import source_hash
 from mosslang.studio import analyze_source, analyze_trace, resolve_workspace_path, workspace_root
 from mosslang.values import Result, Variant
 from mosslang.tooling import SEMANTIC_TOKEN_TYPES, analyze_document
@@ -291,6 +292,14 @@ class MossLanguageTests(unittest.TestCase):
                 self.assertEqual(cli_main(["project-check", str(root)]), 0)
                 self.assertEqual(cli_main(["project-run", str(root)]), 0)
             self.assertTrue((Path(directory) / "library" / "src" / "lib.moss").is_file())
+
+    def test_project_source_hash_is_line_ending_independent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "module.moss"
+            path.write_bytes(b'print("Moss")\r\n')
+            windows_hash = source_hash(path)
+            path.write_bytes(b'print("Moss")\n')
+            self.assertEqual(source_hash(path), windows_hash)
 
     def test_manifest_project_check_detects_cross_module_duplicate_callable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

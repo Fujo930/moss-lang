@@ -269,12 +269,17 @@ def project_lock_payload(graph: ProjectGraph) -> dict[str, Any]:
         "modules": [
             {
                 "path": graph.relative(path),
-                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "sha256": source_hash(path),
                 "imports": [graph.relative(dependency) for dependency in graph.imports.get(path, [])],
             }
             for path in sorted(graph.programs)
         ],
     }
+
+
+def source_hash(path: Path) -> str:
+    source = path.read_text(encoding="utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
 def write_project_lock(graph: ProjectGraph) -> Path:
