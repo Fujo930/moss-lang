@@ -71,6 +71,11 @@ def main(argv: list[str] | None = None) -> int:
     project_init_cmd.add_argument("directory", type=Path)
     project_init_cmd.add_argument("--name", help="package name; defaults to the directory name")
 
+    new_cmd = sub.add_parser("new", help="create a Moss project from a template")
+    new_cmd.add_argument("directory", type=Path)
+    new_cmd.add_argument("--name", help="package name; defaults to the directory name")
+    new_cmd.add_argument("--template", choices=("basic", "rules", "cli", "library"), default="basic")
+
     project_lock_cmd = sub.add_parser("project-lock")
     project_lock_cmd.add_argument("directory", type=Path)
 
@@ -121,6 +126,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "project-init":
             return run_project_init(args.directory, name=args.name)
+
+        if args.command == "new":
+            return run_project_init(args.directory, name=args.name, template=args.template)
 
         if args.command == "project-lock":
             return run_project_lock(args.directory)
@@ -447,10 +455,11 @@ def run_project_test(directory: Path, *, locked: bool = False) -> int:
     return 1 if failed else 0
 
 
-def run_project_init(directory: Path, *, name: str | None = None) -> int:
+def run_project_init(directory: Path, *, name: str | None = None, template: str = "basic") -> int:
     package_name = name or directory.resolve().name
-    manifest = initialize_project(directory, package_name)
+    manifest = initialize_project(directory, package_name, template)
     print(f"created {manifest.name} at {manifest.root}")
+    print(f"template: {template}")
     print(f"entry: {manifest.entry.relative_to(manifest.root).as_posix()}")
     return 0
 

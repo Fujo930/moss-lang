@@ -472,6 +472,33 @@ Both adapters accept only HTTP(S) URLs. `httpPostJson` uses the same
 deterministic JSON encoding as `jsonStringify`. Transport failures and
 non-success HTTP responses become Moss runtime errors.
 
+## External processes and the Process effect
+
+Process execution is an explicit capability. Commands and arguments are passed
+directly to the operating system without a command shell:
+
+```moss
+effect Process
+
+fn inspect(command: Text) -> Any uses Process {
+  return processRun(command, ["--version"])
+}
+```
+
+`processRun(command, args, input)` returns a record containing `exitCode`,
+`stdout`, and `stderr`. It has a fixed 30-second timeout, runs from the current
+Moss source/project directory, and does not invoke a command shell implicitly.
+Calling a shell executable explicitly still grants that shell its normal
+behavior.
+
+`processRunJson(command, args, value)` sends one deterministic JSON value on
+stdin and parses one JSON value from stdout. A nonzero exit code or malformed
+JSON response becomes a Moss runtime error.
+
+The `Process` effect makes external execution visible and avoids shell
+injection by construction. It is not a sandbox: Moss code granted this effect
+can start any executable available to the current user.
+
 ## Rule traces
 
 Rules are intended to express inspectable business decisions. `moss trace`

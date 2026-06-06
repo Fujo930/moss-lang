@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 import json
+import subprocess
 from urllib import error as url_error
 from urllib import parse as url_parse
 from urllib import request as url_request
@@ -250,6 +251,8 @@ class Runtime:
         self.globals.define("jsonStringify", BuiltinFunction("jsonStringify", self.builtin_json_stringify))
         self.globals.define("httpGet", BuiltinFunction("httpGet", self.builtin_http_get, effect="Network"))
         self.globals.define("httpPostJson", BuiltinFunction("httpPostJson", self.builtin_http_post_json, effect="Network"))
+        self.globals.define("processRun", BuiltinFunction("processRun", self.builtin_process_run, effect="Process"))
+        self.globals.define("processRunJson", BuiltinFunction("processRunJson", self.builtin_process_run_json, effect="Process"))
         self.globals.define("Ok", BuiltinFunction("Ok", lambda value=None: Result(True, value)))
         self.globals.define("Err", BuiltinFunction("Err", lambda value=None: Result(False, value)))
         self.globals.define("dbPut", BuiltinFunction("dbPut", self.builtin_db_put, effect="Database"))
@@ -760,6 +763,47 @@ class Runtime:
         except (url_error.URLError, TimeoutError, UnicodeDecodeError) as exc:
             raise MossRuntimeError(f"{method} {url} failed: {exc}") from exc
 
+    def builtin_process_run(self, command: Any, args: Any, input_text: Any = "") -> dict[str, Any]:
+        require_text(command, "processRun command")
+        require_text_list(args, "processRun args")
+        require_text(input_text, "processRun input")
+        if not command or "\0" in command or any("\0" in arg for arg in args):
+            raise MossRuntimeError("processRun requires a non-empty command and arguments without NUL bytes")
+        try:
+            completed = subprocess.run(
+                [command, *args],
+                input=input_text,
+                cwd=self.base_path,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                shell=False,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise MossRuntimeError(f"processRun timed out after 30 seconds: {command}") from exc
+        except OSError as exc:
+            raise MossRuntimeError(f"processRun failed to start {command}: {exc}") from exc
+        return {
+            "exitCode": Decimal(completed.returncode),
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+        }
+
+    def builtin_process_run_json(self, command: Any, args: Any, value: Any) -> Any:
+        request = self.builtin_json_stringify(value) + "\n"
+        result = self.builtin_process_run(command, args, request)
+        if result["exitCode"] != 0:
+            raise MossRuntimeError(
+                f"processRunJson failed with exit code {result['exitCode']}: {str(result['stderr']).strip()}"
+            )
+        try:
+            return self.builtin_json_parse(result["stdout"])
+        except MossRuntimeError as exc:
+            raise MossRuntimeError(f"processRunJson expected one JSON response: {exc}") from exc
+
     def builtin_db_put(self, key: Any, value: Any) -> Any:
         self.db[str(key)] = value
         return value
@@ -935,6 +979,11 @@ def decimal_to_int(value: Any, context: str) -> int:
 def require_text(value: Any, context: str) -> None:
     if not isinstance(value, str):
         raise MossRuntimeError(f"{context} expects Text")
+
+
+def require_text_list(value: Any, context: str) -> None:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise MossRuntimeError(f"{context} expects List<Text>")
 
 
 def require_map(value: Any, context: str) -> None:

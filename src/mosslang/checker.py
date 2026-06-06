@@ -57,6 +57,8 @@ BUILTIN_EFFECTS = {
     "listFiles": "FileSystem",
     "httpGet": "Network",
     "httpPostJson": "Network",
+    "processRun": "Process",
+    "processRunJson": "Process",
 }
 
 
@@ -108,6 +110,8 @@ BUILTIN_RETURN_TYPES = {
     "jsonStringify": "Text",
     "httpGet": "Text",
     "httpPostJson": "Text",
+    "processRun": "Any",
+    "processRunJson": "Any",
 }
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 import tempfile
 import json
+import sys
 import threading
 from contextlib import redirect_stdout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -280,6 +281,16 @@ class MossLanguageTests(unittest.TestCase):
         self.assertEqual(run_code, 0)
         self.assertIn('name = "new-moss-project"', manifest)
         self.assertIn("Hello from Moss", output.getvalue())
+
+    def test_new_templates_are_formatted_checked_and_runnable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            for template in ("basic", "rules", "cli", "library"):
+                root = Path(directory) / template
+                self.assertEqual(cli_main(["new", str(root), "--template", template]), 0)
+                self.assertEqual(cli_main(["project-format", "--check", str(root)]), 0)
+                self.assertEqual(cli_main(["project-check", str(root)]), 0)
+                self.assertEqual(cli_main(["project-run", str(root)]), 0)
+            self.assertTrue((Path(directory) / "library" / "src" / "lib.moss").is_file())
 
     def test_manifest_project_check_detects_cross_module_duplicate_callable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1159,6 +1170,47 @@ fn fetch() -> Text uses Network {
 fetch()
 """
         with self.assertRaisesRegex(MossRuntimeError, "URL must use http or https"):
+            self.run_source(source)
+
+    def test_process_effect_runs_without_a_shell_and_exchanges_json(self) -> None:
+        executable = json.dumps(sys.executable)
+        echo_script = json.dumps('import sys; print(sys.argv[1]); print("warning", file=sys.stderr)')
+        json_script = json.dumps(
+            'import json,sys; value=json.load(sys.stdin); print(json.dumps({"seen":value["name"]},sort_keys=True))'
+        )
+        source = f"""
+effect Process
+
+fn echo() -> Any uses Process {{
+  return processRun({executable}, ["-c", {echo_script}, "Moss"])
+}}
+
+fn exchange() -> Any uses Process {{
+  return processRunJson({executable}, ["-c", {json_script}], {{ name: "Moss" }})
+}}
+
+let result = echo()
+print(textTrim(result.stdout))
+print(textTrim(result.stderr))
+print(result.exitCode)
+print(exchange().seen)
+"""
+        _, output = self.run_source(source)
+        self.assertEqual(output, ["Moss", "warning", "0", "Moss"])
+
+    def test_process_adapters_require_process_effect(self) -> None:
+        diagnostics = check_program(parse_source('fn run() -> Any { return processRun("tool", []) }\n'))
+        self.assertTrue(any("does not declare uses Process" in item.message for item in diagnostics))
+
+    def test_process_run_rejects_invalid_arguments(self) -> None:
+        source = """
+effect Process
+fn run() -> Any uses Process {
+  return processRun("tool", [1])
+}
+run()
+"""
+        with self.assertRaisesRegex(MossRuntimeError, "expects List<Text>"):
             self.run_source(source)
 
     def test_imports_load_moss_files(self) -> None:

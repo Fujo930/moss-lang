@@ -129,6 +129,16 @@ The external-process bridge is an integration boundary, not the final FFI. It
 lets Moss reuse existing ecosystems without silently weakening its type and
 effect model.
 
+Implemented in the first 0.6 development batch:
+
+- explicit, no-shell `Process` effect through `processRun`
+- deterministic JSON subprocess bridge through `processRunJson`
+- `moss new` with basic, rules, CLI, and library templates
+- cross-platform GitHub Actions checks on Windows, macOS, and Linux
+
+Version 0.6 is not released yet. VS Code integration, the hosted playground,
+diagnostic fixes, release automation, tutorials, and the showcase remain.
+
 ## Version 0.7: active self-host frontend and typed FFI prototype
 
 Move verified Moss-written compiler work into the real toolchain:

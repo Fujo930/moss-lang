@@ -14,6 +14,32 @@ from .parser import parse_source
 
 MANIFEST_NAME = "moss.toml"
 LOCK_NAME = "moss.lock"
+PROJECT_TEMPLATES = {
+    "basic": {
+        "src/main.moss": 'print("Hello from Moss")\n',
+    },
+    "cli": {
+        "src/main.moss": 'fn main() {\n  print("Hello from a Moss CLI")\n}\n\nmain()\n',
+    },
+    "rules": {
+        "src/main.moss": (
+            "type Request =\n"
+            "  approved: Bool\n"
+            "  amount: Number\n\n"
+            "rule mayProceed(request: Request) -> Bool =\n"
+            "  request.approved and request.amount > 0\n\n"
+            'let request = { approved: true, amount: 10}\n'
+            'print("may proceed:", mayProceed(request))\n\n'
+            'test "approved positive request may proceed" {\n'
+            "  assert(mayProceed(request))\n"
+            "}\n"
+        ),
+    },
+    "library": {
+        "src/main.moss": 'import "lib.moss"\n\nprint(greeting("Moss"))\n',
+        "src/lib.moss": 'fn greeting(name: Text) -> Text {\n  return "Hello, " + name\n}\n',
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -212,21 +238,27 @@ def manifest_relative(manifest: ProjectManifest, path: Path) -> str:
         return str(path)
 
 
-def initialize_project(directory: Path, name: str) -> ProjectManifest:
+def initialize_project(directory: Path, name: str, template: str = "basic") -> ProjectManifest:
     root = directory.resolve()
     root.mkdir(parents=True, exist_ok=True)
     manifest_path = root / MANIFEST_NAME
-    entry_path = root / "src" / "main.moss"
+    files = PROJECT_TEMPLATES.get(template)
+    if files is None:
+        raise ValueError(f"unknown project template '{template}'")
     if manifest_path.exists():
         raise ValueError(f"{manifest_path} already exists")
-    if entry_path.exists():
-        raise ValueError(f"{entry_path} already exists")
-    entry_path.parent.mkdir(parents=True, exist_ok=True)
+    for relative in files:
+        path = root / relative
+        if path.exists():
+            raise ValueError(f"{path} already exists")
     manifest_path.write_text(
         f'[package]\nname = "{name}"\nversion = "0.1.0"\nentry = "src/main.moss"\n\n[paths]\nsource = ["src"]\n',
         encoding="utf-8",
     )
-    entry_path.write_text('print("Hello from Moss")\n', encoding="utf-8")
+    for relative, source in files.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source, encoding="utf-8")
     return load_manifest(manifest_path)
 
 

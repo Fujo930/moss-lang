@@ -8,6 +8,24 @@ documented, committed, and pushed the current language prototype in
 collaboration with Fujo930. This history is intentionally part development log,
 part memory for future AI agents and human contributors.
 
+## 0.6 development: adoption foundation
+
+The first 0.6 batch adds an explicit `Process` effect. `processRun` launches
+commands without a shell and returns structured exit code, stdout, and stderr.
+`processRunJson` establishes a deterministic JSON request/response boundary for
+reusing Python, Node, and other command-line ecosystems before typed FFI.
+
+`moss new` adds basic, rules, CLI, and library project templates. Cross-platform
+GitHub Actions now run unit, locked-project, formatting, self-host, golden, and
+host/self-host comparison checks.
+
+Why it matters: Moss can begin integrating mature ecosystems without hiding
+the capability or accepting shell injection as an API design, while new users
+receive purposeful projects instead of an empty file.
+
+This work starts 0.6 but does not release it. The README remains on the public
+0.5.0 status until the complete 0.6 milestone is ready.
+
 ## 0.5.0 developer experience
 
 Moss now includes a stdio language server that publishes diagnostics and

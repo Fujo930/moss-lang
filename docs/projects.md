@@ -6,12 +6,23 @@ long-lived codebases maintained by humans and AI agents.
 ## Create a project
 
 ```powershell
-moss project-init hello-moss
+moss new hello-moss
 cd hello-moss
 moss project-run .
 ```
 
-This creates a `moss.toml` manifest and `src/main.moss`.
+This creates a `moss.toml` manifest and `src/main.moss`. Templates provide
+focused starting points:
+
+```powershell
+moss new hello-basic --template basic
+moss new approval-rules --template rules
+moss new command-tool --template cli
+moss new shared-library --template library
+```
+
+`moss project-init` remains available as a compatibility alias for the basic
+template.
 
 ## Manifest
 
