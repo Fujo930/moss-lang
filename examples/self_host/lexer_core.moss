@@ -13,7 +13,7 @@ rule isAlphaNumeric(ch: Text) -> Bool =
   isAlpha(ch) or isDigit(ch)
 
 rule isTwoCharSymbol(text: Text) -> Bool =
-  text == "->" or text == "==" or text == "!=" or text == ">=" or text == "<="
+  text == "->" or text == "==" or text == "!=" or text == ">=" or text == "<=" or text == "|>"
 
 fn escapedChar(ch: Text) -> Text {
   if ch == "n" {
@@ -133,6 +133,12 @@ fn sketchTokens(source: Text) -> List < MossToken > {
     }
 
     two = ch + listGet(chars, index + 1, "")
+    if ch == "\\" {
+      tokens = listPush(tokens, token("LAMBDA", "\\", startLine, startColumn))
+      index = index + 1
+      column = column + 1
+      continue
+    }
     if isTwoCharSymbol(two) {
       tokens = listPush(tokens, token("SYMBOL", two, startLine, startColumn))
       index = index + 2

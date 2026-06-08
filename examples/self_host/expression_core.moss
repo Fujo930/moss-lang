@@ -60,7 +60,7 @@ fn parseListExpr(state: ExprParseState) -> ExprParseResult {
   }
 
   while exprCurrent(state).kind != "EOF" {
-    parsed = parseUpdateExpr(state)
+    parsed = parsePipeExpr(state)
     items = listPush(items, parsed.expr)
     state = parsed.state
 
@@ -101,7 +101,7 @@ fn parseRecordExpr(state: ExprParseState) -> ExprParseResult {
       return exprResult(state, expr("Record", "", null, fields))
     }
 
-    parsed = parseUpdateExpr(exprAdvance(state))
+    parsed = parsePipeExpr(exprAdvance(state))
     fields = mapPut(fields, field.value, parsed.expr)
     state = parsed.state
 
@@ -168,7 +168,7 @@ fn parsePatternExpr(state: ExprParseState) -> ExprParseResult {
 }
 
 fn parseMatchExpr(state: ExprParseState) -> ExprParseResult {
-  subject = parseUpdateExpr(state)
+  subject = parsePipeExpr(state)
   state = subject.state
   cases = []
   if exprCurrent(state).value != "{" {
@@ -182,7 +182,7 @@ fn parseMatchExpr(state: ExprParseState) -> ExprParseResult {
     if exprCurrent(state).value != "->" {
       return exprResult(exprError(state, "expected -> after match pattern"), expr("Match", "", subject.expr, cases))
     }
-    value = parseUpdateExpr(exprAdvance(state))
+    value = parsePipeExpr(exprAdvance(state))
     cases = listPush(cases, { pattern: pattern.expr, expression: value.expr})
     state = value.state
     if exprCurrent(state).value == "," or exprCurrent(state).value == ";" {
@@ -222,11 +222,11 @@ fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
   if item.value == "{" {
     return parseRecordExpr(exprAdvance(state))
   }
-  if item.value == "\\" {
+  if item.kind == "LAMBDA" {
     return parseLambdaExpr(exprAdvance(state))
   }
   if item.value == "(" {
-    nested = parseUpdateExpr(exprAdvance(state))
+    nested = parsePipeExpr(exprAdvance(state))
     if exprCurrent(nested.state).value != ")" {
       failed = exprError(nested.state, "expected ) after expression")
       return exprResult(failed, nested.expr)
@@ -251,7 +251,7 @@ fn parseLambdaExpr(state: ExprParseState) -> ExprParseResult {
     return exprResult(state, expr("Lambda", "", missingExpr(), paramNames))
   }
   state = exprAdvance(state)
-  body = parseUpdateExpr(state)
+  body = parsePipeExpr(state)
   return exprResult(body.state, expr("Lambda", "", body.expr, paramNames))
 }
 
@@ -264,7 +264,7 @@ fn parseCallArguments(state: ExprParseState) -> ExprListParseResult {
   }
 
   while exprCurrent(state).kind != "EOF" {
-    parsed = parseUpdateExpr(state)
+    parsed = parsePipeExpr(state)
     items = listPush(items, parsed.expr)
     state = parsed.state
 
@@ -303,7 +303,7 @@ fn parsePostfixExpr(state: ExprParseState) -> ExprParseResult {
         result = exprResult(exprAdvance(fieldState), expr("Field", field.value, result.expr, null))
       }
     } else {
-      index = parseUpdateExpr(exprAdvance(result.state))
+      index = parsePipeExpr(exprAdvance(result.state))
       if exprCurrent(index.state).value != "]" {
         failed = exprError(index.state, "expected ] after index")
         result = exprResult(failed, expr("Index", "", result.expr, index.expr))
@@ -399,57 +399,75 @@ fn parseOrExpr(state: ExprParseState) -> ExprParseResult {
 
 fn parseUpdateExpr(state: ExprParseState) -> ExprParseResult {
   result = parseOrExpr(state)
-  if exprCurrent(result.state).value != "with" {
-    return result
+  while exprCurrent(result.state).value == "with" {
+    state = exprAdvance(result.state)
+    updates = mapNew()
+    closeBrace = "}"
+    braced = false
+    if exprCurrent(state).value == "{" {
+      braced = true
+      state = exprAdvance(state)
+    }
+
+    while exprCurrent(state).kind != "EOF" {
+      field = exprCurrent(state)
+      if field.kind != "IDENT" {
+        state = exprError(state, "expected field name in record update")
+        return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+      }
+      state = exprAdvance(state)
+      if exprCurrent(state).value != "=" and exprCurrent(state).value != ":" {
+        state = exprError(state, "expected = after record update field")
+        return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+      }
+
+      value = parsePipeExpr(exprAdvance(state))
+      updates = mapPut(updates, field.value, value.expr)
+      state = value.state
+
+      if not braced {
+        result = exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+        break
+      }
+      if exprCurrent(state).value == closeBrace {
+        result = exprResult(exprAdvance(state), expr("RecordUpdate", "", result.expr, updates))
+        break
+      }
+      if exprCurrent(state).value != "," {
+        state = exprError(state, "expected comma or } after record update")
+        return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+      }
+      state = exprAdvance(state)
+      if exprCurrent(state).value == closeBrace {
+        result = exprResult(exprAdvance(state), expr("RecordUpdate", "", result.expr, updates))
+        break
+      }
+    }
+    if not braced and not mapHas(result.expr, "left") {
+      state = exprError(state, "expected } after record update")
+      return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+    }
   }
+  return result
+}
 
-  state = exprAdvance(result.state)
-  updates = mapNew()
-  closeBrace = "}"
-  braced = false
-  if exprCurrent(state).value == "{" {
-    braced = true
+fn parsePipeExpr(state: ExprParseState) -> ExprParseResult {
+  result = parseUpdateExpr(state)
+  while exprCurrent(result.state).value == "|>" {
+    state = exprAdvance(result.state)
+    if exprCurrent(state).kind != "IDENT" {
+      state = exprError(state, "expected function name after |>")
+      return exprResult(state, result.expr)
+    }
+    fnName = exprCurrent(state).value
     state = exprAdvance(state)
+    result = exprResult(state, expr("Call", "", expr("Identifier", fnName, null, null), listPush(listPush(listNew(), result.expr), missingExpr())))
   }
-
-  while exprCurrent(state).kind != "EOF" {
-    field = exprCurrent(state)
-    if field.kind != "IDENT" {
-      state = exprError(state, "expected field name in record update")
-      return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
-    }
-    state = exprAdvance(state)
-    if exprCurrent(state).value != "=" and exprCurrent(state).value != ":" {
-      state = exprError(state, "expected = after record update field")
-      return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
-    }
-
-    value = parseOrExpr(exprAdvance(state))
-    updates = mapPut(updates, field.value, value.expr)
-    state = value.state
-
-    if not braced {
-      return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
-    }
-    if exprCurrent(state).value == closeBrace {
-      return exprResult(exprAdvance(state), expr("RecordUpdate", "", result.expr, updates))
-    }
-    if exprCurrent(state).value != "," {
-      state = exprError(state, "expected comma or } after record update")
-      return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
-    }
-    state = exprAdvance(state)
-    if exprCurrent(state).value == closeBrace {
-      return exprResult(exprAdvance(state), expr("RecordUpdate", "", result.expr, updates))
-    }
-  }
-
-  state = exprError(state, "expected } after record update")
-  return exprResult(state, expr("RecordUpdate", "", result.expr, updates))
+  return result
 }
 
 fn parseExpressionTokens(tokens: List < MossToken >) -> ExprParseResult {
-  result = parseUpdateExpr(exprState(tokens))
+  result = parsePipeExpr(exprState(tokens))
   if exprCurrent(result.state).kind != "EOF" {
     failed = exprError(result.state, "unexpected token after expression: " + exprCurrent(result.state).value)
     return exprResult(failed, result.expr)
