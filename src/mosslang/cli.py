@@ -760,12 +760,25 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) 
         print("error: bundle missing 'file' field", file=sys.stderr)
         return 1
 
+    # Resolve bundle's original file claim. Since v0.57.1 absolute paths are stored.
+    bundle_file_claim = Path(file_path)
+    if not bundle_file_claim.is_absolute():
+        # Legacy relative-path bundle — resolve relative to CWD (where trust was run)
+        bundle_file_claim = (Path.cwd() / bundle_file_claim).resolve()
+    else:
+        bundle_file_claim = bundle_file_claim.resolve()
+
     source_path = source_override or Path(file_path)
     if not source_path.is_absolute():
         source_path = source_path.resolve()
     if not source_path.is_file():
         print(f"error: source file not found: {source_path}", file=sys.stderr)
         return 1
+
+    # Detect file redirection: bundle claims file X, but we resolved to Y.
+    # Only flag when no explicit --source override (user trusted the bundle's file field).
+    source_resolved = source_path.resolve()
+    file_redirected = (not source_override and source_resolved != bundle_file_claim)
 
     source = source_path.read_text(encoding="utf-8-sig")
     actual_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
@@ -792,14 +805,18 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) 
     result = {
         "bundle": bundle_path.as_posix(),
         "source": source_path.as_posix(),
+        "bundle_file": bundle.get("file"),
         "hash_match": stored_hash == actual_hash,
+        "file_redirected": file_redirected,
         "gates_trust": new_bundle.get("trust"),
         "check_ok": new_bundle.get("check", {}).get("ok"),
         "trace_ok": new_bundle.get("trace", {}).get("ok"),
         "golden_ok": new_bundle.get("golden", {}).get("ok"),
         "lock_ok": new_bundle.get("lock", {}).get("ok"),
         "selfhost_ok": new_bundle.get("selfhost", {}).get("ok"),
-        "verified": new_bundle.get("trust", False) and stored_hash == actual_hash,
+        "verified": (new_bundle.get("trust", False)
+                     and stored_hash == actual_hash
+                     and not file_redirected),
     }
 
     if result["verified"]:
@@ -810,6 +827,8 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) 
         reasons = []
         if not result["hash_match"]:
             reasons.append(f"hash mismatch ({stored_hash[:12]}... vs {actual_hash[:12]}...)")
+        if result["file_redirected"]:
+            reasons.append(f"file redirected (bundle claims '{bundle.get('file')}', resolved to '{source_path.as_posix()}')")
         if not result["gates_trust"]:
             failed = [g for g in ["check", "trace", "golden", "lock", "selfhost"] if not result.get(f"{g}_ok")]
             reasons.append(f"failed gates: {', '.join(failed)}")
@@ -838,7 +857,7 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
     source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
     bundle: dict = {
         "moss": __version__,
-        "file": path.as_posix(),
+        "file": path.resolve().as_posix(),
         "source_sha256": source_hash,
         "trust": True,
     }

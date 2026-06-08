@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## v0.57.1 — F1 file-redirect hardening + F5 confirmation
+
+### Fixed
+- **F1 (Critical)**: `file` field now stored as absolute path; `trust-verify` detects
+  `file_redirected` when the bundle claims a different file than the one resolved.
+  With `--source` flag, the consumer explicitly controls which file gets verified.
+  Output now includes `bundle_file` and `file_redirected` fields for transparency.
+- **F5 (Medium)**: Confirmed working — `check_unused_effects` emits warnings for
+  declared-but-unused effects (verified with 4-effect test).
+
+### Remaining F1 limitation
+- Attacker with full bundle write access can change `file` to an absolute path
+  of another valid Moss file and recompute the hash. Trust-verify will re-run gates
+  on that file. Defense: use `--source <expected_file>` to lock verification to a
+  specific file, or inspect `bundle_file` in the output.
+
 ## v0.57.0 — Nuke Audit: F1-F7 fixes
 
 ### Fixed
