@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
-![Version: 0.5.7](https://img.shields.io/badge/version-0.5.7-4f7edb)
+![Version: 0.5.8](https://img.shields.io/badge/version-0.5.8-4f7edb)
 ![Built by DeepSeek](https://img.shields.io/badge/built%20by-DeepSeek-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -202,6 +202,7 @@ moss selfhost --quick
 moss selfhost-compare examples
 moss trust <file.moss>
 moss trust <file.moss> --output trust.json
+moss trust-project <directory>
 moss repl
 moss studio
 moss-lsp
@@ -254,9 +255,8 @@ expression and match-pattern ASTs across all root example programs.
 
 ## Project status
 
-This is version `0.5.7`: the first release with `moss trust`, which produces a
-machine-verifiable trust bundle combining static checks, rule traces, golden
-snapshots, and self-host comparison.
+This is version `0.5.8`: trust bundles now include source hashes, lock verification,
+selfhost comparison details, and `moss trust-project` for whole-project verification.
 with short-circuit `and`/`or`, VM trace support, and consistent behaviour across
 all commands that execute Moss code.
 The repository is released under the MIT License.

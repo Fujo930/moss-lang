@@ -3,6 +3,18 @@
 This file explains the repository history in human terms. The Git commit
 messages stay short; this document gives future readers the memory behind them.
 
+## 0.5.8: trust bundle hardening
+
+`moss trust` bundles now include `source_sha256`, lock file verification,
+and detailed selfhost comparison diagnostics (declarations, names, bodies,
+metadata, and expression ASTs). `moss trust-project` extends trust
+verification to entire Moss projects with per-file results and a project
+summary.
+
+Why it matters: trust bundles are now cryptographically bound to source,
+dependency-integrity-aware, and include actionable failure details. A single
+`moss trust-project .` can verify an entire project in one command.
+
 ## 0.5.7: trust bundles
 
 `moss trust <file.moss>` produces a machine-verifiable JSON bundle combining

@@ -103,9 +103,13 @@ def main(argv: list[str] | None = None) -> int:
     compile_cmd.add_argument("file", type=Path)
     compile_cmd.add_argument("--output", "-o", type=Path, help="output .mbc file path")
 
-    trust_cmd = sub.add_parser("trust", help="produce a trust bundle (check + trace + golden + selfhost)")
+    trust_cmd = sub.add_parser("trust", help="produce a trust bundle (check + trace + golden + lock + selfhost)")
     trust_cmd.add_argument("file", type=Path)
     trust_cmd.add_argument("--output", "-o", type=Path, help="write trust bundle to file (default: stdout)")
+
+    trust_proj_cmd = sub.add_parser("trust-project", help="produce a project-wide trust bundle")
+    trust_proj_cmd.add_argument("directory", type=Path)
+    trust_proj_cmd.add_argument("--output", "-o", type=Path, help="write trust bundle to file")
 
     run_vm_cmd = sub.add_parser("run-vm", help="execute compiled bytecode module")
     run_vm_cmd.add_argument("file", type=Path)
@@ -128,6 +132,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "trust":
             return run_trust(args.file, output=args.output)
+
+        if args.command == "trust-project":
+            return run_trust_project(args.directory, output=args.output)
 
         if args.command == "project-check":
             return run_project_check(args.directory, json_output=args.json, locked=args.locked)
@@ -602,10 +609,14 @@ def run_golden(path: Path, *, update: bool = False) -> int:
 
 def run_trust(path: Path, *, output: Path | None = None) -> int:
     """Produce a trust bundle for a Moss program."""
+    import hashlib
+
     source = path.read_text(encoding="utf-8-sig")
+    source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
     bundle: dict = {
         "moss": __version__,
         "file": path.as_posix(),
+        "source_sha256": source_hash,
         "trust": True,
     }
 
@@ -630,7 +641,32 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
         },
     }
 
-    # 2. Trace rule evaluations
+    # 2. Lock verification
+    lock_path = path.parent / "moss.lock"
+    if lock_path.exists():
+        from .project import verify_project_lock, build_project_graph, find_manifest, load_manifest
+        try:
+            manifest_path = find_manifest(path.parent)
+            if manifest_path:
+                manifest = load_manifest(manifest_path)
+                graph = build_project_graph(manifest)
+                lock_diags = verify_project_lock(graph)
+                bundle["lock"] = {
+                    "ok": len(lock_diags) == 0,
+                    "locked": True,
+                    "diagnostics": lock_diags if lock_diags else None,
+                }
+                if lock_diags:
+                    bundle["trust"] = False
+            else:
+                bundle["lock"] = {"ok": None, "locked": False, "note": "no moss.toml found"}
+        except Exception as e:
+            bundle["lock"] = {"ok": False, "locked": False, "error": str(e)}
+            bundle["trust"] = False
+    else:
+        bundle["lock"] = {"ok": None, "locked": False, "note": "no moss.lock file"}
+
+    # 3. Trace rule evaluations
     if not chk_errors:
         vm_trace = VM(output=lambda _t: None, base_path=path.parent, trace_rules=True)
         mod_trace = compile_program(program, source_path=str(path.resolve()))
@@ -646,7 +682,7 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
         bundle["trace"] = {"ok": False, "events": []}
         bundle["trust"] = False
 
-    # 3. Golden snapshot
+    # 4. Golden snapshot
     if not chk_errors:
         buf = StringIO()
         vm_golden = VM(output=buf.write, base_path=path.parent)
@@ -671,15 +707,32 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
         bundle["golden"] = {"ok": False, "snapshot": None}
         bundle["trust"] = False
 
-    # 4. Self-host comparison (silence its stdout)
+    # 5. Self-host comparison with full details
     _saved_stdout = sys.stdout
     sys.stdout = StringIO()
     try:
-        selfhost_ok = compare_selfhost_file(path)
+        details = compare_selfhost_details(path)
     finally:
         sys.stdout = _saved_stdout
-    bundle["selfhost"] = {"ok": selfhost_ok}
-    if not selfhost_ok:
+    bundle["selfhost"] = {
+        "ok": details["ok"],
+        "declarations_match": details["declarations_match"],
+        "names_match": details["names_match"],
+        "bodies_match": details["bodies_match"],
+        "metadata_match": details["metadata_match"],
+        "expressions_match": details["expressions_match"],
+        "host_summary": details["host"],
+        "selfhost_summary": details["selfhost"],
+        "selfhost_errors": details["errors"] if details["errors"] else None,
+        "expression_error": details["expression_error"],
+        "host_names": details["host_names"],
+        "selfhost_names": details["selfhost_names"],
+        "host_bodies": details["host_bodies"],
+        "selfhost_bodies": details["selfhost_bodies"],
+        "host_metadata": details["host_metadata"],
+        "selfhost_metadata": details["selfhost_metadata"],
+    }
+    if not details["ok"]:
         bundle["trust"] = False
 
     trust_json = json.dumps(bundle, indent=2)
@@ -687,6 +740,93 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(trust_json, encoding="utf-8")
         print(f"trust bundle written: {output}")
+    else:
+        print(trust_json)
+    return 0 if bundle["trust"] else 1
+
+
+def run_trust_project(directory: Path, *, output: Path | None = None) -> int:
+    """Produce a project-wide trust bundle."""
+    import hashlib
+    from .project import find_manifest, load_manifest, build_project_graph, verify_project_lock
+
+    directory = directory.resolve()
+    manifest_path = find_manifest(directory)
+    if manifest_path is None:
+        raise ValueError(f"no moss.toml found from {directory}")
+
+    manifest = load_manifest(manifest_path)
+    graph = build_project_graph(manifest)
+    lock_diags = verify_project_lock(graph)
+
+    bundle: dict = {
+        "moss": __version__,
+        "project": manifest.name,
+        "root": str(directory),
+        "entry": str(manifest.entry.relative_to(manifest.root)),
+        "trust": True,
+    }
+
+    # Lock verification
+    bundle["lock"] = {
+        "ok": len(lock_diags) == 0,
+        "modules": len(graph.programs),
+        "diagnostics": lock_diags if lock_diags else None,
+    }
+    if lock_diags:
+        bundle["trust"] = False
+
+    # Per-file trust results
+    files: list[dict] = []
+    for module_path in sorted(graph.programs):
+        rel = module_path.relative_to(manifest.root) if module_path.is_relative_to(manifest.root) else module_path
+        source = module_path.read_text(encoding="utf-8-sig")
+        source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        program = graph.programs.get(module_path, parse_source(source))
+        diagnostics = check_program(program)
+        chk_errors = [d for d in diagnostics if d.level == "error"]
+
+        file_result: dict = {
+            "file": str(rel),
+            "source_sha256": source_hash,
+            "check": {
+                "ok": len(chk_errors) == 0,
+                "diagnostics": [
+                    {"level": d.level, "message": d.message,
+                     "line": d.location.line if d.location else None,
+                     "column": d.location.column if d.location else None}
+                    for d in diagnostics
+                ],
+                "summary": {
+                    "effects": sum(1 for item in program.items if type(item).__name__ == "EffectDecl"),
+                    "imports": sum(1 for item in program.items if type(item).__name__ == "ImportDecl"),
+                    "types": sum(1 for item in program.items if type(item).__name__ == "TypeDecl"),
+                    "callables": sum(1 for item in program.items if type(item).__name__ in ("RuleDecl", "FunctionDecl")),
+                    "tests": sum(1 for item in program.items if type(item).__name__ == "TestDecl"),
+                },
+            },
+        }
+
+        if chk_errors:
+            file_result["trust"] = False
+            bundle["trust"] = False
+        else:
+            file_result["trust"] = True
+
+        files.append(file_result)
+
+    bundle["files"] = files
+    bundle["summary"] = {
+        "files": len(files),
+        "trusted": sum(1 for f in files if f.get("trust", False)),
+        "failed": sum(1 for f in files if not f.get("trust", False)),
+    }
+
+    trust_json = json.dumps(bundle, indent=2)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(trust_json, encoding="utf-8")
+        print(f"project trust bundle written: {output}")
     else:
         print(trust_json)
     return 0 if bundle["trust"] else 1
@@ -820,6 +960,41 @@ def run_selfhost_compare(path: Path) -> int:
 
 
 def compare_selfhost_file(path: Path) -> bool:
+    details = compare_selfhost_details(path)
+    print(f"{path}:")
+    print(f"  host: {details['host']}")
+    print(f"  selfhost: {details['selfhost']}")
+    if details["errors"]:
+        for error in details["errors"]:
+            print(f"  selfhost parse error: {error}")
+        return False
+    if not details["declarations_match"]:
+        print("  selfhost comparison failed")
+        return False
+    if not details["names_match"]:
+        print(f"  host names: {details['host_names']}")
+        print(f"  selfhost names: {details['selfhost_names']}")
+        print("  selfhost declaration-name comparison failed")
+        return False
+    if not details["bodies_match"]:
+        print(f"  host body statements: {details['host_bodies']}")
+        print(f"  selfhost body statements: {details['selfhost_bodies']}")
+        print("  selfhost body-structure comparison failed")
+        return False
+    if not details["metadata_match"]:
+        print(f"  host metadata: {details['host_metadata']}")
+        print(f"  selfhost metadata: {details['selfhost_metadata']}")
+        print("  selfhost declaration-metadata comparison failed")
+        return False
+    if details["expression_error"] is not None:
+        print(f"  expression AST comparison failed: {details['expression_error']}")
+        return False
+    print("  selfhost comparison passed")
+    return True
+
+
+def compare_selfhost_details(path: Path) -> dict:
+    """Return structured selfhost comparison for trust bundles."""
     source = path.read_text(encoding="utf-8")
     host_program = parse_source(source)
     host = summarize(host_program)
@@ -848,36 +1023,30 @@ def compare_selfhost_file(path: Path) -> bool:
     selfhost_metadata = selfhost_declaration_metadata(nodes)
     expression_error = compare_expression_asts(host_program, vm)
 
-    print(f"{path}:")
-    print(f"  host: {host}")
-    print(f"  selfhost: {selfhost}")
-    if errors:
-        for error in errors:
-            print(f"  selfhost parse error: {error}")
-        return False
-    if host != selfhost:
-        print("  selfhost comparison failed")
-        return False
-    if host_names != selfhost_names:
-        print(f"  host names: {host_names}")
-        print(f"  selfhost names: {selfhost_names}")
-        print("  selfhost declaration-name comparison failed")
-        return False
-    if host_bodies != selfhost_bodies:
-        print(f"  host body statements: {host_bodies}")
-        print(f"  selfhost body statements: {selfhost_bodies}")
-        print("  selfhost body-structure comparison failed")
-        return False
-    if host_metadata != selfhost_metadata:
-        print(f"  host metadata: {host_metadata}")
-        print(f"  selfhost metadata: {selfhost_metadata}")
-        print("  selfhost declaration-metadata comparison failed")
-        return False
-    if expression_error is not None:
-        print(f"  expression AST comparison failed: {expression_error}")
-        return False
-    print("  selfhost comparison passed")
-    return True
+    declarations_match = (not errors) and host == selfhost
+    names_match = host_names == selfhost_names
+    bodies_match = host_bodies == selfhost_bodies
+    metadata_match = host_metadata == selfhost_metadata
+    expressions_match = expression_error is None
+
+    return {
+        "ok": declarations_match and names_match and bodies_match and metadata_match and expressions_match,
+        "host": host,
+        "selfhost": selfhost,
+        "declarations_match": declarations_match,
+        "errors": errors,
+        "host_names": host_names if not names_match else None,
+        "selfhost_names": selfhost_names if not names_match else None,
+        "names_match": names_match,
+        "host_bodies": host_bodies if not bodies_match else None,
+        "selfhost_bodies": selfhost_bodies if not bodies_match else None,
+        "bodies_match": bodies_match,
+        "host_metadata": host_metadata if not metadata_match else None,
+        "selfhost_metadata": selfhost_metadata if not metadata_match else None,
+        "metadata_match": metadata_match,
+        "expression_error": expression_error,
+        "expressions_match": expressions_match,
+    }
 
 
 def compare_expression_asts(program, vm) -> str | None:

@@ -1545,6 +1545,70 @@ print(shipped.status, dbGet("A-100").status)"""
             Path(src_path).unlink(missing_ok=True)
             Path(out_path).unlink(missing_ok=True)
 
+    def test_trust_project_produces_valid_json(self) -> None:
+        """moss trust-project produces a project-wide trust bundle."""
+        import json, tempfile
+        from pathlib import Path
+
+        root = Path(__file__).parent.parent
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            out_path = f.name
+        try:
+            code = cli_main(["trust-project", str(root), "-o", out_path])
+            bundle = json.loads(Path(out_path).read_text())
+            self.assertIn("trust", bundle)
+            self.assertIn("project", bundle)
+            self.assertIn("files", bundle)
+            self.assertIn("lock", bundle)
+            self.assertIn("summary", bundle)
+            self.assertGreater(bundle["summary"]["files"], 0)
+            self.assertEqual(code, 0)
+        finally:
+            Path(out_path).unlink(missing_ok=True)
+
+    def test_trust_bundle_includes_source_hash(self) -> None:
+        """Trust bundle includes source_sha256."""
+        import json, hashlib, tempfile
+        from pathlib import Path
+
+        order_path = Path(__file__).parent.parent / "examples" / "order.moss"
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            out_path = f.name
+        try:
+            cli_main(["trust", str(order_path), "-o", out_path])
+            bundle = json.loads(Path(out_path).read_text())
+            self.assertIn("source_sha256", bundle)
+            self.assertEqual(len(bundle["source_sha256"]), 64)
+            # Verify source hash matches actual file
+            source = order_path.read_text(encoding="utf-8-sig")
+            expected_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+            self.assertEqual(bundle["source_sha256"], expected_hash)
+        finally:
+            Path(out_path).unlink(missing_ok=True)
+
+    def test_trust_bundle_includes_selfhost_details(self) -> None:
+        """Trust bundle includes detailed selfhost comparison results."""
+        import json, tempfile
+        from pathlib import Path
+
+        order_path = Path(__file__).parent.parent / "examples" / "order.moss"
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            out_path = f.name
+        try:
+            cli_main(["trust", str(order_path), "-o", out_path])
+            bundle = json.loads(Path(out_path).read_text())
+            sh = bundle["selfhost"]
+            self.assertIn("ok", sh)
+            self.assertIn("declarations_match", sh)
+            self.assertIn("names_match", sh)
+            self.assertIn("bodies_match", sh)
+            self.assertIn("metadata_match", sh)
+            self.assertIn("expressions_match", sh)
+            self.assertIn("host_summary", sh)
+            self.assertIn("selfhost_summary", sh)
+        finally:
+            Path(out_path).unlink(missing_ok=True)
+
     def test_all_examples_run(self) -> None:
         """Verify all .moss examples can compile and run via VM."""
         import os

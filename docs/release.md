@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.5.8
+
+Moss `0.5.8` hardens the trust bundle with source hashes, lock verification,
+selfhost comparison details, and `moss trust-project`. See `docs/release-0.5.8.md`.
+
 ## 0.5.7
 
 Moss `0.5.7` introduces `moss trust`, which produces a machine-verifiable

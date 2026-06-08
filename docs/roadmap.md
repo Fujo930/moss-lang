@@ -5,6 +5,16 @@ implemented, repaired, documented, committed, and pushed the current repository
 in collaboration with Fujo930. Development on the ds-Mosslang branch is
 continued by Reasonix as of 0.5.5.
 
+## Version 0.5.8: trust bundle hardening
+
+Implemented:
+
+- `source_sha256` in trust bundles — cryptographic binding to verified source
+- lock file verification in `moss trust` (auto-detects `moss.lock` + `moss.toml`)
+- selfhost comparison details: five-dimension breakdown with host/selfhost diffs
+- `moss trust-project <directory>` — project-wide trust bundle
+- 3 new trust tests; 121 tests, 9 subtests pass
+
 ## Version 0.5.7: trust bundles
 
 Implemented:
