@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.5.5
+
+Moss `0.5.5` adds backtick string interpolation and switches `moss run` and
+`moss test` to the bytecode VM. See `docs/release-0.5.5.md` for details.
+
 ## 0.3.0-alpha
 
 Moss `0.3.0-alpha` completes the static-confidence roadmap and provides a

@@ -100,6 +100,29 @@ fn double(x) = x * 2
 fn square(x) = x * x
 ```
 
+### Backtick string interpolation (0.5.5)
+
+Backtick strings support `{expr}` interpolation:
+
+```moss
+let name = "Moss"
+print(`Hello {name}!`)   // Hello Moss!
+
+let a = 10
+let b = 20
+print(`sum: {a + b}`)   // sum: 30
+```
+
+Backtick strings span multiple lines. Use `\``, `\{`, `\\`, `\n`, `\t`,
+`\r` for escapes inside backtick strings. Regular `"..."` strings are
+unchanged and never interpolate.
+
+Functions with arrow bodies can return interpolated strings:
+
+```moss
+fn greet(n) = `Hello {n}!`
+```
+
 ### Pipe operator (0.5.2)
 
 `expr |> fn(args)` desugars to `fn(expr, args)`:

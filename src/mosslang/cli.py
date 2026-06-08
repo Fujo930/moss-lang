@@ -250,11 +250,13 @@ def main(argv: list[str] | None = None) -> int:
                 for diagnostic in diagnostics:
                     print(diagnostic.format(), file=sys.stderr)
                 return 1
-            runtime = Runtime(base_path=args.file.parent)
+            mod = compile_program(program, source_path=str(args.file.resolve()))
+            vm = VM(base_path=args.file.parent)
+            vm.load_module(mod)
             if args.command == "run":
-                runtime.run(program)
+                vm.run()
             else:
-                results = runtime.run_tests(program)
+                results = vm.run_tests()
                 for result in results:
                     marker = "PASS" if result["status"] == "pass" else "FAIL"
                     detail = f": {result['message']}" if result["message"] else ""

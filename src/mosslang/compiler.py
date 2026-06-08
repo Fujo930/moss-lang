@@ -83,6 +83,8 @@ class Compiler:
                 self._register_global(item.name)
             elif isinstance(item, n.ImportDecl):
                 self.module.declare_import(item.path)
+            elif isinstance(item, n.TestDecl):
+                self._register_global(item.name)
 
     def _register_global(self, name: str) -> int:
         if name not in self.globals:
@@ -106,7 +108,7 @@ class Compiler:
     # ── declarations ──
 
     def _compile_declarations(self, program: n.Program) -> None:
-        """Pre-compile all function/rule declarations into code objects."""
+        """Pre-compile all function/rule/test declarations into code objects."""
         for item in program.items:
             if isinstance(item, n.RuleDecl):
                 self.module.declare_function(
@@ -116,6 +118,11 @@ class Compiler:
                 self.module.declare_function(
                     self._compile_function(item)
                 )
+            elif isinstance(item, n.TestDecl):
+                self.module.declare_function(
+                    self._compile_test(item)
+                )
+                self.module.tests.append(item.name)
 
     def _compile_function(self, decl: n.FunctionDecl) -> CodeObject:
         """Compile a function declaration into a CodeObject."""
@@ -170,6 +177,55 @@ class Compiler:
 
         return co
 
+    def _compile_test(self, decl: n.TestDecl) -> CodeObject:
+        """Compile a test declaration into a callable CodeObject."""
+        saved_locals = list(self.locals)
+        saved_constants = list(self.constants)
+        saved_instructions = list(self.instructions)
+        saved_breaks = list(self.loop_breaks)
+        saved_continues = list(self.loop_continues)
+
+        self.locals = []
+        self.instructions = []
+        self.loop_breaks = []
+        self.loop_continues = []
+
+        # Compile all statements; last ExprStmt may have implicit return
+        body = decl.body
+        for stmt in body[:-1]:
+            self._compile_statement(stmt)
+
+        if body:
+            last = body[-1]
+            if isinstance(last, n.ReturnStmt):
+                self._compile_statement(last)
+            elif isinstance(last, n.ExprStmt):
+                self._compile_expression(last.expr)
+            else:
+                self._compile_statement(last)
+                self.emit(Opcode.LOAD_NULL)
+        else:
+            self.emit(Opcode.LOAD_NULL)
+
+        self.emit(Opcode.RETURN)
+
+        self._resolve_labels()
+        co = CodeObject(
+            name=decl.name,
+            instructions=list(self.instructions),
+            constants=list(self.constants),
+            locals=list(self.locals),
+            arg_count=0,
+        )
+
+        self.locals = saved_locals
+        self.constants = saved_constants
+        self.instructions = saved_instructions
+        self.loop_breaks = saved_breaks
+        self.loop_continues = saved_continues
+
+        return co
+
     def _compile_rule(self, decl: n.RuleDecl) -> CodeObject:
         """Compile a rule declaration into a CodeObject (single-expression)."""
         saved_locals = list(self.locals)
@@ -214,7 +270,11 @@ class Compiler:
             self._compile_expression(stmt.expr)
             self._register_local(stmt.name)
             idx = self.locals.index(stmt.name)
+            # Duplicate: store to both local (for module code) and global (for functions/tests)
+            self.emit(Opcode.DUP)
             self.emit(Opcode.STORE_LOCAL, idx)
+            gidx = self._register_global(stmt.name)
+            self.emit(Opcode.STORE_GLOBAL, gidx)
 
         elif isinstance(stmt, n.AssignStmt):
             self._compile_expression(stmt.expr)

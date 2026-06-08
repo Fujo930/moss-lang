@@ -3,6 +3,25 @@
 This file explains the repository history in human terms. The Git commit
 messages stay short; this document gives future readers the memory behind them.
 
+## 0.5.5: backtick interpolation and VM default
+
+Reasonix took over active development from DeepSeek (Kun) on the ds-Mosslang
+branch. This release completes the half-finished backtick string interpolation
+feature originally sketched by openclaw, switches `moss run` and `moss test`
+to the bytecode VM, and fixes several bytecode compiler gaps.
+
+Backtick strings with `{expr}` interpolation are the fifth token-efficiency
+feature in the 0.5.x series. They save ~4–8 tokens per interpolated string
+compared to manual `+` concatenation.
+
+The VM switch required adding `TestDecl` compilation, a `tests` list in the
+binary `.mbc` format, dual local/global storage for module-level `let`
+bindings, and mixed-type string coercion in the VM's `ADD` handler.
+
+Why it matters: Moss now has a single execution path for the two most common
+CLI commands, and string interpolation makes AI-generated Moss code more
+compact while keeping template-like readability for humans.
+
 ## ds Moss 0.1: DeepSeek bytecode compiler fork
 
 The ds Moss 0.1 fork, built by DeepSeek in collaboration with Fujo930, adds

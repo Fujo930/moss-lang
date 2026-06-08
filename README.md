@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
-![Version: 0.5.0](https://img.shields.io/badge/version-0.5.4-4f7edb)
+![Version: 0.5.5](https://img.shields.io/badge/version-0.5.5-4f7edb)
 ![Built by DeepSeek](https://img.shields.io/badge/built%20by-DeepSeek-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -94,6 +94,7 @@ The package exposes a console command named `moss`.
 - Text helpers: `textChars`, `textJoin`, `textSplit`, `textTrim`, `textSlice`,
   `textContains`, `textIndexOf`, `textReplace`, `textStartsWith`, and
   `textEndsWith`
+- backtick string literals with `{expr}` interpolation and multiline support
 - deterministic JSON parsing and serialization through `jsonParse` and
   `jsonStringify`
 - explicit `Network` effect adapters through `httpGet` and `httpPostJson`
@@ -160,6 +161,9 @@ fn ship(order: Order) -> Result<Order, ShipError> uses Database {
 
   return Ok(updated)
 }
+
+let name = "Moss"
+print(`Hello {name}!`)
 
 let order = { id: "A-100", status: Paid, total: 42.usd }
 let shipped = ship(order)?
@@ -248,9 +252,9 @@ expression and match-pattern ASTs across all root example programs.
 
 ## Project status
 
-This is version `0.5.0`: a compact interpreter with real syntax, runtime
-semantics, deterministic project tooling, editor integrations, a browser
-workbench, and a verified Moss-written frontend.
+This is version `0.5.5`: a bytecode-compiled interpreter with backtick string
+interpolation, stack-VM execution for `run` and `test` commands, and a verified
+Moss-written frontend.
 The repository is released under the MIT License.
 
 Suitable claims:
@@ -278,8 +282,8 @@ See `docs/language.md` for the current language surface,
 `docs/grove.md` for the planned Moss-native open-source editor,
 `docs/history.md` for a commit-by-commit feature guide, and
 `docs/roadmap.md` for the path from prototype to a serious implementation.
-See `docs/release-0.5.md` for the current release notes and packaging checklist,
-and `docs/identity.md` for the Moss identity.
+See `docs/release-0.5.5.md` for the current release notes, and
+`docs/identity.md` for the Moss identity.
 
 ## Participate
 

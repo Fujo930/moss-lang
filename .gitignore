@@ -8,3 +8,4 @@ build/
 installer/*.exe
 installer/*.zip
 installer/SHA256SUMS.txt
+reasonix.toml

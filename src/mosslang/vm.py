@@ -72,6 +72,7 @@ class VM:
         for name, fn_co in module.functions.items():
             self.functions[name] = fn_co
         self.effects = set(module.effects)
+        self.tests = list(module.tests)
         self.install_builtins()
         # Register moss-defined functions as globals
         for name, fn_co in module.functions.items():
@@ -384,7 +385,11 @@ class VM:
             elif isinstance(right, Money):
                 frame.stack.append(Money(Decimal(str(left)) + right.amount, right.currency))
             else:
-                frame.stack.append(left + right)
+                if isinstance(left, str) or isinstance(right, str):
+                    from .values import format_value
+                    frame.stack.append(format_value(left) + format_value(right))
+                else:
+                    frame.stack.append(left + right)
         elif op == Opcode.SUB:
             if isinstance(left, Money) and isinstance(right, Money):
                 if left.currency != right.currency:

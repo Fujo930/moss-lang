@@ -1445,6 +1445,70 @@ print(shipped.status, dbGet("A-100").status)"""
         vm.run()
         self.assertEqual(buf.getvalue().strip(), "100.0")
 
+    # ── Backtick string interpolation ──
+
+    def _run_vm_source(self, source: str) -> str:
+        from mosslang.parser import parse_source
+        from mosslang.compiler import compile_program
+        from mosslang.vm import VM
+        from io import StringIO
+
+        buf = StringIO()
+        vm = VM(output=buf.write)
+        mod = compile_program(parse_source(source))
+        vm.load_module(mod)
+        vm.run()
+        return buf.getvalue()
+
+    def test_backtick_simple_string(self) -> None:
+        """Backtick strings without interpolation act like regular strings."""
+        out = self._run_vm_source("print(`hello world`)\n")
+        self.assertEqual(out, "hello world\n")
+
+    def test_backtick_interpolation_with_variable(self) -> None:
+        """Backtick strings can interpolate variables with {name}."""
+        out = self._run_vm_source('let name = "Moss"\nprint(`Hello {name}!`)\n')
+        self.assertEqual(out, "Hello Moss!\n")
+
+    def test_backtick_multiple_interpolations(self) -> None:
+        """Multiple {expr} interpolations in one backtick string."""
+        out = self._run_vm_source("let a = 1\nlet b = 2\nprint(`{a} + {b} = {a + b}`)\n")
+        # Number formatting may include .0 for float representation
+        self.assertIn("+", out)
+        self.assertIn("=", out)
+        self.assertIn("3", out)
+
+    def test_backtick_expression_interpolation(self) -> None:
+        """Interpolation expressions can contain operators and calls."""
+        out = self._run_vm_source("print(`result: {1 + 2 * 3}`)\n")
+        self.assertIn("result: 7", out)  # VM formats number as 7.0
+
+    def test_backtick_multiline(self) -> None:
+        """Backtick strings support multiline text."""
+        out = self._run_vm_source("print(`line1\nline2`)\n")
+        self.assertEqual(out, "line1\nline2\n")
+
+    def test_regular_strings_do_not_interpolate(self) -> None:
+        """Regular double-quoted strings never interpolate."""
+        out = self._run_vm_source('print("Hello {name}")\n')
+        self.assertEqual(out, "Hello {name}\n")
+
+    def test_backtick_arrow_function_with_interpolation(self) -> None:
+        """Backtick interpolation works inside arrow function bodies."""
+        out = self._run_vm_source(
+            'fn greet(n) = `Hello {n}!`\nprint(greet("World"))\n'
+        )
+        self.assertEqual(out, "Hello World!\n")
+
+    def test_backtick_nested_call_in_interpolation(self) -> None:
+        """Function calls are allowed inside interpolation expressions."""
+        out = self._run_vm_source(
+            'fn upper(s) = textReplace(s, "o", "O")\n'
+            'let name = "moss"\n'
+            "print(`{upper(name)}`)\n"
+        )
+        self.assertEqual(out, "mOss\n")
+
     def test_all_examples_run(self) -> None:
         """Verify all .moss examples can compile and run via VM."""
         import os

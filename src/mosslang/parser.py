@@ -156,7 +156,6 @@ class Parser:
             body = [ExprStmt(expr)]
         else:
             body = self.parse_block()
-        self.consume_statement_end()
         return FunctionDecl(name=name, params=params, return_type=return_type, uses=uses, body=body, location=location)
 
     def parse_test_decl(self) -> TestDecl:
@@ -468,6 +467,14 @@ class Parser:
         if self.match_kind("STRING"):
             return Literal(self.previous().value, self.previous().location)
 
+        # Backtick string interpolation: `Hello {name}` → concat chain
+        if self.match_kind("BK_PART"):
+            first = Literal(self.previous().value, self.previous().location)
+            return self._parse_interpolation_chain(first)
+
+        if self.match_kind("INTERP_START"):
+            return self._parse_interpolation_chain(None)
+
         if self.match_value("true"):
             return Literal(True, self.previous().location)
 
@@ -521,6 +528,48 @@ class Parser:
             return ListLiteral(items, location)
 
         raise self.error("expected expression")
+
+    def _parse_interpolation_chain(self, first: object | None) -> object:
+        """Parse string interpolation sequence.
+
+        Called after BK_PART or INTERP_START was already consumed.
+        Tokens remaining: (INTERP_START expr INTERP_END BK_PART?)+
+
+        If ``first`` is a Literal, BK_PART was consumed and INTERP_START is next.
+        If ``first`` is None, INTERP_START was consumed and expr is next.
+
+        Desugars to: first + expr1 + text1 + expr2 + ...
+        """
+        # Track location from first literal or interpolation expression
+        loc = getattr(first, "location", None)
+        expr = first
+
+        if expr is None:
+            # First token was {  —  INTERP_START already consumed, parse expression
+            interp = self.parse_expression()
+            if not self.match_kind("INTERP_END"):
+                raise self.error("expected '}' to close interpolation")
+            expr = interp
+            loc = getattr(expr, "location", None)
+            # Optional trailing text part
+            if self.match_kind("BK_PART"):
+                right = Literal(self.previous().value, self.previous().location)
+                expr = BinaryExpr(left=expr, op="+", right=right, location=loc)
+
+        # Remaining interpolations: INTERP_START expr INTERP_END (BK_PART)?
+        while self.check_kind("INTERP_START"):
+            self.advance()  # consume INTERP_START
+            interp = self.parse_expression()
+            if not self.match_kind("INTERP_END"):
+                raise self.error("expected '}' to close interpolation")
+            expr = BinaryExpr(left=expr, op="+", right=interp, location=loc)
+            if self.match_kind("BK_PART"):
+                right = Literal(self.previous().value, self.previous().location)
+                expr = BinaryExpr(left=expr, op="+", right=right, location=loc)
+
+        if expr is None:
+            raise self.error("empty interpolation")
+        return expr
 
     def parse_lambda(self) -> LambdaExpr:
         params = []

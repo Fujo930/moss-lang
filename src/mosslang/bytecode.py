@@ -158,6 +158,7 @@ class BytecodeModule:
     effects: list[str] = field(default_factory=list)
     types: dict[str, str] = field(default_factory=dict)  # name -> serialized type info
     imports: list[str] = field(default_factory=list)
+    tests: list[str] = field(default_factory=list)
     source_path: str = ""
 
     def add_constant(self, value: Any) -> int:
@@ -240,6 +241,13 @@ class BytecodeModule:
             buf.write(struct.pack('<I', len(ib)))
             buf.write(ib)
         
+        # Tests
+        buf.write(struct.pack('<I', len(self.tests)))
+        for t in self.tests:
+            tb = t.encode('utf-8')
+            buf.write(struct.pack('<I', len(tb)))
+            buf.write(tb)
+        
         # Code objects
         _serialize_code_object(buf, self.code)
         buf.write(struct.pack('<I', len(self.functions)))
@@ -279,6 +287,10 @@ class BytecodeModule:
         # Imports
         n_imports = struct.unpack('<I', buf.read(4))[0]
         mod.imports = [_read_string() for _ in range(n_imports)]
+        
+        # Tests
+        n_tests = struct.unpack('<I', buf.read(4))[0]
+        mod.tests = [_read_string() for _ in range(n_tests)]
         
         # Code objects
         mod.code = _deserialize_code_object(buf)

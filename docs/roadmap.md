@@ -2,7 +2,22 @@
 
 Moss is an AI-designed and AI-built language prototype. Codex has designed,
 implemented, repaired, documented, committed, and pushed the current repository
-in collaboration with Fujo930.
+in collaboration with Fujo930. Development on the ds-Mosslang branch is
+continued by Reasonix as of 0.5.5.
+
+## Version 0.5.5: backtick interpolation and VM default
+
+Implemented:
+
+- backtick string literals with `{expr}` interpolation
+- `moss run` and `moss test` switched to bytecode VM as default execution engine
+- `TestDecl` compilation into callable bytecode `CodeObject` entries
+- `BytecodeModule.tests` list in `.mbc` binary format
+- module-level `let` variables accessible from functions and test blocks
+- mixed-type string coercion for `+` operator in the VM
+- tokenizer backtick collection mode with `BK_PART`/`INTERP_START`/`INTERP_END` tokens
+- `|>` pipe operator token added to tokenizer
+- 8 new backtick interpolation tests; 116 total tests pass
 
 ## Visual roadmap
 
