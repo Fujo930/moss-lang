@@ -138,6 +138,18 @@ def main(argv: list[str] | None = None) -> int:
     art_verify_cmd.add_argument("--source", "-s", type=Path, help="source file (auto-detected from artifact)")
     art_verify_cmd.add_argument("--strict", action="store_true", help="treat warnings as errors and reject on file redirect")
 
+    art_sign_cmd = sub.add_parser("artifact-sign", help="sign a Trust Artifact with HMAC-SHA256")
+    art_sign_cmd.add_argument("bundle", type=Path, help="Trust Artifact JSON file")
+    art_sign_cmd.add_argument("--key", "-k", type=Path, required=True, help="signing key file")
+    art_sign_cmd.add_argument("--output", "-o", type=Path, help="output file (default: stdout)")
+
+    art_verify_sig_cmd = sub.add_parser("artifact-verify-sig", help="verify Trust Artifact HMAC signature")
+    art_verify_sig_cmd.add_argument("bundle", type=Path, help="Trust Artifact JSON file")
+    art_verify_sig_cmd.add_argument("--key", "-k", type=Path, required=True, help="signing key file")
+
+    keygen_cmd = sub.add_parser("keygen", help="generate a signing key for Trust Artifacts")
+    keygen_cmd.add_argument("--output", "-o", type=Path, default=Path("moss.key"), help="output key file")
+
     run_vm_cmd = sub.add_parser("run-vm", help="execute compiled bytecode module")
     run_vm_cmd.add_argument("file", type=Path)
     run_vm_cmd.add_argument("--source-root", type=Path, help="source root for resolving imports")
@@ -175,6 +187,15 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command in ("trust-verify", "artifact-verify"):
             return run_trust_verify(args.bundle, source_override=args.source, strict=args.strict)
+
+        if args.command == "artifact-sign":
+            return run_artifact_sign(args.bundle, key_path=args.key, output=args.output)
+
+        if args.command == "artifact-verify-sig":
+            return run_artifact_verify_sig(args.bundle, key_path=args.key)
+
+        if args.command == "keygen":
+            return run_keygen(args.output)
 
         if args.command == "project-check":
             return run_project_check(args.directory, json_output=args.json, locked=args.locked)
@@ -860,6 +881,113 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None, 
         print(json.dumps(result, indent=2))
         print(f"FAIL: {'; '.join(reasons)}", file=sys.stderr)
         return 1
+
+
+def run_artifact_sign(bundle_path: Path, *, key_path: Path, output: Path | None = None) -> int:
+    """Sign a Trust Artifact JSON with an HMAC-SHA256 key file."""
+    import hashlib
+    import hmac
+
+    try:
+        bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"error reading bundle: {e}", file=sys.stderr)
+        return 1
+
+    key = key_path.read_bytes()
+    if len(key) < 16:
+        print(f"error: key file too short ({len(key)} bytes, need at least 16)", file=sys.stderr)
+        return 1
+
+    # Sign the core evidence fields
+    payload = {
+        "file": bundle.get("file"),
+        "source_sha256": bundle.get("source_sha256"),
+        "check": bundle.get("check", {}).get("ok"),
+        "trace": bundle.get("trace", {}).get("ok"),
+        "golden": bundle.get("golden", {}).get("ok"),
+        "lock": bundle.get("lock", {}).get("ok"),
+        "selfhost": bundle.get("selfhost", {}).get("ok"),
+    }
+    payload_json = json.dumps(payload, sort_keys=True).encode("utf-8")
+    sig = hmac.new(key, payload_json, hashlib.sha256).hexdigest()
+    bundle["signature"] = {
+        "algorithm": "HMAC-SHA256",
+        "payload": payload,
+        "hmac": sig,
+    }
+
+    signed_json = json.dumps(bundle, indent=2)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(signed_json, encoding="utf-8")
+        print(f"signed trust artifact written: {output}")
+    else:
+        print(signed_json)
+    return 0
+
+
+def run_artifact_verify_sig(bundle_path: Path, *, key_path: Path) -> int:
+    """Verify the HMAC signature on a Trust Artifact."""
+    import hashlib
+    import hmac
+
+    try:
+        bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"error reading bundle: {e}", file=sys.stderr)
+        return 1
+
+    sig_data = bundle.get("signature")
+    if not sig_data:
+        print("error: bundle has no 'signature' field", file=sys.stderr)
+        return 1
+
+    key = key_path.read_bytes()
+    stored_payload = sig_data.get("payload", {})
+    # Recompute payload from current bundle values to detect field tampering
+    current_payload = {
+        "file": bundle.get("file"),
+        "source_sha256": bundle.get("source_sha256"),
+        "check": bundle.get("check", {}).get("ok"),
+        "trace": bundle.get("trace", {}).get("ok"),
+        "golden": bundle.get("golden", {}).get("ok"),
+        "lock": bundle.get("lock", {}).get("ok"),
+        "selfhost": bundle.get("selfhost", {}).get("ok"),
+    }
+    payload_match = (stored_payload == current_payload)
+    payload_json = json.dumps(stored_payload, sort_keys=True).encode("utf-8")
+    expected = hmac.new(key, payload_json, hashlib.sha256).hexdigest()
+    stored = sig_data.get("hmac", "")
+
+    result = {
+        "bundle": bundle_path.as_posix(),
+        "algorithm": sig_data.get("algorithm"),
+        "hmac_match": hmac.compare_digest(expected, stored),
+        "payload_match": payload_match,
+    }
+
+    if result["hmac_match"] and result["payload_match"]:
+        print(json.dumps(result, indent=2))
+        print("PASS: signature valid, payload intact")
+        return 0
+    else:
+        reasons = []
+        if not result["payload_match"]: reasons.append("payload tampered (fields don't match signed payload)")
+        if not result["hmac_match"]: reasons.append("HMAC mismatch (signature forged)")
+        print(json.dumps(result, indent=2), file=sys.stderr)
+        print(f"FAIL: {'; '.join(reasons)}", file=sys.stderr)
+        return 1
+
+
+def run_keygen(output: Path) -> int:
+    """Generate a random key file for Trust Artifact signing."""
+    import secrets
+    key = secrets.token_bytes(32)
+    output.write_bytes(key)
+    output.chmod(0o600)
+    print(f"key written: {output} ({len(key)} bytes)")
+    return 0
 
 
 def _find_lock(path: Path) -> Path | None:
