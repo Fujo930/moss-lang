@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
-![Version: 0.7.1](https://img.shields.io/badge/version-0.7.1-4f7edb)
+![Version: 0.7.2](https://img.shields.io/badge/version-0.7.2-4f7edb)
 ![Built by DeepSeek](https://img.shields.io/badge/built%20by-DeepSeek-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -257,9 +257,10 @@ expression and match-pattern ASTs across all root example programs.
 
 ## Project status
 
-This is version `0.7.1`: the Moss-written parser and checker are now active
-frontends alongside the lexer. `moss ast --frontend moss` and
-`moss check --frontend moss` use Moss's own parser and checker.
+This is version `0.7.2`: the Moss frontend can now drive the full compile-and-run
+pipeline. `moss compile --frontend moss` and `moss run --frontend moss` use the
+Moss-written lexer + parser, bridging MossNode dicts to Python AST for the
+bytecode compiler and VM.
 with short-circuit `and`/`or`, VM trace support, and consistent behaviour across
 all commands that execute Moss code.
 The repository is released under the MIT License.

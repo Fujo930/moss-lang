@@ -1678,6 +1678,33 @@ print(shipped.status, dbGet("A-100").status)"""
         self.assertEqual(code, 0)
         self.assertIn("ok", buf.getvalue())
 
+    def test_cli_run_frontend_moss(self) -> None:
+        """moss run --frontend moss executes correctly."""
+        import io, sys
+        from contextlib import redirect_stdout
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = cli_main(["run", "--frontend", "moss", "examples/order.moss"])
+        self.assertEqual(code, 0)
+        self.assertIn("Shipped", buf.getvalue())
+
+    def test_cli_compile_frontend_moss(self) -> None:
+        """moss compile --frontend moss produces valid .mbc."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.NamedTemporaryFile(suffix=".mbc", delete=False) as f:
+            out_path = f.name
+        try:
+            code = cli_main(["compile", "--frontend", "moss", "examples/json_demo.moss", "-o", out_path])
+            self.assertEqual(code, 0)
+            data = Path(out_path).read_bytes()
+            self.assertGreater(len(data), 100)
+            self.assertEqual(data[:4], b'MOSS')
+        finally:
+            Path(out_path).unlink(missing_ok=True)
+
     def test_all_examples_run(self) -> None:
         """Verify all .moss examples can compile and run via VM."""
         import os

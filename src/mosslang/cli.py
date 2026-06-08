@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
         cmd.add_argument("file", type=Path)
         if command == "check":
             cmd.add_argument("--json", action="store_true", help="emit structured diagnostics and summary")
-        if command in ("tokens", "ast", "check"):
+        if command in ("tokens", "ast", "check", "run"):
             cmd.add_argument("--frontend", choices=("host", "moss"), default="host",
                              help="use host (Python) or moss (self-host) frontend")
         if command == "trace":
@@ -109,6 +109,8 @@ def main(argv: list[str] | None = None) -> int:
     compile_cmd = sub.add_parser("compile", help="compile moss source to bytecode")
     compile_cmd.add_argument("file", type=Path)
     compile_cmd.add_argument("--output", "-o", type=Path, help="output .mbc file path")
+    compile_cmd.add_argument("--frontend", choices=("host", "moss"), default="host",
+                             help="use host (Python) or moss (self-host) frontend")
 
     trust_cmd = sub.add_parser("trust", help="produce a trust bundle (check + trace + golden + lock + selfhost)")
     trust_cmd.add_argument("file", type=Path)
@@ -184,7 +186,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "compile":
             source = args.file.read_text(encoding="utf-8-sig")
-            program = parse_source(source)
+            if getattr(args, "frontend", "host") == "moss":
+                from .selfhost import SelfHostFrontend
+                sf = SelfHostFrontend()
+                program = sf.parse_to_ast(source)
+            else:
+                program = parse_source(source)
             diagnostics = check_program(program)
             errors = [d for d in diagnostics if d.level == "error"]
             if errors:
@@ -327,6 +334,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command in {"run", "test"}:
+            if getattr(args, "frontend", "host") == "moss":
+                from .selfhost import SelfHostFrontend
+                sf = SelfHostFrontend()
+                program = sf.parse_to_ast(source)
             diagnostics = check_program(program)
             errors = [d for d in diagnostics if d.level == "error"]
             if errors:
