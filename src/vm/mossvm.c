@@ -101,6 +101,7 @@ static void val_print(FILE *fp, Value *v) {
     case V_NUMBER:  fprintf(fp, "%g", v->as.number); break;
     case V_BOOL:    fprintf(fp, "%s", v->as.boolean ? "true" : "false"); break;
     case V_STRING:  fprintf(fp, "%s", v->as.string); break;
+    case V_RESULT: fprintf(fp, "%s(", v->as.result.ok ? "Ok" : "Err"); val_print(fp, v->as.result.value); fprintf(fp, ")"); break;
     case V_VARIANT: fprintf(fp, "%s", v->as.variant.name); break;
     case V_LIST: {
         fprintf(fp, "[");
@@ -200,6 +201,10 @@ typedef struct {
     int32_t func_count;
     char  **func_names;
     Instructions *func_insts;
+    /* Simple in-memory DB */
+    char  **db_keys;
+    Value **db_vals;
+    int     db_count;
 } VM;
 
 static const char *vm_global_name(VM *vm, int idx) {
@@ -255,6 +260,21 @@ static double to_number(Value *v) {
 
 static Value *vm_resolve_global(VM *vm, int idx);
 
+static void vm_db_put(VM *vm, const char *key, Value *val) {
+    for (int i = 0; i < vm->db_count; i++)
+        if (strcmp(vm->db_keys[i], key) == 0) { vm->db_vals[i] = val; return; }
+    vm->db_keys = realloc(vm->db_keys, (vm->db_count+1)*sizeof(char*));
+    vm->db_vals = realloc(vm->db_vals, (vm->db_count+1)*sizeof(Value*));
+    vm->db_keys[vm->db_count] = strdup(key);
+    vm->db_vals[vm->db_count] = val;
+    vm->db_count++;
+}
+static Value *vm_db_get(VM *vm, const char *key) {
+    for (int i = 0; i < vm->db_count; i++)
+        if (strcmp(vm->db_keys[i], key) == 0) return vm->db_vals[i];
+    return val_null();
+}
+
 static void vm_run(VM *vm) {
     vm->pc = 0;
     vm->running = true;
@@ -299,27 +319,42 @@ static void vm_run(VM *vm) {
             Value *fn_args[32] = {0};
             for (int i = arg - 1; i >= 0; i--) fn_args[i] = stack_pop(&vm->stack);
             Value *callee = stack_pop(&vm->stack);
-            if (callee && callee->kind == V_STRING) {
-                const char *name = callee->as.string;
-                if (strcmp(name, "print") == 0) {
-                    for (int i = 0; i < arg; i++) {
-                        if (i > 0) printf(" ");
-                        val_print(stdout, fn_args[i]);
-                    }
-                    printf("\n"); fflush(stdout);
-                    stack_push(&vm->stack, val_null());
-                } else if (strcmp(name, "len") == 0) {
-                    Value *a = fn_args[0];
-                    if (a && a->kind == V_LIST) stack_push(&vm->stack, val_number(a->as.list.count));
-                    else if (a && a->kind == V_STRING) stack_push(&vm->stack, val_number(strlen(a->as.string)));
-                    else stack_push(&vm->stack, val_number(0));
-                } else if (strcmp(name, "assert") == 0) {
-                    Value *msg = (arg > 1) ? fn_args[1] : NULL;
-                    Value *cond = fn_args[0];
-                    if (!is_truthy(cond)) { fprintf(stderr, "mossvm: assertion failed"); if (msg) { fprintf(stderr, ": "); val_print(stderr, msg); } fprintf(stderr, "\n"); exit(1); }
-                    stack_push(&vm->stack, val_null());
-                }
-            }
+            if (callee) {
+                if (callee->kind == V_STRING) {
+                    const char *name = callee->as.string;
+                    if (strcmp(name, "print") == 0) {
+                        for (int i = 0; i < arg; i++) { if(i>0)printf(" "); val_print(stdout, fn_args[i]); }
+                        printf("\n"); fflush(stdout);
+                        stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "len") == 0) {
+                        Value *a = fn_args[0];
+                        if (a && a->kind == V_LIST) stack_push(&vm->stack, val_number(a->as.list.count));
+                        else if (a && a->kind == V_STRING) stack_push(&vm->stack, val_number(strlen(a->as.string)));
+                        else stack_push(&vm->stack, val_number(0));
+                    } else if (strcmp(name, "assert") == 0) {
+                        Value *msg = (arg > 1) ? fn_args[1] : NULL;
+                        if (!is_truthy(fn_args[0])) { fprintf(stderr, "mossvm: assert failed"); if(msg){fprintf(stderr,": ");val_print(stderr,msg);} fprintf(stderr,"\n"); exit(1); }
+                        stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "dbPut") == 0) {
+                        if (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            vm_db_put(vm, fn_args[0]->as.string, fn_args[1]);
+                            stack_push(&vm->stack, fn_args[1]);
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "dbGet") == 0) {
+                        if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_STRING)
+                            stack_push(&vm->stack, vm_db_get(vm, fn_args[0]->as.string));
+                        else stack_push(&vm->stack, val_null());
+                    } else stack_push(&vm->stack, val_null());
+                } else if (callee->kind == V_VARIANT && callee->as.variant.name) {
+                    /* Ok(value) → Result(true, value), Err(value) → Result(false, value) */
+                    const char *vn = callee->as.variant.name;
+                    Value *res = val_null(); res->kind = V_RESULT;
+                    if (strcmp(vn, "Ok") == 0) { res->as.result.ok = true; res->as.result.value = (arg>0) ? fn_args[0] : val_null(); }
+                    else if (strcmp(vn, "Err") == 0) { res->as.result.ok = false; res->as.result.value = (arg>0) ? fn_args[0] : val_null(); }
+                    else { /* generic variant */ res->kind = V_VARIANT; res->as = callee->as; }
+                    stack_push(&vm->stack, res);
+                } else stack_push(&vm->stack, val_null());
+            } else stack_push(&vm->stack, val_null());
             break;
         }
         case OP_ADD: {
@@ -381,10 +416,38 @@ static void vm_run(VM *vm) {
             } else stack_push(&vm->stack, val_null());
             break;
         }
+        case OP_RECORD_UPDATE: {
+            int count = arg;
+            char *fk[32]; Value *fv[32];
+            for (int i = count - 1; i >= 0; i--) {
+                fv[i] = stack_pop(&vm->stack);
+                Value *kv = stack_pop(&vm->stack);
+                fk[i] = kv && kv->kind == V_STRING ? strdup(kv->as.string) : strdup("?");
+            }
+            Value *base = stack_pop(&vm->stack);
+            Value *res = val_null(); res->kind = V_RECORD;
+            if (base && base->kind == V_RECORD) {
+                res->as.record.count = base->as.record.count;
+                res->as.record.keys = calloc(base->as.record.count, sizeof(char*));
+                res->as.record.vals = calloc(base->as.record.count, sizeof(Value*));
+                for (int i = 0; i < base->as.record.count; i++) {
+                    res->as.record.keys[i] = strdup(base->as.record.keys[i]);
+                    res->as.record.vals[i] = base->as.record.vals[i];
+                }
+                for (int i = 0; i < count; i++)
+                    for (int j = 0; j < res->as.record.count; j++)
+                        if (strcmp(res->as.record.keys[j], fk[i]) == 0) { res->as.record.vals[j] = fv[i]; break; }
+            }
+            stack_push(&vm->stack, res);
+            for (int i = 0; i < count; i++) free(fk[i]);
+            break;
+        }
         case OP_TRY_PROPAGATE: {
             Value *v = stack_pop(&vm->stack);
-            if (v && v->kind == V_RESULT && !v->as.result.ok) { fprintf(stderr, "mossvm: Err propagation\n"); exit(1); }
-            stack_push(&vm->stack, v);
+            if (v && v->kind == V_RESULT) { 
+                if (!v->as.result.ok) { fprintf(stderr, "mossvm: Err("); val_print(stderr, v->as.result.value); fprintf(stderr, ")\n"); exit(1); }
+                stack_push(&vm->stack, v->as.result.value);
+            } else stack_push(&vm->stack, v);
             break;
         }
         case 90: case 91: break; /* TRY/UNWRAP — compile-time, no-op */
