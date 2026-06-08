@@ -47,7 +47,7 @@ python -m mosslang.cli golden examples/order.moss
 
 ## Honest status
 
-- Moss is AI-designed and AI-built by Codex (ds-Mosslang fork by DeepSeek) in collaboration with Fujo930.
+- Moss is AI-designed and AI-built by Codex in collaboration with Fujo930.
 - Moss can execute useful programs and support project-scale workflows.
 - Moss has begun self-hosting, but is not fully self-hosted.
 - Moss remains experimental software.

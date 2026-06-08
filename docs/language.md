@@ -3,7 +3,7 @@
 This document describes the syntax and semantics implemented by the current
 prototype.
 
-Moss is AI-designed and AI-built. DeepSeek designed, implemented, debugged,
+Moss is AI-designed and AI-built. Codex designed, implemented, debugged,
 documented, committed, and pushed the current prototype in collaboration with
 Fujo930. The current public version is `0.5.0`, a self-hosting preview rather
 than a finished self-hosted compiler.
