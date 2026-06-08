@@ -150,27 +150,29 @@ def _moss_stmt_to_ast(stmt: dict) -> Any:
         return n.ExprStmt(expr=n.Literal(None))
     if kind == "If":
         if isinstance(val, dict):
-            then_body = [_moss_stmt_to_ast(s) for s in (val.get("then") or [])]
-            else_body = [_moss_stmt_to_ast(s) for s in (val.get("else") or [])]
-            return n.IfStmt(
-                condition=_moss_expr_to_ast(val.get("condition")),
-                then_body=then_body,
-                else_body=else_body,
-            )
+            # New format: {expression, then_body, else_body} or old: {condition, then, else}
+            condition = _moss_expr_to_ast(val.get("expression") or val.get("condition"))
+            then_list = val.get("then_body") or val.get("then") or []
+            then_body = [_moss_stmt_to_ast(s) for s in then_list]
+            else_list = val.get("else_body") or val.get("else") or []
+            else_body = [_moss_stmt_to_ast(s) for s in else_list]
+            return n.IfStmt(condition=condition, then_body=then_body, else_body=else_body)
         return n.ExprStmt(expr=n.Literal(None))
     if kind == "For":
         if isinstance(val, dict):
-            body = [_moss_stmt_to_ast(s) for s in (val.get("body") or [])]
-            return n.ForStmt(
-                name=name,
-                iterable=_moss_expr_to_ast(val.get("iterable")),
-                body=body,
-            )
+            # New format: {expression, body} or old: {iterable, body}
+            iterable = _moss_expr_to_ast(val.get("expression") or val.get("iterable"))
+            body_list = val.get("body") or []
+            body = [_moss_stmt_to_ast(s) for s in body_list]
+            return n.ForStmt(name=name, iterable=iterable, body=body)
         return n.ExprStmt(expr=n.Literal(None))
     if kind == "While":
         if isinstance(val, dict):
-            body = [_moss_stmt_to_ast(s) for s in (val.get("body") or [])]
-            return n.WhileStmt(condition=_moss_expr_to_ast(val.get("condition")), body=body)
+            # New format: {expression, body} or old: {condition, body}
+            condition = _moss_expr_to_ast(val.get("expression") or val.get("condition"))
+            body_list = val.get("body") or []
+            body = [_moss_stmt_to_ast(s) for s in body_list]
+            return n.WhileStmt(condition=condition, body=body)
         return n.ExprStmt(expr=n.Literal(None))
     if kind in ("Break",):
         return n.BreakStmt()
