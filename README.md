@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: active frontend](https://img.shields.io/badge/self--hosting-active%20frontend-f2c14e)
-![Version: 0.7.2](https://img.shields.io/badge/version-0.7.2-4f7edb)
+![Version: 0.7.3](https://img.shields.io/badge/version-0.7.3-4f7edb)
 ![Built by DeepSeek & Reasonix](https://img.shields.io/badge/built%20by-DeepSeek%20%26%20Reasonix-222222)
 
 Moss is an experimental programming language for long-lived software projects

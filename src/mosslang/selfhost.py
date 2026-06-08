@@ -199,24 +199,30 @@ def _parse_params_from_value(value: str) -> list[n.Param]:
 
 
 def _parse_return_type(value: str) -> str | None:
-    """Extract return type from value string like '(params) -> Type ...'"""
+    """Extract return type from value string like '(params) -> Type ...'
+
+    Handles generic types with optional spaces like 'Result < Order , ShipError >'.
+    """
     if "->" not in value:
         return None
     after = value.split("->", 1)[1].strip()
-    # Could be "Bool" or "Result < Order , ShipError > uses Database {"
     if after.startswith("{"):
         return None
-    ret = ""
-    depth = 0
-    for ch in after:
-        if ch in (" ", "{") and depth == 0:
-            break
-        if ch == "<":
-            depth += 1
-        elif ch == ">":
-            depth -= 1
-        ret += ch
-    return ret.strip() or None
+    # Collect until we hit 'uses', '{', or end
+    end = len(after)
+    for kw in (" uses ", "{"):
+        idx = after.find(kw)
+        if idx != -1 and idx < end:
+            end = idx
+    ret = after[:end].strip()
+    # Strip trailing '=' (rule body marker)
+    ret = ret.rstrip("=").strip()
+    # Remove excess spaces inside <...>
+    import re
+    ret = re.sub(r'\s*<\s*', '<', ret)
+    ret = re.sub(r'\s*>\s*', '>', ret)
+    ret = re.sub(r'\s*,\s*', ', ', ret)
+    return ret if ret else None
 
 
 def _parse_uses(value: str) -> list[str]:
@@ -278,28 +284,37 @@ def moss_nodes_to_program(nodes: list[dict], source: str = "") -> n.Program:
             params = _parse_params_from_value(value)
             ret_type = _parse_return_type(value)
             expr = n.Literal(None)
-            if isinstance(data, dict):
+            if isinstance(data, dict) and data.get("kind") and data.get("kind") != "None":
                 expr = _moss_expr_to_ast(data)
             elif i + 1 < len(nodes) and nodes[i + 1].get("kind") == "Expr":
-                # Rule body is the following Expr node
                 next_data = nodes[i + 1].get("data")
                 if isinstance(next_data, dict):
                     expr = _moss_expr_to_ast(next_data)
-                i += 1  # consume the body node too
-            elif source:
-                # Fall back to extracting expression from source text
+                i += 1
+            if isinstance(expr, n.Literal) and expr.value is None and source:
+                # Fall back: re-parse the full rule declaration through the host parser
                 import re
-                pattern = rf'\brule\s+{re.escape(name)}\b.*?=\s*'
+                # Extract the rule text: 'rule name(...) = body_expression'
+                pattern = rf'\brule\s+{re.escape(name)}\b[^\n]*=[^\n]*'
                 found = re.search(pattern, source)
                 if found:
-                    expr_text = source[found.end():].split('\n', 1)[0].strip()
+                    rule_start = found.start()
+                    # Find end of rule body: next top-level declaration or EOF
+                    rest = source[found.end():]
+                    end_match = re.search(r'\n\s*\b(?:effect|type|rule|fn|test|import)\b', rest)
+                    if end_match:
+                        rule_text = source[rule_start:found.end() + end_match.start()].strip()
+                    else:
+                        rule_text = source[rule_start:].strip()
                     try:
-                        from .parser import Parser
-                        from .tokens import tokenize as _tk
-                        tkns = _tk(expr_text + '\n')
-                        expr = Parser(tkns).parse_expression()
+                        from .parser import parse_source as _ps
+                        rule_prog = _ps(rule_text + '\n')
+                        for rule_item in rule_prog.items:
+                            if isinstance(rule_item, n.RuleDecl) and rule_item.name == name:
+                                expr = rule_item.expr
+                                break
                     except Exception:
-                        expr = n.Literal(None)
+                        pass
             items.append(n.RuleDecl(name=name, params=params, return_type=ret_type, expr=expr))
             i += 1
 
