@@ -1,0 +1,76 @@
+{
+  "moss": "0.56.1",
+  "file": "examples/order.moss",
+  "source_sha256": "dad1930f601b44ec51d8f3e19455d1457656316fcee0c7ba3f2eba49000bcc46",
+  "trust": true,
+  "check": {
+    "ok": true,
+    "diagnostics": [],
+    "summary": {
+      "effects": 1,
+      "imports": 0,
+      "types": 2,
+      "callables": 2,
+      "tests": 1
+    }
+  },
+  "lock": {
+    "ok": true,
+    "locked": true,
+    "diagnostics": null
+  },
+  "trace": {
+    "ok": true,
+    "rules_declared": 1,
+    "events_captured": 1,
+    "events": [
+      {
+        "rule": "canShip",
+        "arguments": {
+          "order": "{id: A-100, status: Paid, total: 42.usd}"
+        },
+        "result": "true",
+        "file": "examples/order.moss",
+        "line": 10,
+        "column": 1
+      }
+    ],
+    "note": null
+  },
+  "golden": {
+    "ok": true,
+    "snapshot": "status: Shipped\nstored: Shipped\n",
+    "expected": null
+  },
+  "selfhost": {
+    "ok": true,
+    "declarations_match": true,
+    "names_match": true,
+    "bodies_match": true,
+    "metadata_match": true,
+    "expressions_match": true,
+    "host_summary": {
+      "effects": 1,
+      "imports": 0,
+      "types": 2,
+      "callables": 2,
+      "tests": 1
+    },
+    "selfhost_summary": {
+      "effects": 1,
+      "imports": 0,
+      "types": 2,
+      "callables": 2,
+      "tests": 1
+    },
+    "selfhost_errors": null,
+    "expression_error": null,
+    "host_names": null,
+    "selfhost_names": null,
+    "host_bodies": null,
+    "selfhost_bodies": null,
+    "host_metadata": null,
+    "selfhost_metadata": null
+  },
+  "_hash_verified": true
+}

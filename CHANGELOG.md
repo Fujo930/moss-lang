@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v0.56.2 — V6 Final Fix: trust-verify command
+
+### Fixed
+- **V6 (Low)**: `source_sha256` now has full consumer-side verification.
+  - `moss trust-verify <bundle>` — new command reads bundle, re-hashes source, reports match/mismatch
+  - stdout path now self-verifies `_hash_verified` by re-reading source
+  - `--output` path round-trip verification (existing) confirmed
+  - Tampered bundle detection: replacing hash with `deadbeef` correctly detected as mismatch
+
 ## v0.56.1 — V5 + V8 Root-Cause Fix
 
 ### Fixed

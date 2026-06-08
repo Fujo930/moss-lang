@@ -120,6 +120,10 @@ def main(argv: list[str] | None = None) -> int:
     trust_proj_cmd.add_argument("directory", type=Path)
     trust_proj_cmd.add_argument("--output", "-o", type=Path, help="write trust bundle to file")
 
+    trust_verify_cmd = sub.add_parser("trust-verify", help="verify a trust bundle against source")
+    trust_verify_cmd.add_argument("bundle", type=Path, help="trust bundle JSON file")
+    trust_verify_cmd.add_argument("--source", "-s", type=Path, help="source file (auto-detected from bundle)")
+
     run_vm_cmd = sub.add_parser("run-vm", help="execute compiled bytecode module")
     run_vm_cmd.add_argument("file", type=Path)
     run_vm_cmd.add_argument("--source-root", type=Path, help="source root for resolving imports")
@@ -154,6 +158,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "trust-project":
             return run_trust_project(args.directory, output=args.output)
+
+        if args.command == "trust-verify":
+            return run_trust_verify(args.bundle, source_override=args.source)
 
         if args.command == "project-check":
             return run_project_check(args.directory, json_output=args.json, locked=args.locked)
@@ -738,6 +745,64 @@ def run_golden(path: Path, *, update: bool = False) -> int:
     return 0
 
 
+def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) -> int:
+    """Verify a trust bundle JSON against its source file."""
+    import hashlib
+
+    try:
+        bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"error reading bundle: {e}", file=sys.stderr)
+        return 1
+
+    file_path = bundle.get("file")
+    stored_hash = bundle.get("source_sha256")
+    if not file_path:
+        print("error: bundle missing 'file' field", file=sys.stderr)
+        return 1
+    if not stored_hash:
+        print("error: bundle missing 'source_sha256' field", file=sys.stderr)
+        return 1
+
+    source_path = source_override or Path(file_path)
+    if not source_path.is_absolute():
+        # Try relative to bundle, then relative to cwd
+        candidate = bundle_path.parent / source_path
+        if candidate.is_file():
+            source_path = candidate
+        else:
+            candidate = Path.cwd() / source_path
+            if candidate.is_file():
+                source_path = candidate
+    if not source_path.is_absolute():
+        source_path = bundle_path.parent / source_path
+
+    if not source_path.is_file():
+        print(f"error: source file not found: {source_path}", file=sys.stderr)
+        return 1
+
+    source = source_path.read_text(encoding="utf-8-sig")
+    actual_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+    result = {
+        "bundle": bundle_path.as_posix(),
+        "source": source_path.as_posix(),
+        "source_sha256_stored": stored_hash,
+        "source_sha256_computed": actual_hash,
+        "hash_match": stored_hash == actual_hash,
+        "trust_stored": bundle.get("trust"),
+    }
+
+    if result["hash_match"]:
+        print(json.dumps(result, indent=2))
+        print(f"PASS: bundle hash matches source ({stored_hash[:12]}...)")
+        return 0
+    else:
+        print(json.dumps(result, indent=2), file=sys.stderr)
+        print(f"FAIL: hash mismatch — bundle: {stored_hash[:12]}... source: {actual_hash[:12]}...", file=sys.stderr)
+        return 1
+
+
 def _find_lock(path: Path) -> Path | None:
     """Walk upward from *path* looking for moss.lock."""
     candidate = path.resolve()
@@ -789,6 +854,14 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
             bundle["_hash_verified"] = False
         print(f"trust bundle written: {output}")
     else:
+        # Self-verify: re-read the source and compare hash for consumer confidence
+        try:
+            re_read = path.read_text(encoding="utf-8-sig")
+            re_hash = hashlib.sha256(re_read.encode("utf-8")).hexdigest()
+            bundle["_hash_verified"] = (re_hash == source_hash)
+        except Exception:
+            bundle["_hash_verified"] = False
+        trust_json = json.dumps(bundle, indent=2)
         print(trust_json)
     return 0 if bundle["trust"] else 1
 
