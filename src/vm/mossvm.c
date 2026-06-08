@@ -383,7 +383,7 @@ static bool vm_load(VM *vm, const char *path) {
     char *co_name = read_string(f);
     int32_t co_argc = (int32_t)read_u32(f);
     int32_t co_capc = (int32_t)read_u32(f);
-    bool co_is_rule = (bool)read_u32(f);
+    uint8_t is_rule_byte; fread(&is_rule_byte, 1, 1, f); (void)is_rule_byte;
     int32_t co_srcl = (int32_t)read_u32(f);
     int32_t co_srcc = (int32_t)read_u32(f);
 
@@ -434,7 +434,7 @@ static bool vm_load(VM *vm, const char *path) {
         /* Now read + skip code object metadata + instructions */
         read_u32(f); /* arg_count */
         read_u32(f); /* cap_count */
-        read_u32(f); /* is_rule */
+        { uint8_t dummy; fread(&dummy, 1, 1, f); } /* is_rule (1 byte) */
         read_u32(f); /* source_line */
         read_u32(f); /* source_column */
         uint32_t nl = read_u32(f); for (uint32_t j = 0; j < nl; j++) free(read_string(f));
