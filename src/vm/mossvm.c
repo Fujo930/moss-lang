@@ -116,8 +116,20 @@ static void val_print(FILE *fp, Value *v) {
     case V_BOOL:    fprintf(fp, "%s", v->as.boolean ? "true" : "false"); break;
     case V_STRING:  fprintf(fp, "%s", v->as.string); break;
     case V_RESULT: fprintf(fp, "%s(", v->as.result.ok ? "Ok" : "Err"); val_print(fp, v->as.result.value); fprintf(fp, ")"); break;
-    case V_VARIANT: fprintf(fp, "%s", v->as.variant.name); break;
+    case V_VARIANT: fprintf(fp, "%s", v->as.variant.name);
+                    if (v->as.variant.payload) { fprintf(fp, "("); val_print(fp, v->as.variant.payload); fprintf(fp, ")"); }
+                    break;
     case V_MONEY:   fprintf(fp, "%g.%s", v->as.money.amount, v->as.money.currency); break;
+    case V_RECORD: {
+        fprintf(fp, "{");
+        for (int i = 0; i < v->as.record.count; i++) {
+            if (i > 0) fprintf(fp, ", ");
+            fprintf(fp, "%s: ", v->as.record.keys[i]);
+            val_print(fp, v->as.record.vals[i]);
+        }
+        fprintf(fp, "}");
+        break;
+    }
     case V_LIST: {
         fprintf(fp, "[");
         for (int i = 0; i < v->as.list.count; i++) {
@@ -613,6 +625,9 @@ static void vm_run(VM *vm) {
                         { stack_push(&vm->stack, rec->as.record.vals[i]); break; }
             } else if (rec && rec->kind == V_NUMBER) {
                 stack_push(&vm->stack, val_money(rec->as.number, field));
+            } else if (rec && rec->kind == V_VARIANT) {
+                char buf[128]; snprintf(buf, sizeof(buf), "%s.%s", rec->as.variant.name, field);
+                stack_push(&vm->stack, val_variant(buf));
             } else stack_push(&vm->stack, val_null());
             break;
         }
