@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
         cmd.add_argument("file", type=Path)
         if command == "check":
             cmd.add_argument("--json", action="store_true", help="emit structured diagnostics and summary")
-        if command in ("tokens", "ast", "check", "run"):
+        if command in ("tokens", "ast", "check", "run", "test"):
             cmd.add_argument("--frontend", choices=("host", "moss"), default="host",
                              help="use host (Python) or moss (self-host) frontend")
         if command == "trace":

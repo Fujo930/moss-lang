@@ -1705,6 +1705,21 @@ print(shipped.status, dbGet("A-100").status)"""
         finally:
             Path(out_path).unlink(missing_ok=True)
 
+    def test_moss_frontend_all_examples_compile(self) -> None:
+        """All .moss examples can compile via moss frontend."""
+        from pathlib import Path
+        from mosslang.selfhost import SelfHostFrontend
+        from mosslang.compiler import compile_program
+
+        sf = SelfHostFrontend()
+        examples = sorted((Path(__file__).parent.parent / "examples").glob("*.moss"))
+        for p in examples:
+            with self.subTest(file=p.name):
+                src = p.read_text(encoding="utf-8")
+                prog = sf.parse_to_ast(src)
+                mod = compile_program(prog, source_path=str(p))
+                self.assertIsNotNone(mod)
+
     def test_all_examples_run(self) -> None:
         """Verify all .moss examples can compile and run via VM."""
         import os
