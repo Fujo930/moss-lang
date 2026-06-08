@@ -1,0 +1,1 @@
+canShip({"order": "{id: A-100, status: Paid, total: 42.usd}"}) = true

@@ -92,6 +92,16 @@ def main(argv: list[str] | None = None) -> int:
     golden_cmd.add_argument("file", type=Path)
     golden_cmd.add_argument("--update", action="store_true", help="write the current output as the golden file")
 
+    trace_graph_cmd = sub.add_parser("trace-graph", help="emit DOT-format rule dependency graph")
+    trace_graph_cmd.add_argument("file", type=Path)
+
+    trace_nondet_cmd = sub.add_parser("trace-nondet", help="detect non-deterministic rule evaluations")
+    trace_nondet_cmd.add_argument("file", type=Path)
+    trace_nondet_cmd.add_argument("--runs", "-n", type=int, default=2, help="number of trace runs to compare")
+
+    trace_replay_cmd = sub.add_parser("trace-replay", help="replay rule evaluations from a trust artifact")
+    trace_replay_cmd.add_argument("bundle", type=Path, help="Trust Artifact JSON file")
+
     docs_cmd = sub.add_parser("docs")
     docs_cmd.add_argument("file", type=Path)
     docs_cmd.add_argument("--output", type=Path)
@@ -196,6 +206,15 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "keygen":
             return run_keygen(args.output)
+
+        if args.command == "trace-graph":
+            return run_trace_graph(args.file)
+
+        if args.command == "trace-nondet":
+            return run_trace_nondet(args.file, runs=args.runs)
+
+        if args.command == "trace-replay":
+            return run_trace_replay(args.bundle)
 
         if args.command == "project-check":
             return run_project_check(args.directory, json_output=args.json, locked=args.locked)
@@ -523,6 +542,153 @@ def portable_trace_event(event: dict) -> dict:
         pass
     result["file"] = path.as_posix()
     return result
+
+
+def run_trace_graph(path: Path) -> int:
+    """Produce a trace dependency graph (DOT format) from rule evaluations."""
+    source = path.read_text(encoding="utf-8-sig")
+    try:
+        program = parse_source(source)
+    except MossError as exc:
+        print(f"parse error: {exc}", file=sys.stderr)
+        return 1
+    diagnostics = check_program(program)
+    if any(d.level == "error" for d in diagnostics):
+        for d in diagnostics:
+            print(f"{d.level}: {d.message}", file=sys.stderr)
+        return 1
+
+    vm = VM(output=lambda _: None, base_path=path.parent, trace_rules=True)
+    mod = compile_program(program, source_path=str(path.resolve()))
+    vm.load_module(mod)
+    vm.run()
+
+    events = vm.trace_events
+    if not events:
+        print("// no trace events")
+        return 0
+
+    print("digraph trace {")
+    print('  rankdir=LR; node [shape=box, style=rounded];')
+    rule_colors = {}
+    for i, e in enumerate(events):
+        rule = e.get("rule", "?")
+        if rule not in rule_colors:
+            rule_colors[rule] = f"#{hash(rule) & 0xFFFFFF:06x}"
+        color = rule_colors[rule]
+        node_id = f"e{i}"
+        args = e.get("arguments", {})
+        args_str = ", ".join(f"{k}={v}" for k, v in (args.items() if isinstance(args, dict) else []))
+        result = e.get("result", "?")
+        label = f"{rule}\\n{args_str}\\n→ {result}"
+        print(f'  {node_id} [label="{label}", color="{color}", fontcolor="{color}"];')
+        if i > 0:
+            print(f"  e{i-1} -> {node_id};")
+    print("}")
+
+    golden_path = path.with_suffix(path.suffix + ".moss.trace")
+    with open(golden_path, "w") as f:
+        for e in events:
+            f.write(f'{e.get("rule","?")}({json.dumps(e.get("arguments",{}))}) = {e.get("result","?")}\n')
+    print(f"// trace saved: {golden_path}")
+    return 0
+
+
+def run_trace_nondet(path: Path, runs: int = 2) -> int:
+    """Run trace N times and detect non-deterministic rule evaluations."""
+    run_results = []
+    source = path.read_text(encoding="utf-8-sig")
+    try:
+        program = parse_source(source)
+    except MossError as exc:
+        print(f"parse error: {exc}", file=sys.stderr)
+        return 1
+
+    for run_i in range(runs):
+        vm = VM(output=lambda _: None, base_path=path.parent, trace_rules=True)
+        mod = compile_program(program, source_path=str(path.resolve()))
+        vm.load_module(mod)
+        vm.run()
+        run_results.append([
+            {"rule": e.get("rule"), "result": e.get("result"),
+             "args": json.dumps(e.get("arguments", {}), sort_keys=True)}
+            for e in vm.trace_events
+        ])
+
+    diffs = []
+    for i in range(len(run_results) - 1):
+        a, b = run_results[i], run_results[i + 1]
+        if len(a) != len(b):
+            diffs.append(f"run {i+1} has {len(a)} events, run {i+2} has {len(b)} events")
+            continue
+        for j in range(len(a)):
+            if a[j] != b[j]:
+                diffs.append(f"event {j}: run {i+1}={a[j]}, run {i+2}={b[j]}")
+
+    if diffs:
+        print("NON-DETERMINISTIC DETECTED:")
+        for d in diffs:
+            print(f"  {d}")
+        return 1
+    else:
+        print(f"Deterministic: {runs} runs, {len(run_results[0])} events each, no differences")
+        return 0
+
+
+def run_trace_replay(bundle_path: Path) -> int:
+    """Replay rule evaluations from a trust bundle's trace events."""
+    try:
+        bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"error reading bundle: {e}", file=sys.stderr)
+        return 1
+
+    events = bundle.get("trace", {}).get("events", [])
+    if not events:
+        print("no trace events in bundle")
+        return 0
+
+    source_path = bundle.get("file")
+    if not source_path or not Path(source_path).is_file():
+        # Try relative to bundle
+        source_path = bundle_path.parent / (source_path or "")
+        if not source_path.is_file():
+            print(f"error: source file not found: {source_path}", file=sys.stderr)
+            return 1
+
+    source = Path(source_path).read_text(encoding="utf-8-sig")
+    try:
+        program = parse_source(source)
+    except MossError as exc:
+        print(f"parse error: {exc}", file=sys.stderr)
+        return 1
+
+    vm = VM(output=lambda _: None, base_path=Path(source_path).parent, trace_rules=True)
+    mod = compile_program(program, source_path=str(Path(source_path).resolve()))
+    vm.load_module(mod)
+    vm.run()
+
+    current_events = vm.trace_events
+    stored_events = events
+
+    print(f"Stored: {len(stored_events)} events, Replayed: {len(current_events)} events")
+    match = True
+    for i, (s, c) in enumerate(zip(stored_events, current_events)):
+        s_rule, c_rule = s.get("rule"), c.get("rule")
+        s_result, c_result = s.get("result"), c.get("result")
+        if s_rule != c_rule or s_result != c_result:
+            match = False
+            print(f"  MISMATCH event {i}: stored {s_rule}={s_result}, replay {c_rule}={c_result}")
+    if len(stored_events) != len(current_events):
+        match = False
+        print(f"  COUNT mismatch: stored {len(stored_events)}, replay {len(current_events)}")
+
+    if match:
+        print("PASS: trace replay matches stored events")
+        return 0
+    else:
+        print("FAIL: trace replay differs from stored events")
+        return 1
 
 
 def run_project_check(directory: Path, *, json_output: bool = False, locked: bool = False) -> int:
