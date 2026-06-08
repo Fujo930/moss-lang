@@ -1655,6 +1655,29 @@ print(shipped.status, dbGet("A-100").status)"""
         self.assertIn("IDENT", buf.getvalue())
         self.assertIn("effect", buf.getvalue())
 
+    def test_cli_ast_frontend_moss(self) -> None:
+        """moss ast --frontend moss produces valid AST output."""
+        import io, sys
+        from contextlib import redirect_stdout
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = cli_main(["ast", "--frontend", "moss", "examples/order.moss"])
+        self.assertEqual(code, 0)
+        self.assertIn("Effect", buf.getvalue())
+        self.assertIn("Order", buf.getvalue())
+
+    def test_cli_check_frontend_moss(self) -> None:
+        """moss check --frontend moss produces valid check output."""
+        import io, sys
+        from contextlib import redirect_stdout
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = cli_main(["check", "--frontend", "moss", "examples/order.moss"])
+        self.assertEqual(code, 0)
+        self.assertIn("ok", buf.getvalue())
+
     def test_all_examples_run(self) -> None:
         """Verify all .moss examples can compile and run via VM."""
         import os

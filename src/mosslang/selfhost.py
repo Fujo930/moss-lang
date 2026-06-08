@@ -43,9 +43,11 @@ class SelfHostFrontend:
         if self._loaded:
             return
         vm = VM(base_path=self._root.parent)
-        # Load parser_core, which transitively imports lexer_core + statement_core
+        # Load parser_core, which transitively imports lexer_core + statement_core.
+        # Load checker_core separately since it's not in the parser import chain.
         importer = (
             f'import "examples/self_host/parser_core.moss"\n'
+            f'import "examples/self_host/checker_core.moss"\n'
         )
         mod = compile_program(parse_source(importer), source_path=str(self._root / "parser_core.moss"))
         vm.load_module(mod)
@@ -86,3 +88,12 @@ class SelfHostFrontend:
         self._ensure_loaded()
         assert self._vm is not None
         return self._vm.call(self._vm.globals.get("parseExpressionSource"), [source])
+
+    def check(self, source: str) -> dict:
+        """Check source using the Moss-written checker. Returns {warnings, errors} dict."""
+        self._ensure_loaded()
+        assert self._vm is not None
+        tokens = self._vm.call(self._vm.globals.get("sketchTokens"), [source])
+        parsed = self._vm.call(self._vm.globals.get("parseProgram"), [tokens])
+        nodes = parsed.get("nodes", [])
+        return self._vm.call(self._vm.globals.get("checkProgramNodes"), [nodes])

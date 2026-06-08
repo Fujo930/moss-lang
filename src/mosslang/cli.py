@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
         cmd.add_argument("file", type=Path)
         if command == "check":
             cmd.add_argument("--json", action="store_true", help="emit structured diagnostics and summary")
-        if command in ("tokens", "ast"):
+        if command in ("tokens", "ast", "check"):
             cmd.add_argument("--frontend", choices=("host", "moss"), default="host",
                              help="use host (Python) or moss (self-host) frontend")
         if command == "trace":
@@ -248,10 +248,60 @@ def main(argv: list[str] | None = None) -> int:
         program = parse_source(source)
 
         if args.command == "ast":
-            pprint.pp(program)
+            if getattr(args, "frontend", "host") == "moss":
+                from .selfhost import SelfHostFrontend
+                sf = SelfHostFrontend()
+                parsed = sf.parse(source)
+                nodes = parsed.get("nodes", [])
+                errors = parsed.get("errors", [])
+                print(f"// Moss frontend parser — {len(nodes)} node(s), {len(errors)} error(s)")
+                for item in nodes:
+                    if isinstance(item, dict):
+                        print(f"  {item.get('kind','?'):10s} {item.get('name','?'):20s} {item.get('value','?')}")
+                    else:
+                        print(f"  {item}")
+                if errors:
+                    print("// errors:")
+                    for e in errors:
+                        print(f"  {e}")
+            else:
+                pprint.pp(program)
             return 0
 
         if args.command == "check":
+            if getattr(args, "frontend", "host") == "moss":
+                from .selfhost import SelfHostFrontend
+                sf = SelfHostFrontend()
+                parsed = sf.parse(source)
+                result = sf.check(source)
+                warnings = result.get("warnings", [])
+                errors = parsed.get("errors", []) + result.get("errors", [])
+                nodes = parsed.get("nodes", [])
+                summary = {
+                    "effects": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") == "Effect"),
+                    "imports": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") == "Import"),
+                    "types": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") == "Type"),
+                    "callables": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") in ("Rule", "Function")),
+                    "tests": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") == "Test"),
+                }
+                if args.json:
+                    print(json.dumps({
+                        "ok": len(errors) == 0,
+                        "file": str(args.file),
+                        "diagnostics": [{"level": "warning", "message": w} for w in warnings] +
+                                        [{"level": "error", "message": e} for e in errors],
+                        "summary": summary,
+                    }))
+                    return 1 if errors else 0
+                for w in warnings:
+                    print(f"warning: {w}")
+                for e in errors:
+                    print(f"error: {e}")
+                if not warnings and not errors:
+                    print(f"ok: {summary['effects']} effect block(s), {summary['imports']} import(s), "
+                          f"{summary['types']} type(s), {summary['callables']} callable(s), {summary['tests']} test(s)")
+                return 1 if errors else 0
+            # host frontend (default)
             diagnostics = check_program(program)
             summary = summarize(program)
             if args.json:
