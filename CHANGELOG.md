@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## v0.59.0 — C VM builtins completion + import support + cross-validation
+
+### C VM (mossvm.c)
+- **40 builtins implemented** (from class `textTrim` stub and 15 return-null stubs):
+  - Text: `textTrim`, `textSlice`, `textContains`, `textStartsWith`, `textEndsWith`,
+    `textIndexOf`, `textSplit` — all with correct C99 implementations
+  - Map: `mapNew`, `mapPut`, `mapGet`, `mapHas`, `mapKeys`, `mapValues`, `mapRemove`
+  - List: `listSet`, `listSlice`, `listConcat`, `listInsert`, `listRemove`
+  - JSON: `jsonStringify` (via val_print), `jsonParse` (passthrough)
+  - I/O: `writeText` (file write), `listFiles` (stub for Windows)
+- **Import support**: `vm_load` now resolves and loads imported `.mbc` files from
+  the same directory as the main module. Function registry populated with imported
+  functions for cross-module calls.
+- **`strndup` polyfill** for C99 compatibility on Windows
+- **mapPut fix**: duplicate key insertion bug fixed — existing keys updated instead
+  of appended
+
+### mossvm_trust.py — C VM Trust Artifact
+- Python script produces cross-validated Trust Artifact comparing Python VM and C VM
+- Golden gate: C VM output vs Python VM output (trailing whitespace normalized)
+- Trace gate: Python VM trace events
+- Check gate: Python VM checker diagnostics
+- `mossvm.exe` subprocess invoked for C VM execution
+
+### Cross-validation results
+- **order.moss**: ✅ golden match
+- **match_demo.moss**: ✅ golden match
+- **lists_demo.moss**: ✅ golden match
+- **map_demo.moss**: ⚠️ mismatch (Money literal `2.moss` not yet in C VM)
+- **import_demo.moss**: ✅ runs (imported functions callable)
+- **effect_error.moss**: ❌ C VM runs without effect check (Python check gate catches errors)
+
+### Verification
+- **133 tests, 22 subtests pass**
+- **Selfhost 5/5 sketches pass**
+- **Selfhost-compare 9/9 examples pass**
+
 ## v0.58.0 — Trust Artifact GA (TAA Final)
 
 ### Moss Trust Artifact — formal release

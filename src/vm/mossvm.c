@@ -7,7 +7,7 @@
  * executes it on a stack-based VM.  All 32 opcodes from the Moss
  * instruction set are supported.
  *
- * v0.17.0 — Reasonix, 2026
+ * v0.59.0 — Reasonix, 2026
  */
 
 #include <stdint.h>
@@ -16,6 +16,15 @@
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
+
+/* strndup polyfill for C99 (POSIX function) */
+static char *strndup(const char *s, size_t n) {
+    size_t len = strlen(s);
+    if (len > n) len = n;
+    char *buf = malloc(len + 1);
+    if (buf) { memcpy(buf, s, len); buf[len] = 0; }
+    return buf;
+}
 
 /* ── Value types ──────────────────────────────────────────────────── */
 
@@ -459,8 +468,6 @@ static void vm_run(VM *vm) {
                             }
                         }
                         stack_push(&vm->stack, val_string(buf));
-                    } else if (strcmp(name, "textSplit") == 0) {
-                        stack_push(&vm->stack, val_null());
                     } else if (strcmp(name, "textChars") == 0) {
                         if (fn_args[0] && fn_args[0]->kind == V_STRING) {
                             Value *lst = val_null(); lst->kind = V_LIST;
@@ -483,10 +490,6 @@ static void vm_run(VM *vm) {
                             buf[pos]=0;
                             stack_push(&vm->stack, val_string(buf));
                         } else stack_push(&vm->stack, val_null());
-                    } else if (strcmp(name, "jsonParse") == 0) {
-                        stack_push(&vm->stack, val_string("{}"));
-                    } else if (strcmp(name, "jsonStringify") == 0) {
-                        stack_push(&vm->stack, val_string("{}"));
                     } else if (strcmp(name, "readText") == 0) {
                         if (fn_args[0] && fn_args[0]->kind == V_STRING) {
                             FILE *rf = fopen(fn_args[0]->as.string, "r");
@@ -502,18 +505,231 @@ static void vm_run(VM *vm) {
                             if (tf) fclose(tf);
                         } else stack_push(&vm->stack, val_bool(false));
                     } else if (strcmp(name, "textTrim") == 0) {
-                        if (fn_args[0] && fn_args[0]->kind == V_STRING) stack_push(&vm->stack, fn_args[0]);
+                        if (fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            const char *s = fn_args[0]->as.string;
+                            while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+                            const char *e = s + strlen(s);
+                            while (e > s && (e[-1] == ' ' || e[-1] == '\t' || e[-1] == '\n' || e[-1] == '\r')) e--;
+                            char *buf = strndup(s, e - s);
+                            stack_push(&vm->stack, val_string(buf));
+                            free(buf);
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "textSlice") == 0) {
+                        if (arg >= 3 && fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            const char *s = fn_args[0]->as.string;
+                            int start = (int)to_number(fn_args[1]);
+                            int end = (int)to_number(fn_args[2]);
+                            int slen = (int)strlen(s);
+                            if (start < 0) start = slen + start;
+                            if (end < 0) end = slen + end;
+                            if (start < 0) start = 0;
+                            if (end > slen) end = slen;
+                            if (start > end) { stack_push(&vm->stack, val_string("")); }
+                            else { char *buf = strndup(s + start, end - start);
+                                stack_push(&vm->stack, val_string(buf)); free(buf); }
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "textContains") == 0) {
+                        stack_push(&vm->stack,
+                            (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_STRING && fn_args[1] && fn_args[1]->kind == V_STRING)
+                            ? val_bool(strstr(fn_args[0]->as.string, fn_args[1]->as.string) != NULL)
+                            : val_bool(false));
+                    } else if (strcmp(name, "textStartsWith") == 0) {
+                        stack_push(&vm->stack,
+                            (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_STRING && fn_args[1] && fn_args[1]->kind == V_STRING)
+                            ? val_bool(strncmp(fn_args[0]->as.string, fn_args[1]->as.string, strlen(fn_args[1]->as.string)) == 0)
+                            : val_bool(false));
+                    } else if (strcmp(name, "textEndsWith") == 0) {
+                        if (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_STRING && fn_args[1] && fn_args[1]->kind == V_STRING) {
+                            const char *s = fn_args[0]->as.string, *suffix = fn_args[1]->as.string;
+                            int slen = strlen(s), sulen = strlen(suffix);
+                            stack_push(&vm->stack, val_bool(slen >= sulen && strcmp(s + slen - sulen, suffix) == 0));
+                        } else stack_push(&vm->stack, val_bool(false));
+                    } else if (strcmp(name, "textIndexOf") == 0) {
+                        if (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_STRING && fn_args[1] && fn_args[1]->kind == V_STRING) {
+                            const char *found = strstr(fn_args[0]->as.string, fn_args[1]->as.string);
+                            stack_push(&vm->stack, found ? val_number(found - fn_args[0]->as.string) : val_number(-1));
+                        } else stack_push(&vm->stack, val_number(-1));
+                    } else if (strcmp(name, "textSplit") == 0) {
+                        if (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_STRING && fn_args[1] && fn_args[1]->kind == V_STRING) {
+                            const char *s = fn_args[0]->as.string, *sep = fn_args[1]->as.string;
+                            Value *lst = val_null(); lst->kind = V_LIST;
+                            lst->as.list.items = calloc(strlen(s) + 1, sizeof(Value*));
+                            int cnt = 0;
+                            const char *p = s;
+                            int seplen = (int)strlen(sep);
+                            if (seplen == 0) {
+                                for (int i = 0; s[i]; i++) lst->as.list.items[cnt++] = val_string((char[]){s[i],0});
+                            } else {
+                                while (*p) {
+                                    const char *nxt = strstr(p, sep);
+                                    if (nxt) {
+                                        lst->as.list.items[cnt++] = val_string(strndup(p, nxt - p));
+                                        p = nxt + seplen;
+                                    } else {
+                                        lst->as.list.items[cnt++] = val_string(p);
+                                        break;
+                                    }
+                                }
+                            }
+                            lst->as.list.count = cnt;
+                            stack_push(&vm->stack, lst);
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "mapNew") == 0) {
+                        Value *m = val_null(); m->kind = V_RECORD;
+                        m->as.record.keys = NULL; m->as.record.vals = NULL; m->as.record.count = 0;
+                        stack_push(&vm->stack, m);
+                    } else if (strcmp(name, "mapPut") == 0) {
+                        if (arg >= 3 && fn_args[0] && fn_args[0]->kind == V_RECORD && fn_args[1] && fn_args[1]->kind == V_STRING) {
+                            Value *m = fn_args[0]; bool fnd = false;
+                            for (int i = 0; i < m->as.record.count; i++)
+                                if (strcmp(m->as.record.keys[i], fn_args[1]->as.string) == 0)
+                                    { m->as.record.vals[i] = fn_args[2]; fnd = true; break; }
+                            if (!fnd) {
+                                m->as.record.keys = realloc(m->as.record.keys, (m->as.record.count+1)*sizeof(char*));
+                                m->as.record.vals = realloc(m->as.record.vals, (m->as.record.count+1)*sizeof(Value*));
+                                m->as.record.keys[m->as.record.count] = strdup(fn_args[1]->as.string);
+                                m->as.record.vals[m->as.record.count] = fn_args[2];
+                                m->as.record.count++;
+                            }
+                            stack_push(&vm->stack, m);
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "mapGet") == 0) {
+                        if (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_RECORD && fn_args[1] && fn_args[1]->kind == V_STRING) {
+                            for (int i = 0; i < fn_args[0]->as.record.count; i++)
+                                if (strcmp(fn_args[0]->as.record.keys[i], fn_args[1]->as.string) == 0)
+                                    { stack_push(&vm->stack, fn_args[0]->as.record.vals[i]); break; }
+                            stack_push(&vm->stack, (arg >= 3) ? fn_args[2] : val_null());
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "mapHas") == 0) {
+                        bool found = false;
+                        if (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_RECORD && fn_args[1] && fn_args[1]->kind == V_STRING)
+                            for (int i = 0; i < fn_args[0]->as.record.count; i++)
+                                if (strcmp(fn_args[0]->as.record.keys[i], fn_args[1]->as.string) == 0) { found = true; break; }
+                        stack_push(&vm->stack, val_bool(found));
+                    } else if (strcmp(name, "mapKeys") == 0) {
+                        Value *lst = val_null(); lst->kind = V_LIST;
+                        if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_RECORD) {
+                            lst->as.list.count = fn_args[0]->as.record.count;
+                            lst->as.list.items = calloc(lst->as.list.count, sizeof(Value*));
+                            for (int i = 0; i < lst->as.list.count; i++)
+                                lst->as.list.items[i] = val_string(fn_args[0]->as.record.keys[i]);
+                        }
+                        stack_push(&vm->stack, lst);
+                    } else if (strcmp(name, "mapValues") == 0) {
+                        Value *lst = val_null(); lst->kind = V_LIST;
+                        if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_RECORD) {
+                            lst->as.list.count = fn_args[0]->as.record.count;
+                            lst->as.list.items = calloc(lst->as.list.count, sizeof(Value*));
+                            for (int i = 0; i < lst->as.list.count; i++)
+                                lst->as.list.items[i] = fn_args[0]->as.record.vals[i];
+                        }
+                        stack_push(&vm->stack, lst);
+                    } else if (strcmp(name, "mapRemove") == 0) {
+                        if (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_RECORD && fn_args[1] && fn_args[1]->kind == V_STRING) {
+                            Value *m = fn_args[0];
+                            int idx = -1;
+                            for (int i = 0; i < m->as.record.count; i++)
+                                if (strcmp(m->as.record.keys[i], fn_args[1]->as.string) == 0) { idx = i; break; }
+                            if (idx >= 0) {
+                                free(m->as.record.keys[idx]);
+                                for (int i = idx; i < m->as.record.count - 1; i++) { m->as.record.keys[i] = m->as.record.keys[i+1]; m->as.record.vals[i] = m->as.record.vals[i+1]; }
+                                m->as.record.count--;
+                            }
+                            stack_push(&vm->stack, m);
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "jsonStringify") == 0) {
+                        char buf[4096] = "";
+                        if (arg >= 1 && fn_args[0]) {
+                            FILE *tmpf = tmpfile();
+                            if (tmpf) { val_print(tmpf, fn_args[0]); fflush(tmpf); long sz = ftell(tmpf); fseek(tmpf, 0, SEEK_SET); fread(buf, 1, sz < 4095 ? sz : 4095, tmpf); buf[sz<4095?sz:4095] = 0; fclose(tmpf); }
+                        }
+                        stack_push(&vm->stack, val_string(buf));
+                    } else if (strcmp(name, "jsonParse") == 0) {
+                        /* Simple JSON parse: just return the string as-is for now */
+                        if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_STRING)
+                            stack_push(&vm->stack, val_string(fn_args[0]->as.string));
                         else stack_push(&vm->stack, val_null());
-                    } else if (strcmp(name, "textContains") == 0 || strcmp(name, "textStartsWith") == 0 || strcmp(name, "textEndsWith") == 0 || strcmp(name, "textIndexOf") == 0 || strcmp(name, "textSlice") == 0) {
-                        stack_push(&vm->stack, val_null());
-                    } else if (strcmp(name, "mapNew") == 0 || strcmp(name, "mapPut") == 0 || strcmp(name, "mapGet") == 0 || strcmp(name, "mapHas") == 0 || strcmp(name, "mapKeys") == 0 || strcmp(name, "mapValues") == 0 || strcmp(name, "mapRemove") == 0) {
-                        stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "writeText") == 0) {
+                        if (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_STRING && fn_args[1] && fn_args[1]->kind == V_STRING) {
+                            FILE *wf = fopen(fn_args[0]->as.string, "w");
+                            if (wf) { fputs(fn_args[1]->as.string, wf); fclose(wf); stack_push(&vm->stack, fn_args[1]); }
+                            else stack_push(&vm->stack, val_null());
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "listFiles") == 0) {
+                        /* Return empty list on Windows — directory listing needs platform code */
+                        Value *lst = val_null(); lst->kind = V_LIST;
+                        lst->as.list.items = NULL; lst->as.list.count = 0;
+#ifdef __unix__
+                        if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            FILE *pp = popen("ls", "r"); /* simplified */
+                            if (pp) { /* TODO: real directory listing */ pclose(pp); }
+                        }
+#endif
+                        stack_push(&vm->stack, lst);
+                    } else if (strcmp(name, "listSet") == 0) {
+                        if (arg >= 3 && fn_args[0] && fn_args[0]->kind == V_LIST) {
+                            int idx = (int)to_number(fn_args[1]);
+                            if (idx >= 0 && idx < fn_args[0]->as.list.count)
+                                fn_args[0]->as.list.items[idx] = fn_args[2];
+                            stack_push(&vm->stack, fn_args[0]);
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "listSlice") == 0) {
+                        if (arg >= 3 && fn_args[0] && fn_args[0]->kind == V_LIST) {
+                            int start = (int)to_number(fn_args[1]);
+                            int end = (int)to_number(fn_args[2]);
+                            Value *lst = val_null(); lst->kind = V_LIST;
+                            int cnt = fn_args[0]->as.list.count;
+                            if (start < 0) start = cnt + start;
+                            if (end < 0) end = cnt + end;
+                            if (start < 0) start = 0;
+                            if (end > cnt) end = cnt;
+                            int n = (end > start) ? end - start : 0;
+                            lst->as.list.items = calloc(n, sizeof(Value*));
+                            lst->as.list.count = n;
+                            for (int i = 0; i < n; i++) lst->as.list.items[i] = fn_args[0]->as.list.items[start + i];
+                            stack_push(&vm->stack, lst);
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "listConcat") == 0) {
+                        Value *lst = val_null(); lst->kind = V_LIST;
+                        int total = 0;
+                        for (int i = 0; i < arg; i++)
+                            if (fn_args[i] && fn_args[i]->kind == V_LIST) total += fn_args[i]->as.list.count;
+                        lst->as.list.items = calloc(total, sizeof(Value*));
+                        lst->as.list.count = total;
+                        int pos = 0;
+                        for (int i = 0; i < arg; i++)
+                            if (fn_args[i] && fn_args[i]->kind == V_LIST)
+                                for (int j = 0; j < fn_args[i]->as.list.count; j++)
+                                    lst->as.list.items[pos++] = fn_args[i]->as.list.items[j];
+                        stack_push(&vm->stack, lst);
+                    } else if (strcmp(name, "listInsert") == 0) {
+                        if (arg >= 3 && fn_args[0] && fn_args[0]->kind == V_LIST) {
+                            Value *lst = fn_args[0];
+                            int idx = (int)to_number(fn_args[1]);
+                            if (idx < 0) idx = lst->as.list.count + idx;
+                            if (idx < 0) idx = 0;
+                            if (idx > lst->as.list.count) idx = lst->as.list.count;
+                            lst->as.list.items = realloc(lst->as.list.items, (lst->as.list.count+1)*sizeof(Value*));
+                            for (int i = lst->as.list.count; i > idx; i--) lst->as.list.items[i] = lst->as.list.items[i-1];
+                            lst->as.list.items[idx] = fn_args[2];
+                            lst->as.list.count++;
+                            stack_push(&vm->stack, lst);
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "listRemove") == 0) {
+                        if (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_LIST) {
+                            Value *lst = fn_args[0];
+                            int idx = (int)to_number(fn_args[1]);
+                            if (idx < 0) idx = lst->as.list.count + idx;
+                            if (idx >= 0 && idx < lst->as.list.count) {
+                                for (int i = idx; i < lst->as.list.count - 1; i++) lst->as.list.items[i] = lst->as.list.items[i+1];
+                                lst->as.list.count--;
+                            }
+                            stack_push(&vm->stack, lst);
+                        } else stack_push(&vm->stack, val_null());
                     } else if (strcmp(name, "httpGet") == 0 || strcmp(name, "httpPostJson") == 0) {
                         stack_push(&vm->stack, val_string("{}"));
                     } else if (strcmp(name, "processRun") == 0 || strcmp(name, "processRunJson") == 0) {
                         stack_push(&vm->stack, val_string("{}"));
-                    } else if (strcmp(name, "writeText") == 0 || strcmp(name, "listFiles") == 0 || strcmp(name, "listSet") == 0 || strcmp(name, "listSlice") == 0 || strcmp(name, "listConcat") == 0 || strcmp(name, "listInsert") == 0 || strcmp(name, "listRemove") == 0) {
-                        stack_push(&vm->stack, val_null());
                     } else if (name[0] >= 'A' && name[0] <= 'Z') {
                         /* Ok(value) → Result, Err(value) → Result, others → Variant */
                         Value *r = val_null();
@@ -709,7 +925,76 @@ static bool vm_load(VM *vm, const char *path) {
     for (int i = 0; i < vm->global_count; i++) vm->global_names[i] = read_string(f);
 
     /* effects */ { uint32_t n = read_u32(f); for (uint32_t i = 0; i < n; i++) free(read_string(f)); }
-    /* imports */  { uint32_t n = read_u32(f); for (uint32_t i = 0; i < n; i++) free(read_string(f)); }
+    /* imports — resolve and load imported .mbc files from same directory */
+    {
+        uint32_t n = read_u32(f);
+        char dir[256] = "";
+        const char *slash = strrchr(path, '/');
+        if (!slash) slash = strrchr(path, '\\');
+        if (slash) { memcpy(dir, path, slash - path + 1); dir[slash - path + 1] = 0; }
+        for (uint32_t i = 0; i < n; i++) {
+            char *imp = read_string(f);
+            char *dot = strrchr(imp, '.');
+            if (dot) {
+                const char *base = strrchr(imp, '/');
+                if (!base) base = strrchr(imp, '\\');
+                if (base) base++; else base = imp;
+                char mbc_path[512];
+                snprintf(mbc_path, sizeof(mbc_path), "%s%s", dir, base);
+                char *ext = strrchr(mbc_path, '.');
+                if (ext) strcpy(ext, ".mbc");
+                FILE *impf = fopen(mbc_path, "rb");
+                if (impf) {
+                    char magic[4]; fread(magic, 1, 4, impf);
+                    if (memcmp(magic, "MOSS", 4) == 0) {
+                        read_u32(impf); /* version */
+                        char *mn = read_string(impf); free(mn);
+                        char *sp = read_string(impf); free(sp);
+                        int32_t ng = (int32_t)read_u32(impf);
+                        for (int32_t j = 0; j < ng; j++) free(read_string(impf));
+                        { uint32_t en = read_u32(impf); for (uint32_t j=0;j<en;j++) free(read_string(impf)); }
+                        { uint32_t in = read_u32(impf); for (uint32_t j=0;j<in;j++) free(read_string(impf)); }
+                        { uint32_t tn = read_u32(impf); for (uint32_t j=0;j<tn;j++) free(read_string(impf)); }
+                        char *cn = read_string(impf); free(cn);
+                        read_u32(impf); read_u32(impf);
+                        { uint8_t d; fread(&d,1,1,impf); }
+                        read_u32(impf); read_u32(impf);
+                        int32_t ilc = (int32_t)read_u32(impf);
+                        for (int32_t j=0;j<ilc;j++) free(read_string(impf));
+                        { uint32_t cl=read_u32(impf); char*cb=malloc(cl+1);fread(cb,1,cl,impf);free(cb); }
+                        { uint32_t ic=read_u32(impf); for(uint32_t j=0;j<ic;j++){fgetc(impf);for(int k=0;k<5;k++)read_u32(impf);} }
+                        int32_t fn = (int32_t)read_u32(impf);
+                        for (int32_t j=0;j<fn;j++) {
+                            char *fn_name = read_string(impf);
+                            int32_t fn_argc = (int32_t)read_u32(impf);
+                            read_u32(impf);
+                            { uint8_t d; fread(&d,1,1,impf); }
+                            read_u32(impf); read_u32(impf);
+                            int32_t flc = (int32_t)read_u32(impf);
+                            char **fln = calloc(flc,sizeof(char*));
+                            for (int32_t k=0;k<flc;k++) fln[k]=read_string(impf);
+                            Value **fco=NULL; int32_t fcc=0;
+                            { uint32_t cl=read_u32(impf); char*cb=malloc(cl+1);fread(cb,1,cl,impf);cb[cl]=0;
+                              for(uint32_t k=0;k<cl;k++)if(cb[k]==',')fcc++; fcc++;
+                              fco=calloc(fcc,sizeof(Value*)); int ci=0;
+                              char*p=cb; while(*p&&ci<fcc){while(*p==' '||*p=='['||*p==']'||*p==',')p++;
+                              if(*p=='"'){p++;char*s=p;while(*p&&*p!='"')p++;*p=0;p++;fco[ci++]=val_string(s);}
+                              else if(*p=='-'||(*p>='0'&&*p<='9')){fco[ci++]=val_number(atof(p));while(*p&&*p!=','&&*p!=']')p++;}
+                              else if(*p=='n'&&strncmp(p,"null",4)==0){fco[ci++]=val_null();p+=4;}
+                              else if(*p=='t'&&strncmp(p,"true",4)==0){fco[ci++]=val_bool(true);p+=4;}
+                              else if(*p=='f'&&strncmp(p,"false",5)==0){fco[ci++]=val_bool(false);p+=5;}
+                              else p++;} fcc=ci; free(cb); }
+                            Instructions fi = read_instructions(impf);
+                            vm_register_func(fn_name, fi, fn_argc, flc, fln, fco, fcc);
+                            free(fn_name);
+                        }
+                    }
+                    fclose(impf);
+                }
+            }
+            free(imp);
+        }
+    }
     /* tests */    { uint32_t n = read_u32(f); for (uint32_t i = 0; i < n; i++) free(read_string(f)); }
 
     /* code object */
@@ -821,6 +1106,8 @@ static Value *vm_resolve_global(VM *vm, int idx) {
     if (gn) {
         g = vm_builtin_by_name(gn);
         if (g) return g;
+        /* Check function registry for imported functions */
+        if (vm_find_func(gn) >= 0) return val_string(gn);
         /* Auto-create variants for capitalized names */
         if (*gn >= 'A' && *gn <= 'Z') return val_variant(gn);
     }
