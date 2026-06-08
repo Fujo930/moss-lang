@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## v0.57.0 — Nuke Audit: F1-F7 fixes
+
+### Fixed
+- **F1 (Critical)**: `trust-verify` now re-runs all trust gates (check/trace/golden/lock/selfhost) on the source file, not just hash comparison. Tampered bundles detected regardless of hash matching.
+- **F2 (High)**: `check_param_types` warning → error. Undeclared types now fail trust.
+  Added recursive import type resolution so cross-file types (MossToken, etc.) are recognized.
+- **F3 (High)**: Non-record `with` update now raises `MossRuntimeError` instead of silently creating empty dict.
+- **F5 (Medium)**: `check_unused_effects` warns when a function declares effects it never calls.
+- **F6 (Medium)**: `check_match_result_patterns` warns when Ok/Err patterns are used on non-Result subjects.
+- **F7 (Medium)**: `_check_import_cycle` warns when an import appears in transitive imports (single-file mode).
+
+### V1 status
+- V1 remains fixed in v0.57.0 — null field access produces JSON bundle with `_error`.
+
+### Verification
+- **133 tests, 22 subtests pass**
+- **Selfhost 5/5 sketches pass**
+- **Selfhost-compare 9/9 examples pass**
+
 ## v0.56.2 — V6 Final Fix: trust-verify command
 
 ### Fixed

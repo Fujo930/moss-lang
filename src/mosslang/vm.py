@@ -322,7 +322,10 @@ class VM:
                 if isinstance(base, dict):
                     result = dict(base)
                 else:
-                    result = {}
+                    raise MossRuntimeError(
+                        f"record update requires a record, got {type(base).__name__} "
+                        f"in '{frame.code.name}' at instruction {frame.pc - 1}"
+                    )
                 result.update(updates)
                 frame.stack.append(result)
             elif op == Opcode.MATCH_BEGIN:

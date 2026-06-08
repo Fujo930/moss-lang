@@ -1,0 +1,31 @@
+MOSS 0.56.2 NUKE AUDIT — FINAL TALLY
+=====================================
+Attack vectors: 40
+Findings: 16 (3 Critical/High, 3 Medium, 10 Low/Info)
+
+CRITICAL:
+  F1: trust-verify only checks hash, doesn't re-run gates
+
+HIGH:
+  F2: check_param_types uses WARNING not ERROR → undeclared types pass trust
+  F3: record update on non-record silently creates empty dict → data loss
+  F4: trust-verify path resolution double-concatenation
+
+MEDIUM:
+  F5: declared but unused effects → no diagnostic
+  F6: match Ok/Err on non-Result → silenty falls to wildcard
+  F7: import cycle not detected in single-file check
+  F8: transitive rule impurity via db state
+
+vs 0.54 audit:
+  8 previously reported → ALL 8 FIXED (V1-V11)
+  V10 partially: fixed crash but introduced F3 (silent data loss)
+  V11 partially: added detection but only WARNING
+
+Reports:
+  moss-fork/nuke-report.md (212 lines)
+  moss-fork/audit-report.md (240 lines, from prior audit)
+Test files:
+  nuke_tests/ (40 .moss attack files)
+  saturation_tests/ (22 from prior round)
+  audit_tests/ (16 from first round)

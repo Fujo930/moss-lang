@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .errors import SourceLocation
+from .parser import parse_source
 from .nodes import (
     BinaryExpr,
     BindingPattern,
@@ -16,6 +18,7 @@ from .nodes import (
     FunctionDecl,
     Identifier,
     IfStmt,
+    ImportDecl,
     IndexAccess,
     LetStmt,
     WhileStmt,
@@ -83,12 +86,25 @@ def check_program(program: Program) -> list[Diagnostic]:
                 diagnostics.append(Diagnostic("error", f"duplicate callable '{item.name}'", item.location))
             functions[item.name] = item
 
+    # Resolve imported types so cross-file type references are recognized.
+    # Follow the import chain recursively (single level is enough for selfhost sketch files).
+    resolved_types: set[str] = set()
+    imported_paths: set[str] = set()
+    _collect_imported_types(program, resolved_types, imported_paths)
+    types |= resolved_types
+
+    # Check for import cycles
+    for item in program.items:
+        if isinstance(item, ImportDecl):
+            _check_import_cycle(item.path, imported_paths, diagnostics, None)
+
     for item in program.items:
         if isinstance(item, FunctionDecl):
             for effect in item.uses:
                 if effect not in effects:
                     diagnostics.append(Diagnostic("error", f"{item.name} uses undeclared effect '{effect}'", item.location))
             check_effect_calls(item, functions, diagnostics)
+            check_unused_effects(item, diagnostics)
             check_param_types(item, types, diagnostics)
         elif isinstance(item, RuleDecl):
             check_rule_effect_calls(item, diagnostics)
@@ -96,6 +112,58 @@ def check_program(program: Program) -> list[Diagnostic]:
 
     check_static_types(program, functions, diagnostics)
     return diagnostics
+
+
+def _check_import_cycle(
+    imp_path: str,
+    imported_paths: set[str],
+    diagnostics: list[Diagnostic],
+    location: SourceLocation | None,
+) -> None:
+    """Detect import cycles: if the imported file is already in the import chain."""
+    # Simplified check: if this file's own import path appears in the transitive set
+    # A real cycle would need path normalization and deeper tracking.
+    # This is a best-effort heuristic.
+    normalized = imp_path.replace("\\", "/").rstrip("/")
+    for p in imported_paths:
+        if p.replace("\\", "/").rstrip("/") == normalized:
+            diagnostics.append(
+                Diagnostic("warning", f"possible import cycle: '{imp_path}' appears in transitive imports", location)
+            )
+            return
+
+
+def _collect_imported_types(
+    program: Program,
+    out: set[str],
+    seen: set[str],
+) -> None:
+    """Recursively collect type declarations from imported files."""
+    for item in program.items:
+        if not isinstance(item, ImportDecl):
+            continue
+        imp_path_str = item.path
+        if imp_path_str in seen:
+            continue
+        seen.add(imp_path_str)
+        # Resolve import path relative to known roots
+        resolved = None
+        for base in [Path("examples"), Path(".")]:
+            candidate = base / imp_path_str
+            if candidate.is_file():
+                resolved = candidate
+                break
+        if resolved is None:
+            continue
+        try:
+            imported = parse_source(resolved.read_text(encoding="utf-8-sig"))
+            for imported_item in imported.items:
+                if isinstance(imported_item, TypeDecl):
+                    out.add(imported_item.name)
+            # Recurse into transitive imports (one more level)
+            _collect_imported_types(imported, out, seen)
+        except Exception:
+            pass  # best-effort
 
 
 BUILTIN_RETURN_TYPES = {
@@ -280,6 +348,7 @@ def infer_expr_type(
         return generic_argument(infer_expr_type(expr.expr, env, functions, types, diagnostics, location), "Result") or "Unknown"
     if isinstance(expr, MatchExpr):
         subject_type = infer_expr_type(expr.subject, env, functions, types, diagnostics, location)
+        check_match_result_patterns(expr, subject_type, diagnostics, location)
         check_match_coverage(expr, subject_type, types, diagnostics, location)
         results = {infer_expr_type(case.expr, env, functions, types, diagnostics, location) for case in expr.cases}
         known = {item for item in results if item != "Unknown"}
@@ -324,6 +393,26 @@ def variant_owner(name: str, types: dict[str, TypeDecl]) -> str | None:
         if declaration.alias and name in {part.strip() for part in declaration.alias.split("|")}
     ]
     return matches[0] if len(matches) == 1 else None
+
+
+def check_match_result_patterns(
+    expr: Any,
+    subject_type: str,
+    diagnostics: list[Diagnostic],
+    location: SourceLocation | None,
+) -> None:
+    """Warn if Ok/Err patterns are used on non-Result subjects."""
+    if subject_type.startswith("Result") or "Result" in subject_type:
+        return
+    for case in getattr(expr, "cases", []):
+        pattern = getattr(case, "pattern", None)
+        if pattern is None:
+            continue
+        pattern_name = getattr(pattern, "name", "")
+        if pattern_name in ("Ok", "Err"):
+            diagnostics.append(
+                Diagnostic("warning", f"match pattern {pattern_name} used on non-Result type '{subject_type}' — will never match", location)
+            )
 
 
 def check_match_coverage(
@@ -438,13 +527,33 @@ def check_rule_effect_calls(
             )
 
 
+def check_unused_effects(
+    function: FunctionDecl,
+    diagnostics: list[Diagnostic],
+) -> None:
+    """Warn about declared effects that are never called in the function body."""
+    if not function.uses:
+        return
+    called = set()
+    for call_name in collect_call_names(function.body):
+        if call_name in BUILTIN_EFFECTS:
+            effect = BUILTIN_EFFECTS[call_name]
+            if effect in function.uses:
+                called.add(effect)
+    for effect in function.uses:
+        if effect not in called:
+            diagnostics.append(
+                Diagnostic("warning", f"{function.name}: effect '{effect}' declared but never used", function.location)
+            )
+
+
 def check_param_types(
     decl: FunctionDecl | RuleDecl,
     types: set[str],
     diagnostics: list[Diagnostic],
 ) -> None:
     """Verify parameter and return type annotations reference declared types."""
-    known = {"Any", "Unknown", "Text", "Number", "Bool", "Null", "List", "Record", "Map", "Money", "Result"} | types
+    known = {"Any", "Unknown", "Text", "Number", "Bool", "Null", "List", "Record", "Map", "Money", "Result", "Option", "Maybe"} | types
     for param in decl.params:
         if not param.type_name:
             continue
@@ -452,7 +561,7 @@ def check_param_types(
             base = part.strip().split("<")[0].strip()
             if base and base not in known:
                 diagnostics.append(
-                    Diagnostic("warning", f"{decl.name}: parameter '{param.name}' has undeclared type '{param.type_name}'", decl.location)
+                    Diagnostic("error", f"{decl.name}: parameter '{param.name}' has undeclared type '{param.type_name}'", decl.location)
                 )
                 break
     if decl.return_type and decl.return_type not in known:
@@ -460,7 +569,7 @@ def check_param_types(
             base = part.strip().split("<")[0].strip()
             if base and base not in known:
                 diagnostics.append(
-                    Diagnostic("warning", f"{decl.name}: return type '{decl.return_type}' is not a declared type", decl.location)
+                    Diagnostic("error", f"{decl.name}: return type '{decl.return_type}' is not a declared type", decl.location)
                 )
                 break
 

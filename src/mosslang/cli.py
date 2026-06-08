@@ -746,7 +746,7 @@ def run_golden(path: Path, *, update: bool = False) -> int:
 
 
 def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) -> int:
-    """Verify a trust bundle JSON against its source file."""
+    """Verify a trust bundle by re-running all trust gates on the source file."""
     import hashlib
 
     try:
@@ -756,50 +756,65 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) 
         return 1
 
     file_path = bundle.get("file")
-    stored_hash = bundle.get("source_sha256")
     if not file_path:
         print("error: bundle missing 'file' field", file=sys.stderr)
-        return 1
-    if not stored_hash:
-        print("error: bundle missing 'source_sha256' field", file=sys.stderr)
         return 1
 
     source_path = source_override or Path(file_path)
     if not source_path.is_absolute():
-        # Try relative to bundle, then relative to cwd
-        candidate = bundle_path.parent / source_path
-        if candidate.is_file():
-            source_path = candidate
-        else:
-            candidate = Path.cwd() / source_path
-            if candidate.is_file():
-                source_path = candidate
-    if not source_path.is_absolute():
-        source_path = bundle_path.parent / source_path
-
+        source_path = source_path.resolve()
     if not source_path.is_file():
         print(f"error: source file not found: {source_path}", file=sys.stderr)
         return 1
 
     source = source_path.read_text(encoding="utf-8-sig")
     actual_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    stored_hash = bundle.get("source_sha256", "")
+
+    # Re-run full trust pipeline on the source file
+    new_bundle: dict = {
+        "moss": __version__,
+        "file": source_path.as_posix(),
+        "source_sha256": actual_hash,
+        "trust": True,
+    }
+    try:
+        _build_trust_bundle(source, actual_hash, source_path, new_bundle)
+    except Exception as exc:
+        new_bundle["trust"] = False
+        new_bundle.setdefault("check", {"ok": False, "diagnostics": []})
+        new_bundle.setdefault("trace", {"ok": False, "events": []})
+        new_bundle.setdefault("golden", {"ok": False, "snapshot": None})
+        new_bundle.setdefault("lock", {"ok": None, "locked": False})
+        new_bundle.setdefault("selfhost", {"ok": False})
+        new_bundle["_error"] = {"type": type(exc).__name__, "message": str(exc)}
 
     result = {
         "bundle": bundle_path.as_posix(),
         "source": source_path.as_posix(),
-        "source_sha256_stored": stored_hash,
-        "source_sha256_computed": actual_hash,
         "hash_match": stored_hash == actual_hash,
-        "trust_stored": bundle.get("trust"),
+        "gates_trust": new_bundle.get("trust"),
+        "check_ok": new_bundle.get("check", {}).get("ok"),
+        "trace_ok": new_bundle.get("trace", {}).get("ok"),
+        "golden_ok": new_bundle.get("golden", {}).get("ok"),
+        "lock_ok": new_bundle.get("lock", {}).get("ok"),
+        "selfhost_ok": new_bundle.get("selfhost", {}).get("ok"),
+        "verified": new_bundle.get("trust", False) and stored_hash == actual_hash,
     }
 
-    if result["hash_match"]:
+    if result["verified"]:
         print(json.dumps(result, indent=2))
-        print(f"PASS: bundle hash matches source ({stored_hash[:12]}...)")
+        print(f"PASS: trust bundle verified — gates passed, hash {actual_hash[:12]}...", file=sys.stderr)
         return 0
     else:
-        print(json.dumps(result, indent=2), file=sys.stderr)
-        print(f"FAIL: hash mismatch — bundle: {stored_hash[:12]}... source: {actual_hash[:12]}...", file=sys.stderr)
+        reasons = []
+        if not result["hash_match"]:
+            reasons.append(f"hash mismatch ({stored_hash[:12]}... vs {actual_hash[:12]}...)")
+        if not result["gates_trust"]:
+            failed = [g for g in ["check", "trace", "golden", "lock", "selfhost"] if not result.get(f"{g}_ok")]
+            reasons.append(f"failed gates: {', '.join(failed)}")
+        print(json.dumps(result, indent=2))
+        print(f"FAIL: {'; '.join(reasons)}", file=sys.stderr)
         return 1
 
 
