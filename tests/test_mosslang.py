@@ -1627,6 +1627,34 @@ print(shipped.status, dbGet("A-100").status)"""
         bundle = run_trust_from_source('fn x() uses Bad { return 1 }\n')
         self.assertFalse(bundle["trust"])
 
+    def test_selfhost_tokenizer_matches_host(self) -> None:
+        """Moss self-host lexer produces equivalent token streams to host."""
+        import os
+        from pathlib import Path
+        from mosslang.selfhost import SelfHostFrontend
+        from mosslang.tokens import tokenize as host_tokenize
+
+        sf = SelfHostFrontend()
+        examples = sorted((Path(__file__).parent.parent / "examples").glob("*.moss"))
+        for p in examples:
+            with self.subTest(file=p.name):
+                src = p.read_text(encoding="utf-8-sig")
+                host = [(t.value, t.line, t.column) for t in host_tokenize(src) if t.kind != "EOF"]
+                moss = [(t.value, t.line, t.column) for t in sf.tokenize(src) if t.kind != "EOF"]
+                self.assertEqual(host, moss, f"token mismatch in {p.name}")
+
+    def test_cli_tokens_frontend_moss(self) -> None:
+        """moss tokens --frontend moss produces valid token output."""
+        import io, sys
+        from contextlib import redirect_stdout
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = cli_main(["tokens", "--frontend", "moss", "examples/order.moss"])
+        self.assertEqual(code, 0)
+        self.assertIn("IDENT", buf.getvalue())
+        self.assertIn("effect", buf.getvalue())
+
     def test_all_examples_run(self) -> None:
         """Verify all .moss examples can compile and run via VM."""
         import os

@@ -39,6 +39,9 @@ def main(argv: list[str] | None = None) -> int:
         cmd.add_argument("file", type=Path)
         if command == "check":
             cmd.add_argument("--json", action="store_true", help="emit structured diagnostics and summary")
+        if command in ("tokens", "ast"):
+            cmd.add_argument("--frontend", choices=("host", "moss"), default="host",
+                             help="use host (Python) or moss (self-host) frontend")
         if command == "trace":
             cmd.add_argument("--json", action="store_true", help="emit stable machine-readable rule trace events")
 
@@ -232,8 +235,14 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "tokens":
-            for token in tokenize(source):
-                print(repr(token))
+            if getattr(args, "frontend", "host") == "moss":
+                from .selfhost import SelfHostFrontend
+                sf = SelfHostFrontend()
+                for token in sf.tokenize(source):
+                    print(repr(token))
+            else:
+                for token in tokenize(source):
+                    print(repr(token))
             return 0
 
         program = parse_source(source)

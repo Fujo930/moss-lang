@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
-![Version: 0.6.2](https://img.shields.io/badge/version-0.6.2-4f7edb)
+![Version: 0.7.0](https://img.shields.io/badge/version-0.7.0-4f7edb)
 ![Built by DeepSeek](https://img.shields.io/badge/built%20by-DeepSeek-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -189,6 +189,7 @@ moss project-init <directory> [--name <package-name>]
 moss run <file.moss>
 moss test <file.moss>
 moss tokens <file.moss>
+moss tokens <file.moss> --frontend moss
 moss ast <file.moss>
 moss trace <file.moss>
 moss trace --json <file.moss>
@@ -256,8 +257,9 @@ expression and match-pattern ASTs across all root example programs.
 
 ## Project status
 
-This is version `0.6.2`: Studio now includes a Trust tab — write code in the
-editor, click Trust, and see the five-gate verification report inline.
+This is version `0.7.0`: the Moss-written lexer is now an active frontend.
+`moss tokens --frontend moss` uses Moss's own tokenizer, and its output is
+verified bit-exact against the Python host tokenizer.
 with short-circuit `and`/`or`, VM trace support, and consistent behaviour across
 all commands that execute Moss code.
 The repository is released under the MIT License.
