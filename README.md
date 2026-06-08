@@ -185,6 +185,7 @@ moss project-format <dir> [--check]
 moss format <file.moss> [--check]
 moss golden <file.moss> [--update]
 moss docs <file.moss> [--output <path>]
+moss bench <file.moss> [-n iterations]
 moss studio [--host HOST] [--port PORT]
 moss playground [--host HOST] [--port PORT]
 moss repl
