@@ -89,6 +89,8 @@ def check_program(program: Program) -> list[Diagnostic]:
                 if effect not in effects:
                     diagnostics.append(Diagnostic("error", f"{item.name} uses undeclared effect '{effect}'", item.location))
             check_effect_calls(item, functions, diagnostics)
+        elif isinstance(item, RuleDecl):
+            check_rule_effect_calls(item, diagnostics)
 
     check_static_types(program, functions, diagnostics)
     return diagnostics
@@ -419,6 +421,19 @@ def check_effect_calls(
                 diagnostics.append(
                     Diagnostic("error", f"{function.name} calls {call_name} but is missing effect(s): {joined}", function.location)
                 )
+
+
+def check_rule_effect_calls(
+    rule: RuleDecl,
+    diagnostics: list[Diagnostic],
+) -> None:
+    """Rules must be pure — they cannot call any effect builtin functions."""
+    for call_name in collect_expr_calls(rule.expr):
+        if call_name in BUILTIN_EFFECTS:
+            effect = BUILTIN_EFFECTS[call_name]
+            diagnostics.append(
+                Diagnostic("error", f"rule '{rule.name}' calls {call_name} ({effect}); rules must be pure", rule.location)
+            )
 
 
 def collect_call_names(nodes: list[Any]) -> list[str]:

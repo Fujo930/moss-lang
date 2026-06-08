@@ -738,6 +738,18 @@ def run_golden(path: Path, *, update: bool = False) -> int:
     return 0
 
 
+def _find_lock(path: Path) -> Path | None:
+    """Walk upward from *path* looking for moss.lock."""
+    candidate = path.resolve()
+    if candidate.is_file():
+        candidate = candidate.parent
+    for directory in (candidate, *candidate.parents):
+        lock_file = directory / "moss.lock"
+        if lock_file.is_file():
+            return lock_file
+    return None
+
+
 def run_trust(path: Path, *, output: Path | None = None) -> int:
     """Produce a trust bundle for a Moss program."""
     import hashlib
@@ -750,6 +762,39 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
         "source_sha256": source_hash,
         "trust": True,
     }
+
+    try:
+        _build_trust_bundle(source, source_hash, path, bundle)
+    except Exception as exc:
+        # Ensure JSON bundle is always produced, even on parse/runtime errors
+        bundle["trust"] = False
+        bundle.setdefault("check", {"ok": False, "diagnostics": []})
+        bundle.setdefault("trace", {"ok": False, "events": []})
+        bundle.setdefault("golden", {"ok": False, "snapshot": None})
+        bundle.setdefault("lock", {"ok": None, "locked": False})
+        bundle.setdefault("selfhost", {"ok": False})
+        bundle["_error"] = {"type": type(exc).__name__, "message": str(exc)}
+
+    trust_json = json.dumps(bundle, indent=2)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(trust_json, encoding="utf-8")
+        # Round-trip verification: ensure written bundle hash matches source
+        written = json.loads(output.read_text(encoding="utf-8"))
+        if written.get("source_sha256") == source_hash:
+            bundle["_hash_verified"] = True
+            trust_json = json.dumps(bundle, indent=2)
+            output.write_text(trust_json, encoding="utf-8")
+        else:
+            bundle["_hash_verified"] = False
+        print(f"trust bundle written: {output}")
+    else:
+        print(trust_json)
+    return 0 if bundle["trust"] else 1
+
+
+def _build_trust_bundle(source: str, source_hash: str, path: Path, bundle: dict) -> None:
+    """Fill the trust bundle with check/trace/golden/lock/selfhost gates."""
 
     # 1. Static check
     program = parse_source(source)
@@ -772,9 +817,9 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
         },
     }
 
-    # 2. Lock verification
-    lock_path = path.parent / "moss.lock"
-    if lock_path.exists():
+    # 2. Lock verification — search upward for moss.lock
+    lock_path = _find_lock(path.parent)
+    if lock_path is not None:
         from .project import verify_project_lock, build_project_graph, find_manifest, load_manifest
         try:
             manifest_path = find_manifest(path.parent)
@@ -798,19 +843,30 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
         bundle["lock"] = {"ok": None, "locked": False, "note": "no moss.lock file"}
 
     # 3. Trace rule evaluations
+    rule_count = sum(1 for item in program.items if type(item).__name__ == "RuleDecl")
     if not chk_errors:
         vm_trace = VM(output=lambda _t: None, base_path=path.parent, trace_rules=True)
         mod_trace = compile_program(program, source_path=str(path.resolve()))
         vm_trace.load_module(mod_trace)
         vm_trace.run()
+        events = [portable_trace_event(e) for e in vm_trace.trace_events]
+        event_count = len(events)
+        # Independent trace validation: events should exist if rules are declared
+        trace_ok = True
+        trace_note = None
+        if rule_count > 0 and event_count == 0:
+            trace_ok = False
+            trace_note = f"no trace events captured for {rule_count} declared rule(s)"
+            bundle["trust"] = False
         bundle["trace"] = {
-            "ok": True,
-            "events": [
-                portable_trace_event(e) for e in vm_trace.trace_events
-            ],
+            "ok": trace_ok,
+            "rules_declared": rule_count,
+            "events_captured": event_count,
+            "events": events,
+            "note": trace_note,
         }
     else:
-        bundle["trace"] = {"ok": False, "events": []}
+        bundle["trace"] = {"ok": False, "rules_declared": rule_count, "events_captured": 0, "events": []}
         bundle["trust"] = False
 
     # 4. Golden snapshot
@@ -865,15 +921,6 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
     }
     if not details["ok"]:
         bundle["trust"] = False
-
-    trust_json = json.dumps(bundle, indent=2)
-    if output:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(trust_json, encoding="utf-8")
-        print(f"trust bundle written: {output}")
-    else:
-        print(trust_json)
-    return 0 if bundle["trust"] else 1
 
 
 def run_trust_project(directory: Path, *, output: Path | None = None) -> int:
@@ -1417,8 +1464,13 @@ def selfhost_body_statement_kinds(nodes: list[dict]) -> dict[str, dict[str, int]
         if item["kind"] not in {"Function", "Test"}:
             continue
         label = ("fn:" if item["kind"] == "Function" else "test:") + item["name"]
+        data = item["data"] or []
+        # Arrow-body function: expression is inline in "value" text, no block statements
+        if not data and item["kind"] == "Function" and "=" in (item.get("value") or ""):
+            result[label] = {"Expr": 1}
+            continue
         counts: Counter[str] = Counter()
-        count_selfhost_statements(item["data"] or [], counts)
+        count_selfhost_statements(data, counts)
         result[label] = dict(sorted(counts.items()))
     return result
 

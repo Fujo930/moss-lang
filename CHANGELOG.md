@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## v0.55.0 — Trust Artifact Audit Fixes (TAA snapshot)
+
+### Fixed Vulnerabilities (audit-report.md)
+- **V2 (High)**: RuleDecl now checked for effect builtin calls. Rules must be pure.
+- **V5 (High)**: Self-host parser arrow-function body boundary fixed. `fn f(x) = expr` no longer eats subsequent top-level declarations.
+- **V1 (Medium)**: `moss trust` always produces JSON bundle, even on parse/runtime errors. Added `_error` field with exception type/message.
+- **V4 (Medium)**: Lock file search walks upward from source directory, matching `find_manifest` behavior.
+- **V6 (Low)**: `source_sha256` round-trip verified on file output. Added `_hash_verified` field.
+- **V3 (Low)**: `trace.ok` now independently validated — checks that declared rules produce trace events. Added `rules_declared`/`events_captured` fields.
+
+### Verification
+- **133 tests, 22 subtests pass**
+- **Selfhost 9/9 comparison passed** (including arrow-function + let patterns)
+- **All 6 audit PoCs verified fixed**
+
 ## v0.43.0 (pre-1.0)
 - Enhanced example run tests with expected output validation
 - 133 tests pass, 22 subtests

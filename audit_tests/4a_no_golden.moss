@@ -1,0 +1,5 @@
+// Test: no .golden file exists — golden.ok should be null
+fn main() {
+  print("hello from no-golden test")
+}
+main()

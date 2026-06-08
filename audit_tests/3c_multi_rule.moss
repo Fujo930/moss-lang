@@ -1,0 +1,24 @@
+// Rule with multiple calls to test event ordering and completeness
+effect Database
+
+type Order =
+  id: Text
+  status: Pending | Paid | Shipped
+  total: Money
+
+rule canShip(order: Order) -> Bool =
+  order.status == Paid and order.total > 0.usd
+
+rule needsReview(order: Order) -> Bool =
+  order.total > 100.usd
+
+fn ship(order: Order) uses Database {
+  require canShip(order) else print("cannot ship")
+  require needsReview(order) else print("no review needed")
+  dbPut(order.id, order)
+}
+
+let o1 = { id: "A", status: Paid, total: 50.usd }
+let o2 = { id: "B", status: Pending, total: 200.usd }
+ship(o1)
+ship(o2)

@@ -1,0 +1,5 @@
+effect Database
+
+fn bad() uses NonExistentEffect {
+  print("hello")
+}

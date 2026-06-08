@@ -1,0 +1,5 @@
+// Test: golden file exists and matches
+fn main() {
+  print("golden match output")
+}
+main()

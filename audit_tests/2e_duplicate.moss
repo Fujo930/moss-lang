@@ -1,0 +1,13 @@
+type Order =
+  id: Text
+
+type Order =
+  id: Text
+
+fn foo() {
+  print("first")
+}
+
+fn foo() {
+  print("second")
+}
