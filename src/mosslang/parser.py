@@ -4,8 +4,6 @@ from decimal import Decimal
 
 from .errors import MossSyntaxError
 from .nodes import (
-    LambdaExpr,
-    Param,
     AssignStmt,
     BinaryExpr,
     CallExpr,
@@ -28,6 +26,7 @@ from .nodes import (
     MatchCase,
     MatchExpr,
     NumberLiteral,
+    Param,
     Program,
     RecordLiteral,
     RecordUpdate,
@@ -338,22 +337,6 @@ class Parser:
                     self.expect_value("=")
                     updates[field] = self.parse_expression()
             return RecordUpdate(expr, updates, getattr(expr, "location", None))
-        # Pipe operator: expr |> fn(args) -> fn(expr, args)
-        while self.check_value("|>"):
-            self.advance()
-            if not self.match("IDENT"):
-                raise self.error("expected function name after |>")
-            callee = Identifier(self.previous().value)
-            if self.match_value("("):
-                args = [expr]
-                if not self.match_value(")"):
-                    args.append(self.parse_expression())
-                    while self.match_value(","):
-                        args.append(self.parse_expression())
-                    self.expect_value(")")
-                expr = CallExpr(callee, args, getattr(expr, "location", None))
-            else:
-                expr = CallExpr(callee, [expr], getattr(expr, "location", None))
         return expr
 
     def parse_or(self) -> object:
@@ -454,8 +437,6 @@ class Parser:
             return expr
 
     def parse_primary(self) -> object:
-        if self.match_kind("LAMBDA"):
-            return self.parse_lambda()
         if self.match_kind("NUMBER"):
             return NumberLiteral(Decimal(self.previous().value), self.previous().location)
 
@@ -515,17 +496,6 @@ class Parser:
             return ListLiteral(items, location)
 
         raise self.error("expected expression")
-
-    def parse_lambda(self) -> LambdaExpr:
-        params = []
-        while not self.check_value("->"):
-            name = self.expect_ident()
-            params.append(Param(name))
-            if not self.match_value(","):
-                break
-        self.expect_value("->")
-        body = self.parse_expression()
-        return LambdaExpr(params, body)
 
     def parse_match_expr(self, location) -> MatchExpr:
         subject = self.parse_expression()

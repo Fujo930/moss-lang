@@ -7,13 +7,13 @@
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
 ![Version: 0.5.0](https://img.shields.io/badge/version-0.5.0-4f7edb)
-![Built by DeepSeek](https://img.shields.io/badge/built%20by-DeepSeek-222222)
+![Built by Codex](https://img.shields.io/badge/built%20by-Codex-222222)
 
 Moss is an experimental programming language for long-lived software projects
 where humans and AI agents work on the same codebase over time.
 
 This repository is intentionally AI-built: Moss was designed, implemented,
-debugged, documented, committed, and pushed by DeepSeek in collaboration with
+debugged, documented, committed, and pushed by Codex in collaboration with
 Fujo930. The project is public as a record of that process and as a runnable
 language prototype.
 
