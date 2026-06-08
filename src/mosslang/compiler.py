@@ -133,10 +133,24 @@ class Compiler:
         for param in decl.params:
             self._register_local(param.name)
 
-        for stmt in decl.body:
+        # Compile all but last statement; last may have implicit return
+        body = decl.body
+        for stmt in body[:-1]:
             self._compile_statement(stmt)
 
-        self.emit(Opcode.LOAD_NULL)  # Default return value
+        if body:
+            last = body[-1]
+            if isinstance(last, n.ReturnStmt):
+                self._compile_statement(last)
+            elif isinstance(last, n.ExprStmt):
+                # Implicit return: compile expression, keep on stack
+                self._compile_expression(last.expr)
+            else:
+                self._compile_statement(last)
+                self.emit(Opcode.LOAD_NULL)
+        else:
+            self.emit(Opcode.LOAD_NULL)
+
         self.emit(Opcode.RETURN)
 
         self._resolve_labels()
