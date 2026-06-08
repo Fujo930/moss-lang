@@ -1308,6 +1308,9 @@ def render_expr(expr) -> str:
     if isinstance(expr, ast_nodes.MatchExpr):
         cases = ", ".join(f"{render_pattern(case.pattern)} -> {render_expr(case.expr)}" for case in expr.cases)
         return f"match {render_expr(expr.subject)} {{ {cases} }}"
+    if isinstance(expr, ast_nodes.LambdaExpr):
+        params = " ".join(p.name for p in expr.params)
+        return f"\\{params} -> {render_expr(expr.expr)}"
     raise TypeError(f"cannot render {type(expr).__name__}")
 
 
@@ -1356,6 +1359,8 @@ def normalize_host_expr(expr):
         return ("Try", normalize_host_expr(expr.expr))
     if isinstance(expr, ast_nodes.MatchExpr):
         return ("Match", normalize_host_expr(expr.subject), tuple((normalize_host_pattern(case.pattern), normalize_host_expr(case.expr)) for case in expr.cases))
+    if isinstance(expr, ast_nodes.LambdaExpr):
+        return ("Lambda", tuple(p.name for p in expr.params), normalize_host_expr(expr.expr))
     raise TypeError(type(expr).__name__)
 
 
@@ -1374,8 +1379,10 @@ def normalize_host_pattern(pattern):
 
 def normalize_selfhost_expr(expr):
     kind = expr["kind"]
-    if kind in {"Number", "Text", "Bool", "Null", "Identifier"}:
+    if kind in {"Number", "Text", "Bool", "Identifier"}:
         return (kind, expr["value"])
+    if kind == "Null":
+        return (kind, "")
     if kind == "Record":
         return (kind, tuple(sorted((key, normalize_selfhost_expr(value)) for key, value in expr["right"].items())))
     if kind == "List":

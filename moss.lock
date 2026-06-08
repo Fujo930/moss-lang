@@ -27,7 +27,7 @@
         "examples/self_host/statement_core.moss"
       ],
       "path": "examples/self_host/parser_core.moss",
-      "sha256": "4b8ac17ca719abf4d5205be8b6b21d6a55b05600306c118c49d3419a3ede3784"
+      "sha256": "02a5b0d47bd0ee164df18e902c74bffdc8586fa33e6de0b2af561a7567b0e581"
     },
     {
       "imports": [

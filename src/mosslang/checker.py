@@ -89,8 +89,10 @@ def check_program(program: Program) -> list[Diagnostic]:
                 if effect not in effects:
                     diagnostics.append(Diagnostic("error", f"{item.name} uses undeclared effect '{effect}'", item.location))
             check_effect_calls(item, functions, diagnostics)
+            check_param_types(item, types, diagnostics)
         elif isinstance(item, RuleDecl):
             check_rule_effect_calls(item, diagnostics)
+            check_param_types(item, types, diagnostics)
 
     check_static_types(program, functions, diagnostics)
     return diagnostics
@@ -434,6 +436,33 @@ def check_rule_effect_calls(
             diagnostics.append(
                 Diagnostic("error", f"rule '{rule.name}' calls {call_name} ({effect}); rules must be pure", rule.location)
             )
+
+
+def check_param_types(
+    decl: FunctionDecl | RuleDecl,
+    types: set[str],
+    diagnostics: list[Diagnostic],
+) -> None:
+    """Verify parameter and return type annotations reference declared types."""
+    known = {"Any", "Unknown", "Text", "Number", "Bool", "Null", "List", "Record", "Map", "Money", "Result"} | types
+    for param in decl.params:
+        if not param.type_name:
+            continue
+        for part in split_top_level(param.type_name, "|"):
+            base = part.strip().split("<")[0].strip()
+            if base and base not in known:
+                diagnostics.append(
+                    Diagnostic("warning", f"{decl.name}: parameter '{param.name}' has undeclared type '{param.type_name}'", decl.location)
+                )
+                break
+    if decl.return_type and decl.return_type not in known:
+        for part in split_top_level(decl.return_type, "|"):
+            base = part.strip().split("<")[0].strip()
+            if base and base not in known:
+                diagnostics.append(
+                    Diagnostic("warning", f"{decl.name}: return type '{decl.return_type}' is not a declared type", decl.location)
+                )
+                break
 
 
 def collect_call_names(nodes: list[Any]) -> list[str]:

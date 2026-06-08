@@ -284,10 +284,12 @@ fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
     value = typeFieldText(state)
     state = skipTypeContinuation(state)
   }
-  if (kind == "Function" or kind == "Test") and not textContains(value, "=") {
-    block = parseBlockStatements(state)
-    state = block.state
-    data = block.statements
+  if kind == "Function" or kind == "Test" {
+    if not textContains(value, "=") {
+      block = parseBlockStatements(state)
+      state = block.state
+      data = block.statements
+    }
   }
   return addNode(state, node(kind, name.value, value, data))
 }

@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## v0.56.0 — Saturation Audit Fixes (TAAv2)
+
+### Fixed Vulnerabilities (Round 2 — saturation_tests/)
+- **V9 (P0)**: Pipe parser `self.match("IDENT")` → `self.match_kind("IDENT")` in `parser.py`
+- **V8 (P0)**: `render_expr()` + `normalize_host_expr()` support for `LambdaExpr`
+- **V10 (P0)**: VM `RECORD_UPDATE` result always initialized, fixing chained `with` crash
+- **V7 (P1)**: `normalize_selfhost_expr` Null value unified to `""` matching host
+- **V11 (P2)**: `check_param_types()` validates parameters/return types; warnings for undeclared types
+- **V5 (P1)**: Self-host parser arrow-function body boundary fixed (arrow `=` detection in `parseNamedLine`)
+- **V6 (P3)**: `source_sha256` round-trip verified on file output (v0.55.0)
+
+### Known Limitations
+- Self-host parser single-line block bodies (`fn f() { expr }`) have empty statement data (trust correctly reports mismatch)
+- Cross-file type resolution not performed (V11 uses warnings for potentially-imported types)
+
+### Verification
+- **133 tests, 22 subtests pass**
+- **Selfhost-compare 9/9 passed** (examples/)
+- **Selfhost 5/5 sketches pass**
+
 ## v0.55.0 — Trust Artifact Audit Fixes (TAA snapshot)
 
 ### Fixed Vulnerabilities (audit-report.md)

@@ -346,7 +346,7 @@ class Parser:
         # Pipe operator: expr |> fn(args) -> fn(expr, args)
         while self.check_value("|>"):
             self.advance()
-            if not self.match("IDENT"):
+            if not self.match_kind("IDENT"):
                 raise self.error("expected function name after |>")
             callee = Identifier(self.previous().value)
             if self.match_value("("):

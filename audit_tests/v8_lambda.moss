@@ -1,0 +1,8 @@
+effect Database
+
+fn main() {
+  let double = \x -> x * 2
+  let result = double(21)
+  print(result)
+}
+main()

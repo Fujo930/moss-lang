@@ -321,7 +321,9 @@ class VM:
                 base = frame.stack.pop()
                 if isinstance(base, dict):
                     result = dict(base)
-                    result.update(updates)
+                else:
+                    result = {}
+                result.update(updates)
                 frame.stack.append(result)
             elif op == Opcode.MATCH_BEGIN:
                 pass
