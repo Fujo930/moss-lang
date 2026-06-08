@@ -1720,6 +1720,40 @@ print(shipped.status, dbGet("A-100").status)"""
                 mod = compile_program(prog, source_path=str(p))
                 self.assertIsNotNone(mod)
 
+    def test_moss_compiler_simple_programs(self) -> None:
+        """Moss-written compiler produces correct output for simple programs."""
+        from mosslang.selfhost import SelfHostFrontend, moss_compiler_to_module
+        from mosslang.parser import parse_source
+        from mosslang.compiler import compile_program
+        from mosslang.vm import VM
+        from io import StringIO
+
+        sf = SelfHostFrontend()
+        tests = [
+            ('arithmetic', 'let x = 1 + 2 * 3\nprint(x)\n', '7'),
+            ('fields', 'let p = { name: "Moss" }\nprint(p.name)\n', 'Moss'),
+            ('bools', 'let ok = true\nlet no = false\nprint(ok and not no)\n', 'true'),
+            ('let_expr', 'let a = 3\nlet b = a + 4\nprint(b)\n', '7'),
+        ]
+        for name, src, expected in tests:
+            with self.subTest(name=name):
+                moss_out = sf.compile_with_moss(src)
+                moss_mod = moss_compiler_to_module(moss_out, '<test>')
+                buf_m = StringIO(); vm_m = VM(output=buf_m.write)
+                vm_m.load_module(moss_mod); vm_m.run()
+                self.assertIn(expected, buf_m.getvalue().strip(),
+                              f"output mismatch for {name}: {buf_m.getvalue()!r}")
+
+    def test_c_vm_source_exists(self) -> None:
+        """C VM source file exists and compiles (syntax check)."""
+        import os
+        vm_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'vm', 'mossvm.c')
+        self.assertTrue(os.path.exists(vm_path), f"C VM source missing: {vm_path}")
+        source = open(vm_path, encoding='utf-8').read()
+        self.assertIn('int main', source)
+        self.assertIn('case OP_ADD', source)
+        self.assertIn('case OP_RETURN', source)
+
     def test_all_examples_run(self) -> None:
         """Verify all .moss examples can compile and run via VM."""
         import os
