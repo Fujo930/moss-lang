@@ -25,6 +25,8 @@ from .project import (
 )
 from .runtime import Runtime
 from .tokens import tokenize
+from .compiler import compile_program
+from .vm import VM
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -97,6 +99,14 @@ def main(argv: list[str] | None = None) -> int:
     studio_cmd.add_argument("--host", default="127.0.0.1")
     studio_cmd.add_argument("--port", type=int, default=8765)
 
+    compile_cmd = sub.add_parser("compile", help="compile moss source to bytecode")
+    compile_cmd.add_argument("file", type=Path)
+    compile_cmd.add_argument("--output", "-o", type=Path, help="output .mbc file path")
+
+    run_vm_cmd = sub.add_parser("run-vm", help="execute compiled bytecode module")
+    run_vm_cmd.add_argument("file", type=Path)
+    run_vm_cmd.add_argument("--source-root", type=Path, help="source root for resolving imports")
+
     args = parser.parse_args(argv)
 
     try:
@@ -144,6 +154,43 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "repl":
             return run_repl()
+
+        if args.command == "compile":
+            source = args.file.read_text(encoding="utf-8-sig")
+            program = parse_source(source)
+            diagnostics = check_program(program)
+            errors = [d for d in diagnostics if d.level == "error"]
+            if errors:
+                for d in diagnostics:
+                    print(d.format(), file=sys.stderr)
+                return 1
+            mod = compile_program(program, source_path=str(args.file.resolve()))
+            output_path = args.output or args.file.with_suffix(".mbc")
+            data = mod.serialize()
+            output_path.write_bytes(data)
+            print(f"compiled {args.file} -> {output_path}  ({len(data)} bytes)")
+            return 0
+
+        if args.command == "run-vm":
+            if args.file.suffix.lower() == ".mbc":
+                data = args.file.read_bytes()
+                from .bytecode import BytecodeModule
+                mod = BytecodeModule.deserialize(data)
+            else:
+                source = args.file.read_text(encoding="utf-8-sig")
+                program = parse_source(source)
+                diagnostics = check_program(program)
+                errors = [d for d in diagnostics if d.level == "error"]
+                if errors:
+                    for d in diagnostics:
+                        print(d.format(), file=sys.stderr)
+                    return 1
+                mod = compile_program(program, source_path=str(args.file.resolve()))
+            base = args.source_root or args.file.parent
+            vm = VM(base_path=base)
+            vm.load_module(mod)
+            vm.run()
+            return 0
 
         source = args.file.read_text(encoding="utf-8")
         if args.command == "format":

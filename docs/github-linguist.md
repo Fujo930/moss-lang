@@ -4,7 +4,7 @@ GitHub cannot display `Moss` in the repository language bar until Moss is added
 to the upstream `github-linguist/linguist` language list.
 
 The public positioning is: Moss is an AI-designed and AI-built programming
-language prototype by Codex and Fujo930. The repository contains real `.moss`
+language prototype by Codex/DeepSeek and Fujo930. The repository contains real `.moss`
 programs and self-hosting preview files, but GitHub's global language database
 does not know the language yet.
 
