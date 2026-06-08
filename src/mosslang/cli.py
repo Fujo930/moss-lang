@@ -112,17 +112,31 @@ def main(argv: list[str] | None = None) -> int:
     compile_cmd.add_argument("--frontend", choices=("host", "moss"), default="host",
                              help="use host (Python) or moss (self-host) frontend")
 
-    trust_cmd = sub.add_parser("trust", help="produce a trust bundle (check + trace + golden + lock + selfhost)")
+    trust_cmd = sub.add_parser("trust", help="produce a trust bundle (alias: artifact)")
     trust_cmd.add_argument("file", type=Path)
     trust_cmd.add_argument("--output", "-o", type=Path, help="write trust bundle to file (default: stdout)")
 
-    trust_proj_cmd = sub.add_parser("trust-project", help="produce a project-wide trust bundle")
+    trust_proj_cmd = sub.add_parser("trust-project", help="project-wide trust bundle (alias: artifact-project)")
     trust_proj_cmd.add_argument("directory", type=Path)
     trust_proj_cmd.add_argument("--output", "-o", type=Path, help="write trust bundle to file")
 
-    trust_verify_cmd = sub.add_parser("trust-verify", help="verify a trust bundle against source")
+    trust_verify_cmd = sub.add_parser("trust-verify", help="verify a trust bundle (alias: artifact-verify)")
     trust_verify_cmd.add_argument("bundle", type=Path, help="trust bundle JSON file")
     trust_verify_cmd.add_argument("--source", "-s", type=Path, help="source file (auto-detected from bundle)")
+    trust_verify_cmd.add_argument("--strict", action="store_true", help="treat warnings as errors and reject on file redirect")
+
+    art_cmd = sub.add_parser("artifact", help="produce a Trust Artifact (check + trace + golden + lock + selfhost)")
+    art_cmd.add_argument("file", type=Path)
+    art_cmd.add_argument("--output", "-o", type=Path, help="write artifact to file (default: stdout)")
+
+    art_proj_cmd = sub.add_parser("artifact-project", help="produce a project-wide Trust Artifact")
+    art_proj_cmd.add_argument("directory", type=Path)
+    art_proj_cmd.add_argument("--output", "-o", type=Path, help="write artifact to file")
+
+    art_verify_cmd = sub.add_parser("artifact-verify", help="verify a Trust Artifact against source")
+    art_verify_cmd.add_argument("bundle", type=Path, help="Trust Artifact JSON file")
+    art_verify_cmd.add_argument("--source", "-s", type=Path, help="source file (auto-detected from artifact)")
+    art_verify_cmd.add_argument("--strict", action="store_true", help="treat warnings as errors and reject on file redirect")
 
     run_vm_cmd = sub.add_parser("run-vm", help="execute compiled bytecode module")
     run_vm_cmd.add_argument("file", type=Path)
@@ -153,14 +167,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "selfhost-compare":
             return run_selfhost_compare(args.file)
 
-        if args.command == "trust":
+        if args.command in ("trust", "artifact"):
             return run_trust(args.file, output=args.output)
 
-        if args.command == "trust-project":
+        if args.command in ("trust-project", "artifact-project"):
             return run_trust_project(args.directory, output=args.output)
 
-        if args.command == "trust-verify":
-            return run_trust_verify(args.bundle, source_override=args.source)
+        if args.command in ("trust-verify", "artifact-verify"):
+            return run_trust_verify(args.bundle, source_override=args.source, strict=args.strict)
 
         if args.command == "project-check":
             return run_project_check(args.directory, json_output=args.json, locked=args.locked)
@@ -745,7 +759,7 @@ def run_golden(path: Path, *, update: bool = False) -> int:
     return 0
 
 
-def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) -> int:
+def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None, strict: bool = False) -> int:
     """Verify a trust bundle by re-running all trust gates on the source file."""
     import hashlib
 
@@ -786,6 +800,7 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) 
 
     # Re-run full trust pipeline on the source file
     new_bundle: dict = {
+        "artifact": f"Moss Trust Artifact v{__version__}",
         "moss": __version__,
         "file": source_path.as_posix(),
         "source_sha256": actual_hash,
@@ -802,10 +817,17 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) 
         new_bundle.setdefault("selfhost", {"ok": False})
         new_bundle["_error"] = {"type": type(exc).__name__, "message": str(exc)}
 
+    # Strict mode: also check for warnings in check diagnostics
+    check_has_warnings = False
+    if strict:
+        diags = new_bundle.get("check", {}).get("diagnostics", [])
+        check_has_warnings = any(d.get("level") == "warning" for d in (diags or []))
+
     result = {
         "bundle": bundle_path.as_posix(),
         "source": source_path.as_posix(),
         "bundle_file": bundle.get("file"),
+        "strict": strict,
         "hash_match": stored_hash == actual_hash,
         "file_redirected": file_redirected,
         "gates_trust": new_bundle.get("trust"),
@@ -816,7 +838,8 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) 
         "selfhost_ok": new_bundle.get("selfhost", {}).get("ok"),
         "verified": (new_bundle.get("trust", False)
                      and stored_hash == actual_hash
-                     and not file_redirected),
+                     and not file_redirected
+                     and not (strict and check_has_warnings)),
     }
 
     if result["verified"]:
@@ -829,6 +852,8 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None) 
             reasons.append(f"hash mismatch ({stored_hash[:12]}... vs {actual_hash[:12]}...)")
         if result["file_redirected"]:
             reasons.append(f"file redirected (bundle claims '{bundle.get('file')}', resolved to '{source_path.as_posix()}')")
+        if strict and check_has_warnings:
+            reasons.append("strict mode: check diagnostics contain warnings")
         if not result["gates_trust"]:
             failed = [g for g in ["check", "trace", "golden", "lock", "selfhost"] if not result.get(f"{g}_ok")]
             reasons.append(f"failed gates: {', '.join(failed)}")
@@ -856,6 +881,7 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
     source = path.read_text(encoding="utf-8-sig")
     source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
     bundle: dict = {
+        "artifact": f"Moss Trust Artifact v{__version__}",
         "moss": __version__,
         "file": path.resolve().as_posix(),
         "source_sha256": source_hash,
@@ -1045,6 +1071,7 @@ def run_trust_project(directory: Path, *, output: Path | None = None) -> int:
     lock_diags = verify_project_lock(graph)
 
     bundle: dict = {
+        "artifact": f"Moss Trust Artifact v{__version__}",
         "moss": __version__,
         "project": manifest.name,
         "root": str(directory),

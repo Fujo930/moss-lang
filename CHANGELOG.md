@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## v0.58.0 — Trust Artifact GA (TAA Final)
+
+### Moss Trust Artifact — formal release
+- **Brand**: `moss artifact` / `moss artifact-verify` / `moss artifact-project` aliases alongside legacy `trust` commands
+- **JSON**: `"artifact": "Moss Trust Artifact v0.58.0"` field in every bundle
+- **--strict**: `moss artifact-verify --strict` treats warnings as errors and rejects file redirects
+- **Spec**: `docs/trust-artifact.md` — formal Trust Artifact format specification v1.0
+- **Threat model**: `docs/threat-model.md` — complete security analysis with gate-by-gate threat model
+
+### Audit history (all fixed)
+- v0.55.0: V1-V6 (Round 1 adversarial audit)
+- v0.56.0: V7-V11 (Round 2 saturation audit)
+- v0.56.1: V5+V8 root-cause fix
+- v0.56.2: V6 trust-verify command
+- v0.57.0: F1-F7 nuke audit fixes
+- v0.57.1: F1 file-redirect hardening
+
+### Verification
+- **133 tests, 22 subtests pass**
+- **Selfhost 5/5 sketches pass**
+- **Selfhost-compare 9/9 examples pass**
+
 ## v0.57.1 — F1 file-redirect hardening + F5 confirmation
 
 ### Fixed

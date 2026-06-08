@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: experimental](https://img.shields.io/badge/self--hosting-experimental-f2c14e)
-![Version: 0.56.1](https://img.shields.io/badge/version-0.56.1-4f7edb)
+![Version: 0.58](https://img.shields.io/badge/version-0.58-4f7edb)
 ![Branch: ds-Mosslang](https://img.shields.io/badge/branch-ds--Mosslang-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -16,7 +16,7 @@ This repository is intentionally AI-built: Moss was designed, implemented,
 debugged, documented, committed, and pushed by three AIs — DeepSeek Codex,
 DeepSeek Kun, and Reasonix — in collaboration with one human, Fujo930.
 
-Version `0.56` on the `ds-Mosslang` branch is an experimental preview
+Version `0.58` on the `ds-Mosslang` branch is the Trust Artifact GA release
 containing a bytecode compiler, C VM, trust bundles, Moss-written frontend
 CLI integration, and a Playground trust report viewer. These features are
 experimental. The active interpreter and CLI still run on Python.
@@ -218,7 +218,7 @@ moss-lsp
 
 ## Project status
 
-This is version `0.56` on the `ds-Mosslang` experimental branch. It is NOT a
+This is version `0.58` on the `ds-Mosslang` Trust Artifact release branch.
 stable release. The active Moss interpreter and CLI still run on Python.
 
 Key additions on this branch:
@@ -234,7 +234,7 @@ Key additions on this branch:
 - Standard library modules
 
 Suitable claims:
-- Moss is AI-designed and AI-built by three AIs across 0.1–0.56.
+- Moss is AI-designed and AI-built by three AIs across 0.1–0.58.
 - Moss can emit structured trust bundles combining checks, traces, locks, golden outputs, and self-host comparisons.
 - Moss has begun self-hosting, but should not be described as fully self-hosted.
 - Moss has an experimental C VM. Most execution still runs on Python.

@@ -1,0 +1,7 @@
+effect Database
+effect Network
+
+fn legit() uses Database, Network {
+  print("no effects used")
+}
+legit()
