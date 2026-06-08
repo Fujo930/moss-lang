@@ -99,6 +99,10 @@ def main(argv: list[str] | None = None) -> int:
     studio_cmd.add_argument("--host", default="127.0.0.1")
     studio_cmd.add_argument("--port", type=int, default=8765)
 
+    playground_cmd = sub.add_parser("playground", help="open the Moss Playground trust report viewer")
+    playground_cmd.add_argument("--host", default="127.0.0.1")
+    playground_cmd.add_argument("--port", type=int, default=8766)
+
     compile_cmd = sub.add_parser("compile", help="compile moss source to bytecode")
     compile_cmd.add_argument("file", type=Path)
     compile_cmd.add_argument("--output", "-o", type=Path, help="output .mbc file path")
@@ -122,6 +126,12 @@ def main(argv: list[str] | None = None) -> int:
             from .studio import run_studio
 
             run_studio(args.host, args.port)
+            return 0
+
+        if args.command == "playground":
+            from .playground import run_playground
+
+            run_playground(args.host, args.port)
             return 0
 
         if args.command == "selfhost":

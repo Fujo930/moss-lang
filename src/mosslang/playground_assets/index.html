@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moss Playground — Trust This AI</title>
+<style>
+:root {
+  --moss: #71D6A2;
+  --gold: #F2C14E;
+  --blue: #8BD9F7;
+  --ink: #121916;
+  --surface: #1a2420;
+  --card: #1e2a25;
+  --text: #d4dcd6;
+  --muted: #6a7870;
+  --pass: #71D6A2;
+  --fail: #e0556a;
+  --warn: #F2C14E;
+  --border: #2a3630;
+  --radius: 8px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  background: var(--ink);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 24px; border-bottom: 1px solid var(--border);
+}
+header h1 { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.3px; }
+header h1 span { color: var(--moss); }
+header .badge { font-size: 0.7rem; background: var(--surface); padding: 3px 10px; border-radius: 12px; color: var(--muted); }
+.version { font-size: 0.7rem; color: var(--muted); }
+main { display: flex; flex: 1; gap: 0; overflow: hidden; }
+.pane { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.pane-left { border-right: 1px solid var(--border); }
+.toolbar { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
+.toolbar button {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  padding: 7px 16px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.8rem;
+  transition: background 0.15s;
+}
+.toolbar button:hover { background: var(--card); }
+.toolbar button.primary { background: var(--moss); color: var(--ink); border-color: var(--moss); font-weight: 600; }
+.toolbar button.primary:hover { opacity: 0.9; }
+.toolbar button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.editor-wrap { flex: 1; position: relative; overflow: hidden; }
+#editor {
+  width: 100%; height: 100%; background: var(--ink); color: var(--text);
+  border: none; resize: none; padding: 16px 20px; font-family: inherit; font-size: 0.85rem;
+  line-height: 1.6; outline: none; tab-size: 2;
+}
+#editor::placeholder { color: var(--muted); }
+.output-wrap { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.output-wrap::-webkit-scrollbar { width: 6px; }
+.output-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.trust-bar {
+  display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+  border-radius: var(--radius); margin-bottom: 20px;
+}
+.trust-bar.trusted { background: rgba(113, 214, 162, 0.1); border: 1px solid rgba(113, 214, 162, 0.3); }
+.trust-bar.untrusted { background: rgba(224, 85, 106, 0.1); border: 1px solid rgba(224, 85, 106, 0.3); }
+.trust-bar.neutral { background: var(--surface); border: 1px solid var(--border); }
+.trust-icon { font-size: 1.8rem; }
+.trust-text { font-size: 1.1rem; font-weight: 600; }
+.trust-text.trusted { color: var(--pass); }
+.trust-text.untrusted { color: var(--fail); }
+.trust-sub { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+.gates { display: flex; flex-direction: column; gap: 10px; }
+.gate {
+  display: grid; grid-template-columns: 24px 1fr auto;
+  align-items: center; gap: 10px;
+  padding: 14px 16px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--border);
+  transition: border-color 0.2s;
+}
+.gate.pass { border-left: 3px solid var(--pass); }
+.gate.fail { border-left: 3px solid var(--fail); }
+.gate.unknown { border-left: 3px solid var(--warn); }
+.gate .g-icon { font-size: 1rem; text-align: center; }
+.gate .g-name { font-size: 0.85rem; font-weight: 500; }
+.gate .g-detail { font-size: 0.72rem; color: var(--muted); grid-column: 2; margin-top: 2px; }
+.gate .g-badge {
+  font-size: 0.7rem; padding: 3px 10px; border-radius: 10px;
+  font-weight: 600;
+}
+.g-badge.pass { background: rgba(113, 214, 162, 0.15); color: var(--pass); }
+.g-badge.fail { background: rgba(224, 85, 106, 0.15); color: var(--fail); }
+.g-badge.warn { background: rgba(242, 193, 78, 0.15); color: var(--warn); }
+
+.detail-block { margin-top: 8px; margin-left: 34px; }
+.detail-block summary { font-size: 0.78rem; color: var(--muted); cursor: pointer; margin-bottom: 6px; }
+.detail-block pre {
+  font-size: 0.72rem; background: var(--ink); padding: 10px 14px; border-radius: 6px;
+  overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+  max-height: 200px; overflow-y: auto; border: 1px solid var(--border);
+}
+.error-msg { color: var(--fail); font-size: 0.8rem; margin-top: 4px; grid-column: 2; }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty-state .big { font-size: 3rem; margin-bottom: 12px; }
+.empty-state p { font-size: 0.85rem; margin-bottom: 6px; }
+
+.status-bar {
+  padding: 8px 24px; border-top: 1px solid var(--border); font-size: 0.7rem;
+  color: var(--muted); display: flex; align-items: center; gap: 16px;
+}
+.status-bar .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.status-bar .dot.online { background: var(--pass); }
+.status-bar .dot.offline { background: var(--fail); }
+
+@media (max-width: 768px) {
+  main { flex-direction: column; }
+  .pane-left { border-right: none; border-bottom: 1px solid var(--border); max-height: 50vh; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="28" height="28" viewBox="0 0 32 32"><path d="M8 28V8l6-2v20l-6 2zm10-20v20l6-2V6l-6 2zM8 8l6-2M14 26l6-2" stroke="#71D6A2" stroke-width="2" fill="none" stroke-linejoin="round"/></svg>
+  <h1>Moss <span>Playground</span></h1>
+  <span class="badge">Trust this AI</span>
+  <span class="version" id="version">v—</span>
+</header>
+
+<main>
+  <div class="pane pane-left">
+    <div class="toolbar">
+      <button class="primary" id="btn-trust" onclick="runTrust()">▶ Trust</button>
+      <button onclick="loadExample('order')">Order workflow</button>
+      <button onclick="loadExample('match')">Match demo</button>
+      <button onclick="loadExample('refund')">Refund service</button>
+      <button onclick="clearAll()">Clear</button>
+      <label style="font-size:0.75rem;color:var(--muted);cursor:pointer;margin-left:auto">
+        📄 <input type="file" accept=".moss" id="file-input" style="display:none" onchange="uploadFile()"> Open
+      </label>
+    </div>
+    <div class="editor-wrap">
+      <textarea id="editor" placeholder="Paste Moss code here, or pick an example above&#10;&#10;fn greet(name) = `Hello {name}!`&#10;print(greet(&quot;World&quot;))" spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="pane">
+    <div class="output-wrap" id="output">
+      <div class="empty-state">
+        <div class="big">🔒</div>
+        <p><strong>Trust Report</strong></p>
+        <p>Write Moss code and click <span style="color:var(--moss)">▶ Trust</span> to verify it.</p>
+        <p style="font-size:0.72rem;margin-top:8px">The Trust bundle proves an AI-generated program does what it claims.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="status-bar">
+  <span class="dot" id="status-dot"></span>
+  <span id="status-text">Ready</span>
+</div>
+
+<script>
+const EXAMPLES = {
+  order: `effect Database
+
+type Order =
+  id: Text
+  status: Pending | Paid | Shipped | Cancelled
+  total: Money
+
+type ShipError = NotReady | Missing
+
+rule canShip(order: Order) -> Bool =
+  order.status == Paid and order.total > 0.usd
+
+fn ship(order: Order) -> Result<Order, ShipError> uses Database {
+  require canShip(order)
+    else ShipError.NotReady(order.status)
+
+  updated = order with status = Shipped
+  dbPut(order.id, updated)
+
+  return Ok(updated)
+}
+
+let order = { id: "A-100", status: Paid, total: 42.usd }
+let shipped = ship(order)?
+print("status:", shipped.status)
+print("stored:", dbGet("A-100").status)
+
+test "ship stores paid order" {
+  checked = ship(order)?
+  assert(checked.status == Shipped, "expected shipped status")
+}`,
+
+  match: `type Shape = Circle | Square | Triangle
+
+fn area(s: Shape) -> Number {
+  return match s {
+    Circle -> 3.14,
+    Square -> 4.0,
+    Triangle -> 1.5
+  }
+}
+
+let c = Circle
+print("circle area:", area(c))
+
+test "circle area" { assert(area(Circle) == 3.14) }
+test "square area" { assert(area(Square) == 4.0) }`,
+
+  refund: `effect Database, Network
+
+type RefundRequest = orderId: Text, reason: Text, amount: Money
+type RefundError = NotFound | AlreadyRefunded
+
+rule withinWindow(r: RefundRequest) -> Bool = true
+
+fn processRefund(r: RefundRequest) -> Result<Text, RefundError> uses Database, Network {
+  order = dbGet(r.orderId)
+  require order != null else RefundError.NotFound(r.orderId)
+  require order.status == Paid else RefundError.AlreadyRefunded(order.status)
+  require withinWindow(r) else RefundError.AlreadyRefunded(order.status)
+
+  updated = order with status = Cancelled
+  dbPut(r.orderId, updated)
+  return Ok("refund-processed")
+}
+
+let r = { orderId: "R-500", reason: "damaged", amount: 99.usd }
+print("result:", processRefund(r)?)
+
+test "refund paid order" {
+  r = { orderId: "R-500", reason: "test", amount: 10.usd }
+  assert(processRefund(r)?.body == "refund-processed")
+}`
+};
+
+function loadExample(name) {
+  document.getElementById('editor').value = EXAMPLES[name] || '';
+  document.getElementById('output').innerHTML = '<div class="empty-state"><div class="big">📋</div><p>Example loaded. Click <span style="color:var(--moss)">▶ Trust</span> to verify.</p></div>';
+  setStatus('ready', 'Example loaded');
+}
+
+function clearAll() {
+  document.getElementById('editor').value = '';
+  document.getElementById('output').innerHTML = '<div class="empty-state"><div class="big">🔒</div><p><strong>Trust Report</strong></p><p>Write Moss code and click <span style="color:var(--moss)">▶ Trust</span> to verify it.</p></div>';
+  setStatus('ready', 'Ready');
+}
+
+function uploadFile() {
+  const f = document.getElementById('file-input').files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('editor').value = e.target.result;
+    setStatus('ready', `Loaded: ${f.name}`);
+  };
+  reader.readAsText(f);
+}
+
+async function runTrust() {
+  const source = document.getElementById('editor').value;
+  if (!source.trim()) return;
+
+  const btn = document.getElementById('btn-trust');
+  btn.disabled = true;
+  btn.textContent = '⟳ Trusting...';
+  setStatus('offline', 'Running trust pipeline...');
+
+  try {
+    const resp = await fetch('/api/trust', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({source})
+    });
+    const bundle = await resp.json();
+    renderTrust(bundle);
+    const trusted = bundle.trust;
+    setStatus(trusted ? 'online' : 'offline', trusted ? 'Trusted' : 'Trust failed');
+  } catch (e) {
+    document.getElementById('output').innerHTML = `<div class="empty-state"><div class="big">⚠️</div><p><strong>Cannot reach Moss server</strong></p><p style="color:var(--fail)">Run <code>moss playground</code> locally to use the Trust pipeline.</p><p style="font-size:0.72rem;margin-top:8px">This page is also deployable to GitHub Pages, but the trust verification requires a local Moss backend.</p></div>`;
+    setStatus('offline', 'Backend unreachable');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Trust';
+  }
+}
+
+function renderTrust(b) {
+  document.getElementById('version').textContent = 'v' + (b.moss || '—');
+  const trusted = b.trust;
+  const icon = trusted ? '✅' : '❌';
+  const cls = trusted ? 'trusted' : 'untrusted';
+  const msg = trusted ? 'Trust Verified' : 'Trust Failed';
+  const sub = trusted
+    ? 'All gates passed. This AI-generated program is provably correct.'
+    : 'One or more gates failed. See details below.';
+
+  let html = `<div class="trust-bar ${cls}">
+    <div class="trust-icon">${icon}</div>
+    <div>
+      <div class="trust-text ${cls}">${msg}</div>
+      <div class="trust-sub">${sub}</div>
+      <div class="trust-sub" style="margin-top:4px">source: <code style="font-size:0.7rem">${(b.source_sha256||'').substring(0,16)}...</code> &middot; Moss ${b.moss||'—'}</div>
+    </div>
+  </div><div class="gates">`;
+
+  // Check gate
+  const chk = b.check || {};
+  html += renderGate('check', 'Static Check', chk.ok, chk.summary
+    ? `${chk.summary.effects} effects, ${chk.summary.types} types, ${chk.summary.callables} callables, ${chk.summary.tests} tests`
+    : '', chk.diagnostics);
+
+  // Lock gate (optional)
+  if (b.lock && b.lock.ok !== null) {
+    html += renderGate('lock', 'Lock', b.lock.ok,
+      b.lock.ok ? `${b.lock.modules||0} modules locked` : (b.lock.error || b.lock.note || 'unlocked'),
+      b.lock.diagnostics);
+  }
+
+  // Trace gate
+  const trc = b.trace || {};
+  html += renderGate('trace', 'Rule Trace', trc.ok, `${(trc.events||[]).length} rule evaluation(s)`, null, trc.events);
+
+  // Golden gate
+  const gld = b.golden || {};
+  const gldNote = gld.note || (gld.ok ? 'snapshot matches' : 'snapshot mismatch');
+  html += renderGate('golden', 'Golden Snapshot', gld.ok === true, gldNote, null, null,
+    gld.snapshot ? `Snapshot:\n${gld.snapshot}` : null);
+
+  // Selfhost gate
+  const sh = b.selfhost || {};
+  const shOk = sh.ok;
+  html += renderGate('selfhost', 'Selfhost Compare', shOk,
+    shOk ? 'declarations, names, bodies, metadata, expressions all match' : 'discrepancy detected',
+    null, null, null,
+    shOk ? null : `${sh.expression_error||'comparison failed'}\nhost: ${JSON.stringify(sh.host_summary||{})}\nselfhost: ${JSON.stringify(sh.selfhost_summary||{})}`);
+
+  html += '</div>';
+  document.getElementById('output').innerHTML = html;
+}
+
+function renderGate(id, name, ok, detail, diagnostics, events, snapshot, comparisonDetail) {
+  const cls = ok === true ? 'pass' : (ok === false ? 'fail' : 'unknown');
+  const icon = ok === true ? '✓' : (ok === false ? '✗' : '—');
+  const badge = ok === true ? 'PASS' : (ok === false ? 'FAIL' : 'SKIP');
+  const badgeCls = ok === true ? 'pass' : (ok === false ? 'fail' : 'warn');
+
+  let html = `<div class="gate ${cls}">
+    <div class="g-icon">${icon}</div>
+    <div class="g-name">${name}</div>
+    <div class="g-badge ${badgeCls}">${badge}</div>`;
+
+  if (detail) html += `<div class="g-detail">${detail}</div>`;
+
+  // Diagnostics
+  if (diagnostics && diagnostics.length) {
+    html += `<div class="error-msg">`;
+    for (const d of diagnostics) {
+      const loc = d.line ? ` [${d.line}:${d.column||0}]` : '';
+      html += `${d.level}: ${d.message}${loc}<br>`;
+    }
+    html += `</div>`;
+  }
+
+  // Trace events
+  if (events && events.length) {
+    html += `<details class="detail-block"><summary>${events.length} rule evaluation(s)</summary><pre>`;
+    for (const e of events) {
+      const args = Object.entries(e.arguments||{}).map(([k,v]) => `${k}=${v}`).join(', ');
+      html += `${e.rule}(${args}) → ${e.result}  [${e.file}:${e.line}:${e.column}]\n`;
+    }
+    html += `</pre></details>`;
+  }
+
+  // Snapshot
+  if (snapshot) {
+    html += `<details class="detail-block"><summary>Program output</summary><pre>${snapshot}</pre></details>`;
+  }
+
+  // Selfhost comparison detail
+  if (comparisonDetail) {
+    html += `<details class="detail-block"><summary>Comparison detail</summary><pre>${comparisonDetail}</pre></details>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function setStatus(state, text) {
+  const dot = document.getElementById('status-dot');
+  dot.className = 'dot ' + state;
+  document.getElementById('status-text').textContent = text;
+}
+
+// Keyboard shortcut: Ctrl+Enter to trust
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'Enter') runTrust();
+});
+</script>
+</body>
+</html>

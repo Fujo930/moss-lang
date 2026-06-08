@@ -3,6 +3,18 @@
 This file explains the repository history in human terms. The Git commit
 messages stay short; this document gives future readers the memory behind them.
 
+## 0.6.0: Moss Playground — trust becomes visible
+
+`moss playground` opens a browser-based trust report viewer. Paste Moss code,
+click "Trust", and see a green/red verification report with gate-level
+detail for check, trace, golden, and selfhost comparison. The Playground
+frontend is a self-contained single-page application deployable to
+GitHub Pages.
+
+Why it matters: trust bundles are no longer a CLI JSON file. Anyone can see
+Moss prove an AI-generated program correct in under 30 seconds without
+installing anything beyond `pip install mosslang`.
+
 ## 0.5.8: trust bundle hardening
 
 `moss trust` bundles now include `source_sha256`, lock file verification,

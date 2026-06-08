@@ -1609,6 +1609,24 @@ print(shipped.status, dbGet("A-100").status)"""
         finally:
             Path(out_path).unlink(missing_ok=True)
 
+    def test_playground_trust_runs_on_valid_source(self) -> None:
+        """Playground trust endpoint returns valid bundle for valid Moss code."""
+        from mosslang.playground import run_trust_from_source
+
+        bundle = run_trust_from_source('print("hello playground")\n')
+        self.assertIn("trust", bundle)
+        self.assertTrue(bundle["trust"])
+        self.assertTrue(bundle["check"]["ok"])
+        self.assertIn("source_sha256", bundle)
+        self.assertEqual(len(bundle["source_sha256"]), 64)
+
+    def test_playground_trust_rejects_invalid_source(self) -> None:
+        """Playground trust returns trust=false with diagnostics for invalid code."""
+        from mosslang.playground import run_trust_from_source
+
+        bundle = run_trust_from_source('fn x() uses Bad { return 1 }\n')
+        self.assertFalse(bundle["trust"])
+
     def test_all_examples_run(self) -> None:
         """Verify all .moss examples can compile and run via VM."""
         import os

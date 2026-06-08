@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.6.0
+
+Moss `0.6.0` introduces the Playground: a browser-based trust report viewer.
+Paste Moss code, click Trust, see the result. See `docs/release-0.6.0.md`.
+
 ## 0.5.8
 
 Moss `0.5.8` hardens the trust bundle with source hashes, lock verification,

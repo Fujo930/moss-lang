@@ -5,6 +5,17 @@ implemented, repaired, documented, committed, and pushed the current repository
 in collaboration with Fujo930. Development on the ds-Mosslang branch is
 continued by Reasonix as of 0.5.5.
 
+## Version 0.6.0: Moss Playground
+
+Implemented:
+
+- `moss playground` — browser-based trust report viewer on port 8766
+- `/api/trust` JSON endpoint for programmatic trust verification
+- visual trust panel: green/red gates for check, trace, golden, selfhost
+- built-in examples (Order workflow, Match demo, Refund service)
+- self-contained frontend deployable to GitHub Pages
+- 2 playground tests; 123 tests, 9 subtests pass
+
 ## Version 0.5.8: trust bundle hardening
 
 Implemented:
