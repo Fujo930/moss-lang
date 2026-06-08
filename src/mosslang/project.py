@@ -39,6 +39,35 @@ PROJECT_TEMPLATES = {
         "src/main.moss": 'import "lib.moss"\n\nprint(greeting("Moss"))\n',
         "src/lib.moss": 'fn greeting(name: Text) -> Text {\n  return "Hello, " + name\n}\n',
     },
+    "trust": {
+        "src/main.moss": (
+            'effect Database\n\n'
+            'type Order =\n'
+            '  id: Text\n'
+            '  status: Pending | Paid | Shipped\n'
+            '  total: Money\n\n'
+            'type ShipError = NotReady | Missing\n\n'
+            'rule canShip(o: Order) -> Bool = o.status == Paid and o.total > 0.usd\n\n'
+            'fn ship(o: Order) -> Result<Order, ShipError> uses Database {\n'
+            '  require canShip(o) else ShipError.NotReady(o.status)\n'
+            '  updated = o with status = Shipped\n'
+            '  dbPut(o.id, updated)\n'
+            '  return Ok(updated)\n'
+            '}\n\n'
+            'let order = { id: "TR-001", status: Paid, total: 99.usd }\n'
+            'let shipped = ship(order)?\n'
+            'print("shipped:", shipped.status)\n\n'
+            'test "ship paid order" {\n'
+            '  result = ship(order)?\n'
+            '  assert(result.status == Shipped, "expected shipped")\n'
+            '}\n\n'
+            'test "reject pending" {\n'
+            '  pending = order with status = Pending\n'
+            '  rejected = ship(pending)\n'
+            '  assert(rejected == Err(ShipError.NotReady(Pending)), "expected NotReady")\n'
+            '}\n'
+        ),
+    },
 }
 
 

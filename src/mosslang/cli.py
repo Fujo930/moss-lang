@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     new_cmd = sub.add_parser("new", help="create a Moss project from a template")
     new_cmd.add_argument("directory", type=Path)
     new_cmd.add_argument("--name", help="package name; defaults to the directory name")
-    new_cmd.add_argument("--template", choices=("basic", "rules", "cli", "library"), default="basic")
+    new_cmd.add_argument("--template", choices=("basic", "rules", "cli", "library", "trust"), default="basic")
 
     project_lock_cmd = sub.add_parser("project-lock")
     project_lock_cmd.add_argument("directory", type=Path)
