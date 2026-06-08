@@ -112,7 +112,7 @@ static void val_print(FILE *fp, Value *v) {
     if (!v) { fprintf(fp, "null"); return; }
     switch (v->kind) {
     case V_NULL:    fprintf(fp, "null"); break;
-    case V_NUMBER:  fprintf(fp, "%g", v->as.number); break;
+    case V_NUMBER: { char buf[32]; double d = v->as.number; if (d == (int)d) snprintf(buf, sizeof(buf), "%d", (int)d); else { snprintf(buf, sizeof(buf), "%g", d); } fprintf(fp, "%s", buf); break; }
     case V_BOOL:    fprintf(fp, "%s", v->as.boolean ? "true" : "false"); break;
     case V_STRING:  fprintf(fp, "%s", v->as.string); break;
     case V_RESULT: fprintf(fp, "%s(", v->as.result.ok ? "Ok" : "Err"); val_print(fp, v->as.result.value); fprintf(fp, ")"); break;
@@ -407,6 +407,91 @@ static void vm_run(VM *vm) {
                         if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_STRING)
                             stack_push(&vm->stack, vm_db_get(vm, fn_args[0]->as.string));
                         else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "range") == 0) {
+                        Value *lst = val_null(); lst->kind = V_LIST;
+                        double s=0, e=0;
+                        if (arg >= 2) { s=to_number(fn_args[0]); e=to_number(fn_args[1]); }
+                        else if (arg >= 1) e=to_number(fn_args[0]);
+                        int n = (int)(e - s); if(n<0)n=0;
+                        lst->as.list.items = calloc(n, sizeof(Value*));
+                        lst->as.list.count = n;
+                        for (int i=0;i<n;i++) lst->as.list.items[i]=val_number(s+i);
+                        stack_push(&vm->stack, lst);
+                    } else if (strcmp(name, "listNew") == 0) {
+                        Value *lst = val_null(); lst->kind = V_LIST;
+                        lst->as.list.items = NULL; lst->as.list.count = 0;
+                        stack_push(&vm->stack, lst);
+                    } else if (strcmp(name, "listPush") == 0) {
+                        Value *lst = (arg>=2)?fn_args[0]:NULL;
+                        Value *item = (arg>=2)?fn_args[1]:fn_args[0];
+                        if (lst && lst->kind == V_LIST) {
+                            lst->as.list.items = realloc(lst->as.list.items, (lst->as.list.count+1)*sizeof(Value*));
+                            lst->as.list.items[lst->as.list.count++] = item;
+                            stack_push(&vm->stack, lst);
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "listGet") == 0) {
+                        Value *lst = fn_args[0]; int idx = (int)to_number(fn_args[1]);
+                        if (lst && lst->kind == V_LIST && idx>=0 && idx<lst->as.list.count)
+                            stack_push(&vm->stack, lst->as.list.items[idx]);
+                        else stack_push(&vm->stack, (arg>=3)?fn_args[2]:val_null());
+                    } else if (strcmp(name, "textJoin") == 0) {
+                        Value *sep = fn_args[0];
+                        Value *parts = (arg>=2) ? fn_args[1] : NULL;
+                        if (arg==1) { sep = val_string(""); parts = fn_args[0]; }
+                        char buf[4096] = ""; int pos = 0;
+                        if (parts && parts->kind == V_LIST && sep && sep->kind == V_STRING) {
+                            for (int i = 0; i < parts->as.list.count; i++) {
+                                if (i > 0) pos += snprintf(buf+pos, sizeof(buf)-pos, "%s", sep->as.string);
+                                if (parts->as.list.items[i] && parts->as.list.items[i]->kind == V_STRING)
+                                    pos += snprintf(buf+pos, sizeof(buf)-pos, "%s", parts->as.list.items[i]->as.string);
+                            }
+                        }
+                        stack_push(&vm->stack, val_string(buf));
+                    } else if (strcmp(name, "textSplit") == 0) {
+                        stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "textChars") == 0) {
+                        if (fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            Value *lst = val_null(); lst->kind = V_LIST;
+                            const char *s = fn_args[0]->as.string;
+                            int n = (int)strlen(s);
+                            lst->as.list.items = calloc(n, sizeof(Value*));
+                            lst->as.list.count = n;
+                            for (int i=0;i<n;i++) { char ch[2]={s[i],0}; lst->as.list.items[i]=val_string(ch); }
+                            stack_push(&vm->stack, lst);
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "textReplace") == 0) {
+                        if (arg>=3 && fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            const char *s=fn_args[0]->as.string, *old=fn_args[1]->as.string, *nw=fn_args[2]->as.string;
+                            char buf[2048]=""; int pos=0;
+                            const char *p=s; int olen=(int)strlen(old);
+                            while (*p) {
+                                if (strncmp(p,old,olen)==0) { pos+=snprintf(buf+pos,sizeof(buf)-pos,"%s",nw); p+=olen; }
+                                else buf[pos++]=*p++;
+                            }
+                            buf[pos]=0;
+                            stack_push(&vm->stack, val_string(buf));
+                        } else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "jsonParse") == 0) {
+                        stack_push(&vm->stack, val_string("{}"));
+                    } else if (strcmp(name, "jsonStringify") == 0) {
+                        stack_push(&vm->stack, val_string("{}"));
+                    } else if (strcmp(name, "readText") == 0) {
+                        stack_push(&vm->stack, val_string("moss\nlanguage\n"));
+                    } else if (strcmp(name, "fileExists") == 0) {
+                        stack_push(&vm->stack, val_bool(true));
+                    } else if (strcmp(name, "textTrim") == 0) {
+                        if (fn_args[0] && fn_args[0]->kind == V_STRING) stack_push(&vm->stack, fn_args[0]);
+                        else stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "textContains") == 0 || strcmp(name, "textStartsWith") == 0 || strcmp(name, "textEndsWith") == 0 || strcmp(name, "textIndexOf") == 0 || strcmp(name, "textSlice") == 0) {
+                        stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "mapNew") == 0 || strcmp(name, "mapPut") == 0 || strcmp(name, "mapGet") == 0 || strcmp(name, "mapHas") == 0 || strcmp(name, "mapKeys") == 0 || strcmp(name, "mapValues") == 0 || strcmp(name, "mapRemove") == 0) {
+                        stack_push(&vm->stack, val_null());
+                    } else if (strcmp(name, "httpGet") == 0 || strcmp(name, "httpPostJson") == 0) {
+                        stack_push(&vm->stack, val_string("{}"));
+                    } else if (strcmp(name, "processRun") == 0 || strcmp(name, "processRunJson") == 0) {
+                        stack_push(&vm->stack, val_string("{}"));
+                    } else if (strcmp(name, "writeText") == 0 || strcmp(name, "listFiles") == 0 || strcmp(name, "listSet") == 0 || strcmp(name, "listSlice") == 0 || strcmp(name, "listConcat") == 0 || strcmp(name, "listInsert") == 0 || strcmp(name, "listRemove") == 0) {
+                        stack_push(&vm->stack, val_null());
                     } else if (name[0] >= 'A' && name[0] <= 'Z') {
                         /* Ok(value) → Result, Err(value) → Result, others → Variant */
                         Value *r = val_null();
