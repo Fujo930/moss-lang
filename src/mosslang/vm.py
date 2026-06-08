@@ -170,6 +170,22 @@ class VM:
                 results.append({'name': test_name, 'status': 'fail', 'message': str(exc)})
         return results
 
+    def call(self, func: Any, args: list[Any]) -> Any:
+        """Call a Moss function from Python host code."""
+        if isinstance(func, CodeObject):
+            fn_name = func.name
+            fn_globals = self._function_globals.get(fn_name, self._module.globals if self._module else [])
+            frame = Frame(func, captured={'globals': self.globals}, global_names=fn_globals)
+            for i, arg in enumerate(args):
+                if i < len(frame.locals):
+                    frame.locals[i] = arg
+            try:
+                self._execute(frame)
+                return frame.stack.pop() if frame.stack else None
+            except ReturnSignal as sig:
+                return sig.value
+        raise MossRuntimeError(f"cannot call {type(func).__name__}")
+
     def _execute(self, frame):
         while frame.pc < len(frame.code.instructions):
             inst = frame.code.instructions[frame.pc]

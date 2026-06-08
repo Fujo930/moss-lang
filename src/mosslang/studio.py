@@ -16,7 +16,8 @@ from io import StringIO
 from .checker import Diagnostic, check_program
 from .errors import MossError
 from .parser import parse_source
-from .runtime import Runtime
+from .compiler import compile_program
+from .vm import VM
 from .tokens import tokenize
 from .tooling import analyze_document
 from .project import build_project_graph, find_manifest, load_manifest
@@ -81,9 +82,13 @@ def analyze_source(
             return response
 
         if execute:
-            runtime = Runtime(output.append, base_path=analysis_base_path(path))
+            # strip trailing newlines for studio output (VM print adds \n)
+            out_lines: list[str] = []
+            vm = VM(output=lambda s: out_lines.append(s.rstrip("\n")), base_path=analysis_base_path(path))
+            mod = compile_program(program, source_path=str(path or "<studio>"))
+            vm.load_module(mod)
             if test:
-                results = runtime.run_tests(program)
+                results = vm.run_tests()
                 for result in results:
                     marker = "PASS" if result["status"] == "pass" else "FAIL"
                     detail = f": {result['message']}" if result["message"] else ""
@@ -92,7 +97,8 @@ def analyze_source(
                 output.append(f"{len(results) - failed}/{len(results)} tests passed")
                 response["ok"] = failed == 0
                 return response
-            runtime.run(program)
+            vm.run()
+            output.extend(out_lines)
         response["ok"] = True
         return response
     except MossError as exc:
@@ -305,13 +311,16 @@ def analyze_trace(source: str, *, path: str | None = None) -> dict[str, Any]:
         return response
     output: list[str] = []
     program = parse_source(source)
-    runtime = Runtime(output.append, base_path=analysis_base_path(path), trace_rules=True)
-    runtime.run(program)
+    out_lines: list[str] = []
+    vm = VM(output=lambda s: out_lines.append(s.rstrip("\n")), base_path=analysis_base_path(path), trace_rules=True)
+    mod = compile_program(program, source_path=str(path or "<studio>"))
+    vm.load_module(mod)
+    vm.run()
     response["output"] = [
         f"{event.get('line', 1)}:{event.get('column', 1)} {event['rule']} -> {event['result']}"
-        for event in runtime.trace_events
+        for event in vm.trace_events
     ]
-    response["trace"] = runtime.trace_events
+    response["trace"] = vm.trace_events
     return response
 
 

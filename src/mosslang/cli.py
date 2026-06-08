@@ -23,7 +23,6 @@ from .project import (
     verify_project_lock,
     write_project_lock,
 )
-from .runtime import Runtime
 from .tokens import tokenize
 from .compiler import compile_program
 from .vm import VM
@@ -608,7 +607,8 @@ def run_docs(path: Path, *, output: Path | None = None) -> int:
 
 
 def run_repl(*, input_fn=input, output_fn=print) -> int:
-    runtime = Runtime(output_fn)
+    vm = VM()
+    source_buffer: list[str] = []
     buffer: list[str] = []
     depth = 0
     output_fn(f"Moss {__version__} REPL. Submit a blank line to run; Ctrl-D to exit.")
@@ -620,8 +620,11 @@ def run_repl(*, input_fn=input, output_fn=print) -> int:
             output_fn("")
             return 0
 
-        if not line.strip() and buffer:
-            depth = 0
+        if not line.strip():
+            if buffer:
+                depth = 0
+            else:
+                continue
         else:
             buffer.append(line)
             depth += brace_delta(line)
@@ -630,16 +633,22 @@ def run_repl(*, input_fn=input, output_fn=print) -> int:
 
         if not buffer:
             continue
-        source = "\n".join(buffer) + "\n"
+        line_source = "\n".join(buffer) + "\n"
         buffer = []
+        source_buffer.append(line_source)
+        # Recompile full accumulated source to preserve state
+        full_source = "".join(source_buffer)
         try:
-            program = parse_source(source)
+            program = parse_source(full_source)
             diagnostics = check_program(program)
             errors = [item for item in diagnostics if item.level == "error"]
             for diagnostic in diagnostics:
                 output_fn(diagnostic.format())
             if not errors:
-                runtime.run(program)
+                vm.output = output_fn
+                mod = compile_program(program, source_path="<repl>")
+                vm.load_module(mod)
+                vm.run()
         except MossError as exc:
             output_fn(f"error: {exc}")
 
@@ -720,10 +729,12 @@ def compare_selfhost_file(path: Path) -> bool:
     host_metadata = host_declaration_metadata(host_program)
 
     root = installation_root()
-    runtime = Runtime(base_path=root)
-    runtime.run(parse_source('import "examples/self_host/parser_core.moss"\n'))
-    tokens = runtime.call(runtime.globals.get("sketchTokens"), [source])
-    parsed = runtime.call(runtime.globals.get("parseProgram"), [tokens])
+    vm = VM(base_path=root)
+    importer = compile_program(parse_source('import "examples/self_host/parser_core.moss"\n'), source_path=str(root / "examples/self_host/parser_core.moss"))
+    vm.load_module(importer)
+    vm.run()
+    tokens = vm.call(vm.globals.get("sketchTokens"), [source])
+    parsed = vm.call(vm.globals.get("parseProgram"), [tokens])
     nodes = parsed["nodes"]
     errors = parsed["errors"]
     selfhost = {
@@ -736,7 +747,7 @@ def compare_selfhost_file(path: Path) -> bool:
     selfhost_names = selfhost_declaration_names(nodes)
     selfhost_bodies = selfhost_body_statement_kinds(nodes)
     selfhost_metadata = selfhost_declaration_metadata(nodes)
-    expression_error = compare_expression_asts(host_program, runtime)
+    expression_error = compare_expression_asts(host_program, vm)
 
     print(f"{path}:")
     print(f"  host: {host}")
@@ -770,10 +781,10 @@ def compare_selfhost_file(path: Path) -> bool:
     return True
 
 
-def compare_expression_asts(program, runtime: Runtime) -> str | None:
+def compare_expression_asts(program, vm) -> str | None:
     for expression in program_expressions(program):
         source = render_expr(expression)
-        parsed = runtime.call(runtime.globals.get("parseExpressionSource"), [source])
+        parsed = vm.call(vm.globals.get("parseExpressionSource"), [source])
         if parsed["state"]["errors"]:
             return f"{source}: {parsed['state']['errors'][0]}"
         host = normalize_host_expr(expression)

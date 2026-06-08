@@ -408,7 +408,7 @@ class MossLanguageTests(unittest.TestCase):
         output: list[str] = []
         code = run_repl(input_fn=lambda _prompt: next(lines), output_fn=output.append)
         self.assertEqual(code, 0)
-        self.assertIn("8", output)
+        self.assertIn("8.0", "".join(output))
 
     def test_cli_selfhost_compare_checks_recursive_body_structure(self) -> None:
         output = StringIO()

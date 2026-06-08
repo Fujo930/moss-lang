@@ -1,60 +1,44 @@
 # Moss 0.5.6 release notes
 
-Moss `0.5.6` unifies the command-line execution engine: `moss run`, `moss test`,
-`moss trace`, `moss golden`, `moss project-run`, `moss project-test`, and
-`moss selfhost` now all run on the bytecode VM.
+Moss `0.5.6` completes the VM migration: every Moss command now executes
+through the bytecode compiler and stack VM. The tree-walking Runtime
+interpreter (`runtime.py`) is no longer used for any CLI, Studio, selfhost,
+or REPL execution path.
 
-This completes the 0.5.x foundation work — a single, consistent execution
-path for every moss CLI command that executes user code.
+## All commands on VM
 
-## VM unifies execution
+| Command | Engine |
+|---------|--------|
+| `moss run` | VM ✅ (since 0.5.5) |
+| `moss test` | VM ✅ (since 0.5.5) |
+| `moss trace` | VM ✅ |
+| `moss trace --json` | VM ✅ |
+| `moss golden` | VM ✅ |
+| `moss project-run` | VM ✅ |
+| `moss project-test` | VM ✅ |
+| `moss selfhost` | VM ✅ |
+| `moss selfhost --quick` | VM ✅ |
+| `moss selfhost-compare` | VM ✅ |
+| `moss repl` | VM ✅ |
+| `moss studio` | VM ✅ |
 
-| Command | 0.5.5 | 0.5.6 |
-|---------|-------|-------|
-| `moss run` | VM | VM |
-| `moss test` | VM | VM |
-| `moss trace` | Runtime | **VM** |
-| `moss golden` | Runtime | **VM** |
-| `moss project-run` | Runtime | **VM** |
-| `moss project-test` | Runtime | **VM** |
-| `moss selfhost` | Runtime | **VM** |
-| `moss repl` | Runtime | Runtime |
-| `moss selfhost-compare` | Runtime | Runtime |
+## VM additions
 
-`moss repl` and `moss selfhost-compare` remain on the tree-walking Runtime
-for now; they use Runtime-specific APIs (`call()`, mutable environment) that
-need a VM refactor planned for 0.5.7.
+- `VM.call(func, args)` — call a Moss function from Python host code
+- `VM._load_imports` passes through `tests` list from imported modules
+- Enhanced `GET_INDEX` error message with list type, length, and function name
 
-## Bug fixes
+## VM `builtin_print` behavior preserved
 
-- **Short-circuit `and`/`or`** — The bytecode compiler now emits jump-based
-  short-circuit evaluation for `and` and `or`, matching the Runtime's
-  behaviour. This was the root cause of selfhost sketches crashing on the VM
-  with out-of-bounds index errors in `while ... and ...` loops.
-- **`textJoin` parameter order** — The VM's `builtin_text_join` now accepts
-  `textJoin(parts)` with one argument (empty separator) and uses the correct
-  `(parts, separator)` order, matching the Runtime.
-- **Project import paths** — The VM now respects `import_paths` (declared
-  source roots in `moss.toml`), resolving imports from multiple directories
-  as the Runtime does.
-- **Imported module tests** — Test blocks from imported modules are now
-  discovered and executed by `moss project-test` and `moss selfhost`.
+The VM `builtin_print` appends `\n` to every line (same as 0.5.1–0.5.5).
+Studio wraps VM output to strip trailing newlines for its JSON response
+format.
 
-## New: VM trace support
+## REPL state accumulation
 
-`moss trace` now works on the bytecode VM. Rules are tagged at compile time
-(`CodeObject.is_rule`), and the VM records a structured trace event after
-each rule evaluation with the rule name, formatted arguments, result, source
-file, line, and column. The `--json` output format is compatible with the
-Runtime-era format.
-
-## Compiler additions
-
-- `CodeObject.is_rule` flag set by `_compile_rule`
-- `CodeObject.source_line` / `source_column` from the rule declaration
-- `_compile_test` for test block compilation
-- `_compile_short_circuit` for jump-based `and`/`or`
-- `BytecodeModule.tests` list serialized in `.mbc` format
+The REPL now accumulates all entered source lines and recompiles the full
+program on each submission. This preserves variable definitions across
+multiple entries, matching the original Runtime REPL behavior.
 
 ## Verification
 
@@ -63,20 +47,21 @@ python -m pytest tests/test_mosslang.py -q
 # 116 passed, 9 subtests passed
 
 python -m mosslang.cli selfhost --quick
-# 5/5 sketch tests PASS
+# 5/5 sketch tests pass
 
-python -m mosslang.cli trace examples/order.moss
-# 10:1 canShip(order=...) -> true
-# 1 rule evaluation(s)
+python -m mosslang.cli selfhost-compare examples
+# all examples pass host/self-host comparison
 
-python -m mosslang.cli test examples/order.moss
-# PASS ship stores paid order
-# 1/1 tests passed
+python -m mosslang.cli project-test --locked .
+# 1/1 project tests passed
 ```
+
+## Removed
+
+- `cli.py` no longer imports `Runtime`
 
 ## Upgrade notes
 
-- `.mbc` files from 0.5.5 are incompatible (new `is_rule`, `source_line`,
-  `source_column` fields in `CodeObject` serialization).
-- `moss repl` and `moss selfhost-compare` still use the Runtime; their
-  arrow-function-with-implicit-return behaviour may differ from VM commands.
+- `.mbc` format unchanged from 0.5.5
+- `moss.lock` files are compatible
+- No breaking changes to the Moss language
