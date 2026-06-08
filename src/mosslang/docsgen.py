@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .nodes import EffectDecl, FunctionDecl, RuleDecl, TypeDecl
+from .nodes import EffectDecl, FunctionDecl, RuleDecl, TestDecl, TypeDecl
 from .parser import parse_source
 
 
@@ -27,4 +27,22 @@ def generate_api_docs(path: Path) -> str:
             if isinstance(item, FunctionDecl) and item.uses:
                 signature += " uses " + ", ".join(item.uses)
             lines.extend([f"## {kind}: {item.name}", "", f"`{signature}`", ""])
+
+    # Trust verification section
+    effect_count = sum(1 for item in program.items if isinstance(item, EffectDecl))
+    rule_count = sum(1 for item in program.items if isinstance(item, RuleDecl))
+    test_count = sum(1 for item in program.items if isinstance(item, TestDecl))
+    lines.extend([
+        "## Trust Verification", "",
+        f"This module contains {effect_count} effect(s), {rule_count} rule(s), and {test_count} test(s).",
+        "",
+        "Verify with:",
+        "",
+        "```powershell",
+        f"moss check {path.name}",
+        f"moss trust {path.name}",
+        f"moss trace --json {path.name}",
+        "```",
+        "",
+    ])
     return "\n".join(lines).rstrip() + "\n"
