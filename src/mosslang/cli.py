@@ -2034,11 +2034,12 @@ def selfhost_body_statement_kinds(nodes: list[dict]) -> dict[str, dict[str, int]
         if item["kind"] not in {"Function", "Test"}:
             continue
         label = ("fn:" if item["kind"] == "Function" else "test:") + item["name"]
-        data = item["data"] or []
-        # Arrow-body function: expression is inline in "value" text, no block statements
-        if not data and item["kind"] == "Function" and "=" in (item.get("value") or ""):
+        raw_data = item.get("data")
+        # Arrow-body function: data is a dict (parsed expression), not a list of statements
+        if isinstance(raw_data, dict) and raw_data.get("kind"):
             result[label] = {"Expr": 1}
             continue
+        data = raw_data if isinstance(raw_data, list) else []
         counts: Counter[str] = Counter()
         count_selfhost_statements(data, counts)
         result[label] = dict(sorted(counts.items()))

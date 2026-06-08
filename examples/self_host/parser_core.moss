@@ -302,10 +302,15 @@ fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
     } else if currentToken(state).value == "=" {
       value = tokenText(value, currentToken(state))
       state = advance(state)
+      exprTokens = []
       while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
+        exprTokens = listPush(exprTokens, currentToken(state))
         value = tokenText(value, currentToken(state))
         state = advance(state)
       }
+      exprTokens = listPush(exprTokens, token("EOF", "", 0, 0))
+      parsedExpr = parseExpressionTokens(exprTokens)
+      data = parsedExpr.expr
     }
     if currentToken(state).kind == "NEWLINE" {
       state = advance(state)

@@ -327,6 +327,9 @@ def moss_nodes_to_program(nodes: list[dict], source: str = "") -> n.Program:
             body: list[Any] = []
             if isinstance(data, list):
                 body = [_moss_stmt_to_ast(s) for s in data]
+            elif isinstance(data, dict) and data.get("kind"):
+                expr = _moss_expr_to_ast(data)
+                body = [n.ReturnStmt(expr=expr)]
             items.append(n.FunctionDecl(
                 name=name, params=params, return_type=ret_type,
                 uses=uses, body=body,
