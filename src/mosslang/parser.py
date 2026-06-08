@@ -337,6 +337,22 @@ class Parser:
                     self.expect_value("=")
                     updates[field] = self.parse_expression()
             return RecordUpdate(expr, updates, getattr(expr, "location", None))
+        # Pipe operator: expr |> fn(args) -> fn(expr, args)
+        while self.check_value("|>"):
+            self.advance()
+            if not self.match("IDENT"):
+                raise self.error("expected function name after |>")
+            callee = Identifier(self.previous().value)
+            if self.match_value("("):
+                args = [expr]
+                if not self.match_value(")"):
+                    args.append(self.parse_expression())
+                    while self.match_value(","):
+                        args.append(self.parse_expression())
+                    self.expect_value(")")
+                expr = CallExpr(callee, args, getattr(expr, "location", None))
+            else:
+                expr = CallExpr(callee, [expr], getattr(expr, "location", None))
         return expr
 
     def parse_or(self) -> object:
