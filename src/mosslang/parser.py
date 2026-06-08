@@ -143,13 +143,19 @@ class Parser:
         self.expect_value("fn")
         name = self.expect_ident()
         params = self.parse_params()
-        return_type = self.parse_optional_return_type(stop_values={"uses", "{"})
+        return_type = self.parse_optional_return_type(stop_values={"uses", "{", "="})
         uses: list[str] = []
         if self.match_value("uses"):
             uses.append(self.expect_ident())
             while self.match_value(","):
                 uses.append(self.expect_ident())
-        body = self.parse_block()
+        # Arrow body shortcut: fn name(params) = expr (instead of { expr })
+        if self.match_value("="):
+            expr = self.parse_expression()
+            self.consume_statement_end()
+            body = [ExprStmt(expr)]
+        else:
+            body = self.parse_block()
         self.consume_statement_end()
         return FunctionDecl(name=name, params=params, return_type=return_type, uses=uses, body=body, location=location)
 
