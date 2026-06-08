@@ -873,6 +873,13 @@ def run_selfhost_run(path: Path) -> int:
         mbc_path = Path(f.name)
     mbc_path.write_bytes(mod.serialize())
     cvm = Path(__file__).resolve().parents[2] / "bin" / "mossvm.exe"
+    if not cvm.is_file():
+        # PyInstaller bundle: check executable directory
+        import sys as _sys
+        if getattr(_sys, 'frozen', False):
+            cvm = Path(_sys.executable).parent / "mossvm.exe"
+    if not cvm.is_file():
+        cvm = Path.cwd() / "mossvm.exe"
     c_output = None
     if cvm.is_file():
         result = subprocess.run([str(cvm), str(mbc_path)], capture_output=True, text=True, timeout=30)
