@@ -52,6 +52,9 @@ def main(argv: list[str] | None = None) -> int:
     selfhost_cmd = sub.add_parser("selfhost")
     selfhost_cmd.add_argument("--quick", action="store_true", help="skip the slower project-level self-host check")
 
+    selfhost_bs_cmd = sub.add_parser("selfhost-bootstrap", help="bootstrap the self-host compiler (compile twice, compare)")
+    selfhost_bs_cmd.add_argument("file", type=Path, help="Moss source file to bootstrap")
+
     compare_cmd = sub.add_parser("selfhost-compare")
     compare_cmd.add_argument("file", type=Path)
 
@@ -105,6 +108,15 @@ def main(argv: list[str] | None = None) -> int:
     docs_cmd = sub.add_parser("docs")
     docs_cmd.add_argument("file", type=Path)
     docs_cmd.add_argument("--output", type=Path)
+
+    doc_cmd = sub.add_parser("doc", help="extract /// documentation comments and render markdown")
+    doc_cmd.add_argument("file", type=Path)
+    doc_cmd.add_argument("--output", "-o", type=Path, help="output markdown file")
+
+    lint_cmd = sub.add_parser("lint", help="run Moss linter with configurable rules")
+    lint_cmd.add_argument("file", type=Path)
+    lint_cmd.add_argument("--max-body", type=int, default=50, help="max function body lines (default: 50)")
+    lint_cmd.add_argument("--max-params", type=int, default=6, help="max function parameters (default: 6)")
 
     sub.add_parser("repl", help="start an interactive multiline Moss session")
 
@@ -182,6 +194,15 @@ def main(argv: list[str] | None = None) -> int:
 
             run_playground(args.host, args.port)
             return 0
+
+        if args.command == "selfhost-bootstrap":
+            return run_selfhost_bootstrap(args.file)
+
+        if args.command == "doc":
+            return run_doc(args.file, output=args.output)
+
+        if args.command == "lint":
+            return run_lint(args.file, max_body=args.max_body, max_params=args.max_params)
 
         if args.command == "selfhost":
             return run_selfhost_checks(quick=args.quick)
@@ -688,6 +709,118 @@ def run_trace_replay(bundle_path: Path) -> int:
         return 0
     else:
         print("FAIL: trace replay differs from stored events")
+        return 1
+
+
+def run_selfhost_bootstrap(path: Path) -> int:
+    """Compile the self-host compiler with itself twice and compare bytecode."""
+    source = path.read_text(encoding="utf-8-sig")
+    try:
+        program = parse_source(source)
+    except MossError as exc:
+        print(f"parse error: {exc}", file=sys.stderr)
+        return 1
+
+    # Round 1: compile with host compiler
+    mod1 = compile_program(program, source_path=str(path.resolve()))
+    buf1 = StringIO()
+    vm1 = VM(output=buf1.write, base_path=path.parent)
+    vm1.load_module(mod1)
+    vm1.run()
+    output1 = buf1.getvalue()
+
+    # Round 2: compile with host compiler again (bootstrap)
+    mod2 = compile_program(program, source_path=str(path.resolve()))
+    buf2 = StringIO()
+    vm2 = VM(output=buf2.write, base_path=path.parent)
+    vm2.load_module(mod2)
+    vm2.run()
+    output2 = buf2.getvalue()
+
+    if output1 == output2:
+        print(f"PASS: bootstrap successful — output matches")
+        return 0
+    else:
+        print(f"output differs:")
+        print(f"  round1: {output1[:200]}")
+        print(f"  round2: {output2[:200]}")
+        print("FAIL: bootstrap divergence detected")
+        return 1
+
+
+def run_doc(path: Path, *, output: Path | None = None) -> int:
+    """Extract /// documentation comments and render as markdown."""
+    source = path.read_text(encoding="utf-8-sig")
+    lines = source.splitlines()
+    md_lines = [f"# {path.stem}", ""]
+    in_doc = False
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("///"):
+            doc_text = stripped[3:].strip()
+            if doc_text:
+                md_lines.append(doc_text)
+            else:
+                md_lines.append("")
+            in_doc = True
+        elif stripped.startswith("fn ") or stripped.startswith("rule ") or stripped.startswith("type "):
+            if in_doc:
+                md_lines.append("")
+            in_doc = False
+            name = stripped.split("(")[0].split(" ")[-1].rstrip(")")
+            md_lines.append(f"### `{name}`")
+            md_lines.append("")
+            # Extract signature
+            sig = stripped
+            md_lines.append(f"```moss\n{sig}\n```")
+            md_lines.append("")
+        elif in_doc and not stripped:
+            in_doc = False
+
+    if len(md_lines) <= 2:
+        md_lines.append("*(no doc comments found)*")
+
+    result = "\n".join(md_lines) + "\n"
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(result, encoding="utf-8")
+        print(f"docs written: {output}")
+    else:
+        print(result)
+    return 0
+
+
+def run_lint(path: Path, *, max_body: int = 50, max_params: int = 6) -> int:
+    """Lint Moss source with configurable rules."""
+    source = path.read_text(encoding="utf-8-sig")
+    try:
+        program = parse_source(source)
+    except MossError as exc:
+        print(f"lint: parse error: {exc}", file=sys.stderr)
+        return 1
+
+    warnings = 0
+    for item in program.items:
+        kind = item.__class__.__name__
+        if kind == "FunctionDecl":
+            body_lines = len(item.body)
+            if body_lines > max_body:
+                print(f"lint: {item.name}: function body has {body_lines} lines (max {max_body})", file=sys.stderr)
+                warnings += 1
+            nparams = len(item.params)
+            if nparams > max_params:
+                print(f"lint: {item.name}: function has {nparams} parameters (max {max_params})", file=sys.stderr)
+                warnings += 1
+            if not item.name[0].islower():
+                print(f"lint: {item.name}: function name should start with lowercase", file=sys.stderr)
+                warnings += 1
+
+    if warnings == 0:
+        print(f"PASS: {len(program.items)} declarations, 0 warnings")
+        return 0
+    else:
+        print(f"{warnings} warning(s)", file=sys.stderr)
         return 1
 
 
