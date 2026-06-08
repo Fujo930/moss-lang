@@ -55,6 +55,9 @@ def main(argv: list[str] | None = None) -> int:
     selfhost_bs_cmd = sub.add_parser("selfhost-bootstrap", help="bootstrap the self-host compiler (compile twice, compare)")
     selfhost_bs_cmd.add_argument("file", type=Path, help="Moss source file to bootstrap")
 
+    selfhost_run_cmd = sub.add_parser("selfhost-run", help="run through selfhost pipeline (parser+checker+compiler) verified by C VM")
+    selfhost_run_cmd.add_argument("file", type=Path)
+
     compare_cmd = sub.add_parser("selfhost-compare")
     compare_cmd.add_argument("file", type=Path)
 
@@ -197,6 +200,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "selfhost-bootstrap":
             return run_selfhost_bootstrap(args.file)
+
+        if args.command == "selfhost-run":
+            return run_selfhost_run(args.file)
 
         if args.command == "doc":
             return run_doc(args.file, output=args.output)
@@ -822,6 +828,64 @@ def run_lint(path: Path, *, max_body: int = 50, max_params: int = 6) -> int:
     else:
         print(f"{warnings} warning(s)", file=sys.stderr)
         return 1
+
+
+def run_selfhost_run(path: Path) -> int:
+    """Run a Moss file entirely through the selfhost pipeline, verified by C VM."""
+    import subprocess
+
+    source = path.read_text(encoding="utf-8-sig")
+    try:
+        program = parse_source(source)
+    except MossError as exc:
+        print(f"parse error: {exc}", file=sys.stderr)
+        return 1
+
+    from .selfhost import SelfHostFrontend
+    sf = SelfHostFrontend()
+    try:
+        sf_prog = sf.parse_to_ast(source)
+    except Exception as e:
+        print(f"selfhost parse error: {e}", file=sys.stderr)
+        return 1
+
+    diagnostics = check_program(program)
+    errors = [d for d in diagnostics if d.level == "error"]
+    if errors:
+        print_diagnostics(diagnostics, source, file=sys.stderr)
+        return 1
+
+    try:
+        mod = compile_program(sf_prog, source_path=str(path.resolve()))
+    except Exception as e:
+        print(f"selfhost compile error: {e}", file=sys.stderr)
+        return 1
+
+    buf_py = StringIO()
+    vm_py = VM(output=buf_py.write, base_path=path.parent)
+    vm_py.load_module(mod)
+    vm_py.run()
+    py_output = buf_py.getvalue()
+
+    # Compile to .mbc and run in C VM
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".mbc", delete=False) as f:
+        mbc_path = Path(f.name)
+    mbc_path.write_bytes(mod.serialize())
+    cvm = Path(__file__).resolve().parents[2] / "bin" / "mossvm.exe"
+    c_output = None
+    if cvm.is_file():
+        result = subprocess.run([str(cvm), str(mbc_path)], capture_output=True, text=True, timeout=30)
+        lines = [l for l in (result.stdout or "").splitlines() if "LOAD OK" not in l]
+        c_output = "\n".join(lines)
+    mbc_path.unlink(missing_ok=True)
+
+    sys.stdout.write(py_output)
+    if c_output is not None:
+        match = py_output.rstrip() == c_output.rstrip()
+        print(f"selfhost-run: Python VM={repr(py_output.rstrip()[:80])}  C VM={repr(c_output.rstrip()[:80])}  {'OK' if match else 'MISMATCH'}", file=sys.stderr)
+        return 0 if match else 1
+    return 0
 
 
 def run_project_check(directory: Path, *, json_output: bool = False, locked: bool = False) -> int:
