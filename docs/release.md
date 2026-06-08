@@ -14,7 +14,7 @@ Public description:
 
 Use this wording carefully:
 
-- Good: "AI-designed and AI-built by Codex in collaboration with Fujo930."
+- Good: "AI-designed and AI-built by Codex (ds-Mosslang fork by DeepSeek) in collaboration with Fujo930."
 - Good: "self-hosting preview" or "self-hosting started."
 - Good: "Moss code now reads and checks Moss code."
 - Avoid: "fully self-hosted."

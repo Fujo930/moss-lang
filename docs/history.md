@@ -3,6 +3,23 @@
 This file explains the repository history in human terms. The Git commit
 messages stay short; this document gives future readers the memory behind them.
 
+## ds Moss 0.1: DeepSeek bytecode compiler fork
+
+The ds Moss 0.1 fork, built by DeepSeek in collaboration with Fujo930, adds
+a bytecode compiler and stack-based virtual machine to the Moss language
+prototype.
+
+- 32-opcode stack-machine bytecode ISA with binary .mbc serialization format
+- Full AST -> bytecode compiler supporting all Moss language constructs
+- Stack VM with complete Moss semantics: variants, Money, Result, effects
+- CLI commands: moss compile, moss run-vm
+- 19/19 unit tests passing, 7/9 examples compatible
+- Label backpatching for if/while/for/match control flow
+
+ds Moss 0.1 is a branch, not a release. It proves that Moss can be compiled
+to a portable bytecode format and executed outside the tree-walking
+interpreter, laying groundwork for future native compilation targets.
+
 Moss is AI-designed and AI-built. Codex designed, implemented, debugged,
 documented, committed, and pushed the current language prototype in
 collaboration with Fujo930. This history is intentionally part development log,
