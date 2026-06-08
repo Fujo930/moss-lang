@@ -54,6 +54,19 @@ typedef struct Value {
     } as;
 } Value;
 
+static Value *val_null(void);
+static Value *val_number(double n);
+static Value *val_bool(bool b);
+static Value *val_string(const char *s);
+
+static Value *val_variant(const char *name) {
+    Value *v = calloc(1, sizeof(Value));
+    v->kind = V_VARIANT;
+    v->as.variant.name = strdup(name);
+    v->as.variant.payload = NULL;
+    return v;
+}
+
 static Value *val_null(void) {
     Value *v = calloc(1, sizeof(Value));
     v->kind = V_NULL;
@@ -88,6 +101,7 @@ static void val_print(FILE *fp, Value *v) {
     case V_NUMBER:  fprintf(fp, "%g", v->as.number); break;
     case V_BOOL:    fprintf(fp, "%s", v->as.boolean ? "true" : "false"); break;
     case V_STRING:  fprintf(fp, "%s", v->as.string); break;
+    case V_VARIANT: fprintf(fp, "%s", v->as.variant.name); break;
     case V_LIST: {
         fprintf(fp, "[");
         for (int i = 0; i < v->as.list.count; i++) {
@@ -321,9 +335,10 @@ static void vm_run(VM *vm) {
         case OP_EQ:  { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack);
             bool eq = (l->kind == r->kind);
             if (eq && l->kind == V_NUMBER) eq = (l->as.number == r->as.number);
-            if (eq && l->kind == V_STRING) eq = (strcmp(l->as.string, r->as.string) == 0);
-            if (eq && l->kind == V_BOOL) eq = (l->as.boolean == r->as.boolean);
-            if (eq && l->kind == V_NULL) eq = true;
+            else if (eq && l->kind == V_STRING) eq = (strcmp(l->as.string, r->as.string) == 0);
+            else if (eq && l->kind == V_BOOL) eq = (l->as.boolean == r->as.boolean);
+            else if (eq && l->kind == V_VARIANT) eq = (strcmp(l->as.variant.name, r->as.variant.name) == 0);
+            else if (eq && l->kind == V_NULL) eq = true;
             stack_push(&vm->stack, val_bool(eq)); break;
         }
         case OP_NEQ: { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_bool(to_number(l) != to_number(r))); break; }
@@ -474,7 +489,12 @@ static Value *vm_resolve_global(VM *vm, int idx) {
     Value *g = vm_global(vm, idx);
     if (g) return g;
     const char *gn = vm_global_name(vm, idx);
-    if (gn) return vm_builtin_by_name(gn);
+    if (gn) {
+        g = vm_builtin_by_name(gn);
+        if (g) return g;
+        /* Auto-create variants for capitalized names */
+        if (*gn >= 'A' && *gn <= 'Z') return val_variant(gn);
+    }
     /* No global name registered — use fallback: common builtins at low indices */
     if (idx < (int)BUILTIN_COUNT) return val_string(BUILTIN_NAMES[idx]);
     return NULL;
