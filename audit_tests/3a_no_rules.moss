@@ -1,6 +1,0 @@
-// No rules at all — trace should be empty
-effect Database
-
-fn justPrint() {
-  print("hello")
-}

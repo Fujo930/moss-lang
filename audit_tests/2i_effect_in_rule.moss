@@ -1,5 +1,0 @@
-effect Database
-
-// Rules should be pure — but can they call effect functions?
-rule impureRule(order) =
-  dbPut(order.id, order)  // rule calling effect builtin — should this be caught?

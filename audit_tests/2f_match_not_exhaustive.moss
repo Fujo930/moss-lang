@@ -1,8 +1,0 @@
-type Status = Pending | Paid | Shipped | Cancelled
-
-rule describe(s: Status) -> Text =
-  match s {
-    Paid -> "paid"
-    Pending -> "pending"
-  }
-// missing Shipped and Cancelled — no wildcard

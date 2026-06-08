@@ -1,4 +1,0 @@
-effect Database
-
-rule impureRule(order) uses Database =
-  dbPut(order.id, order)

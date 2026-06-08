@@ -1,8 +1,0 @@
-// Syntax error: unclosed brace
-effect Database
-
-fn broken() {
-  dbPut("x", 1)
-// missing closing brace
-
-let x = 42

@@ -1,8 +1,0 @@
-effect Database
-
-fn saveWithoutDeclaringEffect(order) {
-  dbPut(order.id, order)
-}
-
-let order = { id: "A-102", status: Paid, total: 10.usd }
-saveWithoutDeclaringEffect(order)

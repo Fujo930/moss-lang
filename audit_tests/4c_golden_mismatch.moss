@@ -1,5 +1,0 @@
-// Test: golden file exists but output is different
-fn main() {
-  print("WRONG output — does not match golden")
-}
-main()
