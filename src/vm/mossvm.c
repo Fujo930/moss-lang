@@ -488,9 +488,19 @@ static void vm_run(VM *vm) {
                     } else if (strcmp(name, "jsonStringify") == 0) {
                         stack_push(&vm->stack, val_string("{}"));
                     } else if (strcmp(name, "readText") == 0) {
-                        stack_push(&vm->stack, val_string("moss\nlanguage\n"));
+                        if (fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            FILE *rf = fopen(fn_args[0]->as.string, "r");
+                            if (rf) { fseek(rf,0,SEEK_END); long sz=ftell(rf); fseek(rf,0,SEEK_SET);
+                                char *buf=malloc(sz+1); fread(buf,1,sz,rf); buf[sz]=0; fclose(rf);
+                                stack_push(&vm->stack, val_string(buf)); free(buf); }
+                            else stack_push(&vm->stack, val_string(""));
+                        } else stack_push(&vm->stack, val_null());
                     } else if (strcmp(name, "fileExists") == 0) {
-                        stack_push(&vm->stack, val_bool(true));
+                        if (fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            FILE *tf = fopen(fn_args[0]->as.string, "r");
+                            stack_push(&vm->stack, val_bool(tf != NULL));
+                            if (tf) fclose(tf);
+                        } else stack_push(&vm->stack, val_bool(false));
                     } else if (strcmp(name, "textTrim") == 0) {
                         if (fn_args[0] && fn_args[0]->kind == V_STRING) stack_push(&vm->stack, fn_args[0]);
                         else stack_push(&vm->stack, val_null());
