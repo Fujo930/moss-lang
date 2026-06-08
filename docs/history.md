@@ -367,3 +367,100 @@ recursive statement shapes.
 Why it matters: the Moss-written frontend must preserve the contracts that
 tools, checkers, and future code generation depend on, not merely recognize
 that a declaration exists.
+
+## ds Moss 0.5.1–0.5.4: token-efficient syntax for AI generation
+
+The 0.5.x series, built by DeepSeek (Kun), adds four syntax features designed
+to reduce token count when AI models generate Moss code. Every feature was
+implemented, tested, committed, and pushed in a single session.
+
+### 0.5.1 — implicit return
+
+The last expression in a function body is automatically returned. No `return`
+keyword needed.
+
+```moss
+// before
+fn add(a, b) {
+  return a + b
+}
+// after
+fn add(a, b) { a + b }
+```
+
+Compiler change: `_compile_function` checks whether the last statement is an
+`ExprStmt`. If so, the expression result stays on the stack instead of being
+popped and replaced by `LOAD_NULL`.
+
+### 0.5.2 — pipe operator `|>`
+
+`expr |> fn(args)` desugars to `fn(expr, args)`. Supports chaining.
+
+```moss
+// before
+cleaned = textTrim(textSplit(source, " "))
+// after
+cleaned = source |> textSplit(" ") |> textTrim
+```
+
+Tokenizer change: `|>` added to `TWO_CHAR_TOKENS`. Parser change: `parse_update`
+transforms pipe chains into `CallExpr` nodes, so the compiler and VM need no
+modifications.
+
+### 0.5.3 — lambda expressions `\x -> expr`
+
+Anonymous functions with Haskell-style backslash syntax.
+
+```moss
+let double = \x -> x * 2
+let add = \a, b -> a + b
+print(double(5))  // 10
+```
+
+New AST node `LambdaExpr`. Compiler compiles the lambda body into a `CodeObject`
+constant. VM's `_resolve_callable` now checks frame locals so lambda `CodeObject`
+values can be called by name.
+
+### 0.5.4 — arrow function body shorthand
+
+`fn name(params) = expr` replaces `fn name(params) { expr }` for
+single-expression functions.
+
+```moss
+// before
+fn double(x) { x * 2 }
+// after
+fn double(x) = x * 2
+```
+
+Parser change: `parse_function_decl` accepts `=` after the parameter list as
+a block-free body. Combines with implicit return (0.5.1) for zero overhead.
+
+### Infrastructure fixes
+
+The 0.5.1–0.5.4 releases also included critical runtime fixes discovered during
+self-host testing:
+
+- **Import support**: VM `_load_imports` compiles and merges imported modules
+- **For-loop continue**: `continue_label` moved after increment to prevent
+  infinite loops
+- **CLI .mbc deserialization**: `compile`/`run-vm` commands moved before source
+  text read to avoid parsing binary as Moss source
+- **Float index handling**: text/list slice builtins accept float indices
+  (since Moss NumberLiterals become Decimal→float in the constant pool)
+- **VM builtin compatibility**: `listGet` optional default, `None` as valid
+  `LOAD_LOCAL` value, `LOOP_NULL` removal
+- **Self-host project runs**: `project_check.moss` now completes with 0 errors,
+  0 warnings — the Moss-written checker successfully validates the self_host
+  directory
+
+### Token efficiency summary
+
+| Feature | Tokens saved | Example |
+|---------|-------------|---------|
+| Implicit return | 1 per function | `fn f(x) { x+1 }` vs `fn f(x) { return x+1 }` |
+| Pipe `\|>` | ~3 per chain | `a \|> f \|> g` vs `g(f(a))` |
+| Lambda `\` | ~4 per lambda | `\x -> x+1` vs `fn tmp(x) { return x+1 }` |
+| Arrow body `=` | 2 per function | `fn f(x) = x+1` vs `fn f(x) { x+1 }` |
+
+All 108 tests + 9 subtests pass consistently across all versions.

@@ -81,6 +81,44 @@ test "ships paid orders" {
 `moss run` ignores test blocks. `moss test` runs program setup first, then runs
 each test block and reports pass/fail results.
 
+
+### Implicit return (0.5.1)
+
+The last expression in a function body is automatically returned:
+
+```moss
+fn add(a, b) { a + b }
+fn greet(name) { "Hello, " + name }
+```
+
+### Arrow function body (0.5.4)
+
+Single-expression functions can use `=` instead of `{ }`:
+
+```moss
+fn double(x) = x * 2
+fn square(x) = x * x
+```
+
+### Pipe operator (0.5.2)
+
+`expr |> fn(args)` desugars to `fn(expr, args)`:
+
+```moss
+cleaned = source |> textSplit(" ") |> textTrim |> textSlice(0, 10)
+```
+
+### Lambda expressions (0.5.3)
+
+Anonymous functions with Haskell-style backslash syntax:
+
+```moss
+let double = \x -> x * 2
+let add = \a, b -> a + b
+let result = items |> filter(\x -> x > 0) |> map(\x -> x * 2)
+```
+
+
 ## Values
 
 The prototype supports:

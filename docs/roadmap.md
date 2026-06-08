@@ -116,9 +116,12 @@ Developer experience:
 - test runner with golden output files
 - generated Markdown API and schema docs
 
-Version 0.5 feature work is complete. The next milestone focuses on reducing
-friction in the first user experience while preparing the verified Moss-written
-frontend for active use.
+Version 0.5 feature work is complete.
+
+**ds-Mosslang 0.5.1–0.5.4** (DeepSeek fork): adds bytecode compiler + stack VM
+(32-opcode ISA, .mbc binary format), token-efficient syntax (implicit return,
+pipe `|>`, lambda `\`, arrow body `fn f(x) = expr`), and full self-host
+project support (`project_check.moss` runs 0 errors). All 108 tests pass.
 
 ## Version 0.6: adoption and integration foundation
 

@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
-![Version: 0.5.0](https://img.shields.io/badge/version-0.5.0-4f7edb)
+![Version: 0.5.0](https://img.shields.io/badge/version-0.5.4-4f7edb)
 ![Built by DeepSeek](https://img.shields.io/badge/built%20by-DeepSeek-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -30,7 +30,7 @@ rules.
 ## Quick start
 
 Windows users can download the standalone compiler, language server, and Studio
-from the [`v0.5.0` release](https://github.com/Fujo930/moss-lang/releases/tag/v0.5.0).
+from the [`v0.5.4` release](https://github.com/Fujo930/moss-lang/releases/tag/v0.5.4).
 Choose the installer or portable ZIP; neither requires a separate Python
 installation.
 
