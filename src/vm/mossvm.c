@@ -155,6 +155,8 @@ static void val_print(FILE *fp, Value *v) {
 /* ── Stack ─────────────────────────────────────────────────────────── */
 
 #define STACK_MAX 4096
+#define MAX_FRAME_DEPTH 1000
+#define MAX_STRING_LEN (1024 * 1024)  /* 1 MB */
 typedef struct {
     Value *slots[STACK_MAX];
     int sp;
@@ -192,6 +194,7 @@ static uint32_t read_u32(FILE *f) {
 
 static char *read_string(FILE *f) {
     uint32_t len = read_u32(f);
+    if (len > MAX_STRING_LEN) { fprintf(stderr, "mossvm: string too long (%u bytes)\n", len); exit(1); }
     char *s = malloc(len + 1);
     fread(s, 1, len, f);
     s[len] = 0;
@@ -494,8 +497,9 @@ static void vm_run(VM *vm) {
                         if (fn_args[0] && fn_args[0]->kind == V_STRING) {
                             FILE *rf = fopen(fn_args[0]->as.string, "r");
                             if (rf) { fseek(rf,0,SEEK_END); long sz=ftell(rf); fseek(rf,0,SEEK_SET);
-                                char *buf=malloc(sz+1); fread(buf,1,sz,rf); buf[sz]=0; fclose(rf);
-                                stack_push(&vm->stack, val_string(buf)); free(buf); }
+                                if (sz > MAX_STRING_LEN) { fclose(rf); fprintf(stderr, "mossvm: file too large (%ld bytes, max %d)\n", sz, MAX_STRING_LEN); stack_push(&vm->stack, val_string("")); }
+                                else { char *buf=malloc(sz+1); fread(buf,1,sz,rf); buf[sz]=0; fclose(rf);
+                                stack_push(&vm->stack, val_string(buf)); free(buf); } }
                             else stack_push(&vm->stack, val_string(""));
                         } else stack_push(&vm->stack, val_null());
                     } else if (strcmp(name, "fileExists") == 0) {
@@ -747,7 +751,7 @@ static void vm_run(VM *vm) {
                     } else {
                         /* Moss-defined function */
                         int fi = vm_find_func(name);
-                        if (fi >= 0 && vm->frame_depth < 254) {
+                        if (fi >= 0 && vm->frame_depth < (MAX_FRAME_DEPTH - 1)) {
                             vm->frames[vm->frame_depth].saved_pc           = vm->pc;
                             vm->frames[vm->frame_depth].saved_locals       = vm->locals;
                             vm->frames[vm->frame_depth].saved_local_count  = vm->local_count;
@@ -765,6 +769,9 @@ static void vm_run(VM *vm) {
                             for (int ai = 0; ai < arg && ai < vm->local_count; ai++)
                                 vm->locals[ai] = fn_args[ai];
                             vm->pc = 0;
+                        } else if (fi >= 0 && vm->frame_depth >= (MAX_FRAME_DEPTH - 1)) {
+                            fprintf(stderr, "mossvm: stack overflow — max call depth %d exceeded at '%s'\n", MAX_FRAME_DEPTH, name);
+                            exit(1);
                         } else stack_push(&vm->stack, val_null());
                     }
             } else if (callee->kind == V_VARIANT && callee->as.variant.name) {
