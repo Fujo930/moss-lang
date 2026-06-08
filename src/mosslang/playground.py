@@ -37,8 +37,10 @@ def run_trust_from_source(source: str) -> dict:
     import hashlib
 
     source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    version = _get_version()
     bundle: dict = {
-        "moss": _get_version(),
+        "artifact": f"Moss Trust Artifact v{version}",
+        "moss": version,
         "source_sha256": source_hash,
         "trust": True,
     }
@@ -48,7 +50,8 @@ def run_trust_from_source(source: str) -> dict:
         program = parse_source(source)
     except MossError as e:
         return {
-            "moss": _get_version(),
+            "artifact": f"Moss Trust Artifact v{version}",
+            "moss": version,
             "source_sha256": source_hash,
             "trust": False,
             "check": {

@@ -329,16 +329,19 @@
   function renderTrust(b) {
     const tc = $('#trustContent');
     const trusted = b.trust;
-    const icon = trusted ? '&#x2705;' : '&#x274C;';
-    const msg = trusted ? 'Trust Verified' : 'Trust Failed';
-    const sub = trusted ? 'All gates passed. This program is provably correct.' : 'One or more gates failed.';
+    const icon = trusted ? '\u2705' : '\u274C';
+    const msg = trusted ? 'Trust Artifact Verified' : 'Trust Artifact Failed';
+    const sub = trusted
+      ? 'All five gates passed. Structured evidence of correctness.'
+      : 'One or more gates failed — see details below.';
+    const artifact = b.artifact || `Moss Trust Artifact v${b.moss||'0.58'}`;
 
     let html = `<div class="trust-bar ${trusted ? 'trusted' : 'untrusted'}">
       <div class="trust-icon">${icon}</div>
       <div>
         <div class="trust-text ${trusted ? 'trusted' : 'untrusted'}">${msg}</div>
-        <div class="trust-sub">${sub}</div>
-        <div class="trust-sub" style="margin-top:4px">sha256 <code>${(b.source_sha256||'').substring(0,16)}...</code></div>
+        <div class="trust-sub">${artifact}</div>
+        <div class="trust-sub">sha256 <code>${(b.source_sha256||'').substring(0,16)}\u2026</code></div>
       </div>
     </div><div class="gates">`;
 
@@ -404,8 +407,17 @@ print(greet("Moss"))`;
     updateLineNumbers();
   }
 
-  // Update release tag from version in response
-  fetch('/api/examples').then(r => r.json()).then(() => {
-    releaseTag.textContent = '0.6';
-  }).catch(() => {});
-})();
+  // Update release tag from version endpoint
+  (async function loadVersion() {
+    try {
+      const rsp = await fetch('/api/version');
+      if (rsp.ok) {
+        const v = await rsp.json();
+        releaseTag.textContent = v.moss || '0.58';
+      } else {
+        releaseTag.textContent = '0.58';
+      }
+    } catch (_) {
+      releaseTag.textContent = '0.58';
+    }
+  })();

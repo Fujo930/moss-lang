@@ -1,6 +1,6 @@
 #define AppName "Moss"
-#define AppVersion "0.7.3"
-#define AppPublisher "DeepSeek, Reasonix, and Fujo930"
+#define AppVersion "0.58.0"
+#define AppPublisher "Fujo930 + Reasonix"
 
 [Setup]
 AppId={{36DA50F6-51CB-4DB4-A37A-C6032D14E1A5}
@@ -10,7 +10,7 @@ AppPublisher={#AppPublisher}
 DefaultDirName={localappdata}\Programs\Moss
 DefaultGroupName=Moss
 OutputDir=..\installer
-OutputBaseFilename=Moss-0.7.3-Windows-Setup
+OutputBaseFilename=Moss-0.58.0-Windows-Setup
 SetupIconFile=moss.ico
 UninstallDisplayIcon={app}\Moss Studio.exe
 PrivilegesRequired=lowest

@@ -21,6 +21,7 @@ from .vm import VM
 from .tokens import tokenize
 from .tooling import analyze_document
 from .project import build_project_graph, find_manifest, load_manifest
+from . import __version__
 
 
 ASSET_TYPES = {
@@ -182,7 +183,7 @@ def example_source(filename: str) -> str:
 
 def make_handler() -> type[BaseHTTPRequestHandler]:
     class StudioHandler(BaseHTTPRequestHandler):
-        server_version = "MossStudio/0.1"
+        server_version = "MossStudio/0.58"
 
         def do_GET(self) -> None:
             if self.path in {"/", "/index.html"}:
@@ -196,6 +197,9 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
                 return
             if self.path == "/moss-mark.svg":
                 self.send_asset("moss-mark.svg")
+                return
+            if self.path == "/api/version":
+                self.send_json({"moss": __version__, "studio": "0.58"})
                 return
             if self.path == "/api/examples":
                 examples = []

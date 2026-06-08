@@ -69,15 +69,15 @@ if (-not $Iscc) { throw "Inno Setup compiler was not found." }
 
 & $Iscc (Join-Path $PSScriptRoot "moss.iss")
 
-$Portable = Join-Path $ReleaseRoot "Moss-0.7.3-Windows-Portable.zip"
+$Portable = Join-Path $ReleaseRoot "Moss-0.58.0-Windows-Portable.zip"
 Remove-Item $Portable -Force -ErrorAction SilentlyContinue
 Compress-Archive -Path (Join-Path $BuildRoot "moss\*") -DestinationPath $Portable -CompressionLevel Optimal
 
 $Artifacts = @(
-  (Join-Path $ReleaseRoot "Moss-0.7.3-Windows-Setup.exe"),
+  (Join-Path $ReleaseRoot "Moss-0.58.0-Windows-Setup.exe"),
   $Portable,
-  (Join-Path $Root "dist\mosslang-0.7.3-py3-none-any.whl"),
-  (Join-Path $Root "dist\mosslang-0.7.3.tar.gz")
+  (Join-Path $Root "dist\mosslang-0.58.0-py3-none-any.whl"),
+  (Join-Path $Root "dist\mosslang-0.58.0.tar.gz")
 )
 $Hashes = foreach ($Artifact in $Artifacts) {
   $Hash = Get-FileHash $Artifact -Algorithm SHA256
