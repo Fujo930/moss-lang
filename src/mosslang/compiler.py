@@ -419,6 +419,9 @@ class Compiler:
             self._compile_expression(expr.expr)
             self.emit(Opcode.TRY_PROPAGATE)
 
+        elif isinstance(expr, n.LambdaExpr):
+            self._compile_lambda(expr)
+
         else:
             raise ValueError(f"Unsupported expression: {type(expr).__name__}")
 
@@ -480,6 +483,44 @@ class Compiler:
         name_idx = self._add_constant(name)
         self.emit(Opcode.LOAD_CONST, name_idx)
         self.emit(Opcode.CALL, arg_count)
+
+    def _compile_lambda(self, expr: n.LambdaExpr) -> None:
+        """Compile a lambda into a CodeObject constant."""
+        saved_locals = list(self.locals)
+        saved_constants = list(self.constants)
+        saved_instructions = list(self.instructions)
+        saved_breaks = list(self.loop_breaks)
+        saved_continues = list(self.loop_continues)
+
+        self.locals = []
+        self.instructions = []
+        self.loop_breaks = []
+        self.loop_continues = []
+
+        for param in expr.params:
+            self._register_local(param.name)
+
+        self._compile_expression(expr.expr)
+        self.emit(Opcode.RETURN)
+        self._resolve_labels()
+
+        co = CodeObject(
+            name="<lambda>",
+            instructions=list(self.instructions),
+            constants=list(self.constants),
+            locals=list(self.locals),
+            arg_count=len(expr.params),
+        )
+
+        self.locals = saved_locals
+        self.constants = saved_constants
+        self.instructions = saved_instructions
+        self.loop_breaks = saved_breaks
+        self.loop_continues = saved_continues
+
+        # Push the lambda CodeObject onto the stack
+        self._add_constant(co)
+        self.emit(Opcode.LOAD_CONST, self._constant_index(co))
 
     def _compile_match(self, expr: n.MatchExpr) -> None:
         """Compile match: DUP subject, EQ against each variant, jump to matching body."""

@@ -351,6 +351,12 @@ class VM:
             raise MossRuntimeError(f"cannot call {type(callee).__name__}")
 
     def _resolve_callable(self, name, frame):
+        # Check frame locals for lambda / closure values
+        if name in frame.code.locals:
+            idx = frame.code.locals.index(name)
+            val = frame.locals[idx]
+            if isinstance(val, CodeObject):
+                return val
         if name in self.globals:
             return self.globals[name]
         if name in self.functions:
