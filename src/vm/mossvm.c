@@ -19,7 +19,7 @@
 
 /* ── Value types ──────────────────────────────────────────────────── */
 
-typedef enum { V_NULL, V_NUMBER, V_BOOL, V_STRING, V_LIST, V_RECORD, V_VARIANT, V_RESULT, V_CODE } ValueKind;
+typedef enum { V_NULL, V_NUMBER, V_BOOL, V_STRING, V_LIST, V_RECORD, V_VARIANT, V_RESULT, V_CODE, V_MONEY } ValueKind;
 
 typedef struct Value {
     ValueKind kind;
@@ -45,6 +45,10 @@ typedef struct Value {
             struct Value *value;
         } result;
         struct {
+            double amount;
+            char *currency;
+        } money;
+        struct {
             uint8_t  *instructions;
             int32_t  *args;
             int32_t   length;
@@ -57,6 +61,8 @@ typedef struct Value {
 static Value *val_null(void);
 static Value *val_number(double n);
 static Value *val_bool(bool b);
+
+static Value *val_money(double amount, const char *currency);
 static Value *val_string(const char *s);
 
 static Value *val_variant(const char *name) {
@@ -87,6 +93,14 @@ static Value *val_bool(bool b) {
     return v;
 }
 
+static Value *val_money(double amount, const char *currency) {
+    Value *v = calloc(1, sizeof(Value));
+    v->kind = V_MONEY;
+    v->as.money.amount = amount;
+    v->as.money.currency = strdup(currency);
+    return v;
+}
+
 static Value *val_string(const char *s) {
     Value *v = calloc(1, sizeof(Value));
     v->kind = V_STRING;
@@ -103,6 +117,7 @@ static void val_print(FILE *fp, Value *v) {
     case V_STRING:  fprintf(fp, "%s", v->as.string); break;
     case V_RESULT: fprintf(fp, "%s(", v->as.result.ok ? "Ok" : "Err"); val_print(fp, v->as.result.value); fprintf(fp, ")"); break;
     case V_VARIANT: fprintf(fp, "%s", v->as.variant.name); break;
+    case V_MONEY:   fprintf(fp, "%g.%s", v->as.money.amount, v->as.money.currency); break;
     case V_LIST: {
         fprintf(fp, "[");
         for (int i = 0; i < v->as.list.count; i++) {
@@ -197,15 +212,48 @@ typedef struct {
     Instructions insts;
     int     pc;
     bool    running;
-    Value **functions;
-    int32_t func_count;
-    char  **func_names;
-    Instructions *func_insts;
+    /* Call frame stack for Moss function calls */
+    struct {
+        int       saved_pc;
+        Value   **saved_locals;
+        int32_t   saved_local_count;
+        char    **saved_local_names;
+        Value   **saved_constants;
+        int32_t   saved_const_count;
+        Instructions saved_insts;
+    } frames[256];
+    int     frame_depth;
     /* Simple in-memory DB */
     char  **db_keys;
     Value **db_vals;
     int     db_count;
 } VM;
+
+/* Function registry for Moss-defined functions */
+#define MAX_FUNCS 512
+static struct { char *name; Instructions insts; int arg_count; int local_count; char **local_names; Value **constants; int const_count; } *func_registry = NULL;
+static int func_registry_count = 0;
+
+static void vm_register_func(const char *name, Instructions insts, int arg_count,
+                              int local_count, char **local_names,
+                              Value **constants, int const_count) {
+    if (!func_registry) func_registry = calloc(MAX_FUNCS, sizeof(*func_registry));
+    int idx = func_registry_count++;
+    func_registry[idx].name = strdup(name);
+    func_registry[idx].insts = insts;
+    func_registry[idx].arg_count = arg_count;
+    func_registry[idx].local_count = local_count;
+    func_registry[idx].local_names = local_names;
+    func_registry[idx].constants = constants;
+    func_registry[idx].const_count = const_count;
+}
+
+static int vm_find_func(const char *name) {
+    if (!func_registry) return -1;
+    for (int i = 0; i < func_registry_count; i++)
+        if (func_registry[i].name && strcmp(func_registry[i].name, name) == 0) return i;
+    return -1;
+}
 
 static const char *vm_global_name(VM *vm, int idx) {
     if (idx >= 0 && idx < vm->global_count && vm->global_names[idx])
@@ -254,6 +302,7 @@ static double to_number(Value *v) {
     case V_NUMBER: return v->as.number;
     case V_BOOL:   return v->as.boolean ? 1.0 : 0.0;
     case V_STRING: return atof(v->as.string);
+    case V_MONEY:  return v->as.money.amount;
     default:       return 0;
     }
 }
@@ -313,14 +362,28 @@ static void vm_run(VM *vm) {
         }
         case OP_JUMP_IF_TRUE:
             { Value *cond = stack_pop(&vm->stack); if (is_truthy(cond)) vm->pc = arg; break; }
-        case OP_RETURN: vm->running = false; break;
+        case OP_RETURN:
+            if (vm->frame_depth > 0) {
+                Value *ret = vm->stack.sp > 0 ? stack_pop(&vm->stack) : val_null();
+                vm->frame_depth--;
+                vm->pc          = vm->frames[vm->frame_depth].saved_pc;
+                vm->locals      = vm->frames[vm->frame_depth].saved_locals;
+                vm->local_count = vm->frames[vm->frame_depth].saved_local_count;
+                vm->local_names = vm->frames[vm->frame_depth].saved_local_names;
+                vm->constants   = vm->frames[vm->frame_depth].saved_constants;
+                vm->const_count = vm->frames[vm->frame_depth].saved_const_count;
+                vm->insts       = vm->frames[vm->frame_depth].saved_insts;
+                stack_push(&vm->stack, ret);
+            } else {
+                vm->running = false;
+            }
+            break;
         case OP_CALL: {
-            /* Pop args first (reverse order), then callee — matches Python VM */
             Value *fn_args[32] = {0};
             for (int i = arg - 1; i >= 0; i--) fn_args[i] = stack_pop(&vm->stack);
             Value *callee = stack_pop(&vm->stack);
-            if (callee) {
-                if (callee->kind == V_STRING) {
+            if (!callee) { stack_push(&vm->stack, val_null()); break; }
+            if (callee->kind == V_STRING) {
                     const char *name = callee->as.string;
                     if (strcmp(name, "print") == 0) {
                         for (int i = 0; i < arg; i++) { if(i>0)printf(" "); val_print(stdout, fn_args[i]); }
@@ -344,16 +407,50 @@ static void vm_run(VM *vm) {
                         if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_STRING)
                             stack_push(&vm->stack, vm_db_get(vm, fn_args[0]->as.string));
                         else stack_push(&vm->stack, val_null());
-                    } else stack_push(&vm->stack, val_null());
-                } else if (callee->kind == V_VARIANT && callee->as.variant.name) {
-                    /* Ok(value) → Result(true, value), Err(value) → Result(false, value) */
-                    const char *vn = callee->as.variant.name;
-                    Value *res = val_null(); res->kind = V_RESULT;
-                    if (strcmp(vn, "Ok") == 0) { res->as.result.ok = true; res->as.result.value = (arg>0) ? fn_args[0] : val_null(); }
-                    else if (strcmp(vn, "Err") == 0) { res->as.result.ok = false; res->as.result.value = (arg>0) ? fn_args[0] : val_null(); }
-                    else { /* generic variant */ res->kind = V_VARIANT; res->as = callee->as; }
-                    stack_push(&vm->stack, res);
-                } else stack_push(&vm->stack, val_null());
+                    } else if (name[0] >= 'A' && name[0] <= 'Z') {
+                        /* Ok(value) → Result, Err(value) → Result, others → Variant */
+                        Value *r = val_null();
+                        if (strcmp(name, "Ok") == 0) {
+                            r->kind = V_RESULT; r->as.result.ok = true;
+                            r->as.result.value = (arg > 0) ? fn_args[0] : val_null();
+                        } else if (strcmp(name, "Err") == 0) {
+                            r->kind = V_RESULT; r->as.result.ok = false;
+                            r->as.result.value = (arg > 0) ? fn_args[0] : val_null();
+                        } else {
+                            r->kind = V_VARIANT; r->as.variant.name = strdup(name);
+                            r->as.variant.payload = (arg > 0) ? fn_args[0] : NULL;
+                        }
+                        stack_push(&vm->stack, r);
+                    } else {
+                        /* Moss-defined function */
+                        int fi = vm_find_func(name);
+                        if (fi >= 0 && vm->frame_depth < 254) {
+                            vm->frames[vm->frame_depth].saved_pc           = vm->pc;
+                            vm->frames[vm->frame_depth].saved_locals       = vm->locals;
+                            vm->frames[vm->frame_depth].saved_local_count  = vm->local_count;
+                            vm->frames[vm->frame_depth].saved_local_names  = vm->local_names;
+                            vm->frames[vm->frame_depth].saved_constants    = vm->constants;
+                            vm->frames[vm->frame_depth].saved_const_count  = vm->const_count;
+                            vm->frames[vm->frame_depth].saved_insts        = vm->insts;
+                            vm->frame_depth++;
+                            vm->insts       = func_registry[fi].insts;
+                            vm->constants   = func_registry[fi].constants;
+                            vm->const_count = func_registry[fi].const_count;
+                            vm->local_count = func_registry[fi].local_count;
+                            vm->local_names = func_registry[fi].local_names;
+                            vm->locals      = calloc(vm->local_count, sizeof(Value*));
+                            for (int ai = 0; ai < arg && ai < vm->local_count; ai++)
+                                vm->locals[ai] = fn_args[ai];
+                            vm->pc = 0;
+                        } else stack_push(&vm->stack, val_null());
+                    }
+            } else if (callee->kind == V_VARIANT && callee->as.variant.name) {
+                const char *vn = callee->as.variant.name;
+                Value *res = val_null(); res->kind = V_RESULT;
+                if (strcmp(vn, "Ok") == 0) { res->as.result.ok = true; res->as.result.value = (arg>0) ? fn_args[0] : val_null(); }
+                else if (strcmp(vn, "Err") == 0) { res->as.result.ok = false; res->as.result.value = (arg>0) ? fn_args[0] : val_null(); }
+                else { res->kind = V_VARIANT; res->as = callee->as; }
+                stack_push(&vm->stack, res);
             } else stack_push(&vm->stack, val_null());
             break;
         }
@@ -371,6 +468,7 @@ static void vm_run(VM *vm) {
         case OP_EQ:  { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack);
             bool eq = (l->kind == r->kind);
             if (eq && l->kind == V_NUMBER) eq = (l->as.number == r->as.number);
+            else if (eq && l->kind == V_MONEY) eq = (l->as.money.amount == r->as.money.amount && strcmp(l->as.money.currency, r->as.money.currency) == 0);
             else if (eq && l->kind == V_STRING) eq = (strcmp(l->as.string, r->as.string) == 0);
             else if (eq && l->kind == V_BOOL) eq = (l->as.boolean == r->as.boolean);
             else if (eq && l->kind == V_VARIANT) eq = (strcmp(l->as.variant.name, r->as.variant.name) == 0);
@@ -408,11 +506,11 @@ static void vm_run(VM *vm) {
             Value *rec = stack_pop(&vm->stack);
             const char *field = vm_const(vm, arg)->as.string;
             if (rec && rec->kind == V_RECORD) {
-                for (int i = 0; i < rec->as.record.count; i++) {
-                    if (strcmp(rec->as.record.keys[i], field) == 0) {
-                        stack_push(&vm->stack, rec->as.record.vals[i]); break;
-                    }
-                }
+                for (int i = 0; i < rec->as.record.count; i++)
+                    if (strcmp(rec->as.record.keys[i], field) == 0)
+                        { stack_push(&vm->stack, rec->as.record.vals[i]); break; }
+            } else if (rec && rec->kind == V_NUMBER) {
+                stack_push(&vm->stack, val_money(rec->as.number, field));
             } else stack_push(&vm->stack, val_null());
             break;
         }
@@ -453,30 +551,8 @@ static void vm_run(VM *vm) {
         case 90: case 91: break; /* TRY/UNWRAP — compile-time, no-op */
         case 100: case 101: break; /* CHECK_EFFECT — compile-time */
         case OP_REQUIRE: {
-            int count = arg;
-            char *fk[32]; Value *fv[32];
-            for (int i = count - 1; i >= 0; i--) {
-                fv[i] = stack_pop(&vm->stack);
-                Value *kv = stack_pop(&vm->stack);
-                fk[i] = kv && kv->kind == V_STRING ? strdup(kv->as.string) : strdup("?");
-            }
-            Value *base = stack_pop(&vm->stack);
-            Value *res = val_null(); res->kind = V_RECORD;
-            if (base && base->kind == V_RECORD) {
-                res->as.record.count = base->as.record.count;
-                res->as.record.keys = calloc(base->as.record.count, sizeof(char*));
-                res->as.record.vals = calloc(base->as.record.count, sizeof(Value*));
-                for (int i = 0; i < base->as.record.count; i++) {
-                    res->as.record.keys[i] = strdup(base->as.record.keys[i]);
-                    res->as.record.vals[i] = base->as.record.vals[i];
-                }
-                for (int i = 0; i < count; i++)
-                    for (int j = 0; j < res->as.record.count; j++)
-                        if (strcmp(res->as.record.keys[j], fk[i]) == 0) { res->as.record.vals[j] = fv[i]; break; }
-            }
-            stack_push(&vm->stack, res);
-            for (int i = 0; i < count; i++) free(fk[i]);
-            break;
+            Value *err_val = stack_pop(&vm->stack);
+            fprintf(stderr, "mossvm: require failed: "); val_print(stderr, err_val); fprintf(stderr, "\n"); exit(1);
         }
         default:
             fprintf(stderr, "mossvm: unhandled opcode %d at pc %d\n", op, vm->pc - 1);
@@ -552,25 +628,45 @@ static bool vm_load(VM *vm, const char *path) {
     vm->pc = 0;
 
     /* functions */
-    vm->func_count = (int32_t)read_u32(f);
-    vm->functions = calloc(vm->func_count, sizeof(Value*));
-    vm->func_names = calloc(vm->func_count, sizeof(char*));
-    vm->func_insts = calloc(vm->func_count, sizeof(Instructions));
-    for (int i = 0; i < vm->func_count; i++) {
+    int32_t nfunc = (int32_t)read_u32(f);
+    for (int i = 0; i < nfunc; i++) {
         char *fn_name = read_string(f);
-        vm->func_names[i] = fn_name;
-        /* register as global callable */
-        Value *fn_val = val_string(fn_name);
-        /* Now read + skip code object metadata + instructions */
-        read_u32(f); /* arg_count */
+        int32_t fn_argc = (int32_t)read_u32(f);
         read_u32(f); /* cap_count */
-        { uint8_t dummy; fread(&dummy, 1, 1, f); } /* is_rule (1 byte) */
+        { uint8_t dummy; fread(&dummy, 1, 1, f); } /* is_rule */
         read_u32(f); /* source_line */
         read_u32(f); /* source_column */
-        uint32_t nl = read_u32(f); for (uint32_t j = 0; j < nl; j++) free(read_string(f));
-        uint32_t ncj = read_u32(f); fseek(f, ncj, SEEK_CUR); /* skip constants */
-        vm->func_insts[i] = read_instructions(f);
-        vm->functions[i] = fn_val;
+        int32_t fn_locals = (int32_t)read_u32(f);
+        char **fn_local_names = calloc(fn_locals, sizeof(char*));
+        for (int j = 0; j < fn_locals; j++) fn_local_names[j] = read_string(f);
+        /* Read constants (JSON) */
+        int32_t fn_const_count = 0;
+        Value **fn_constants = NULL;
+        {
+            uint32_t cjl = read_u32(f);
+            char *cjson = malloc(cjl + 1);
+            fread(cjson, 1, cjl, f); cjson[cjl] = 0;
+            /* Count and parse */
+            for (uint32_t j = 0; j < cjl; j++) if (cjson[j] == ',') fn_const_count++;
+            fn_const_count++;
+            fn_constants = calloc(fn_const_count, sizeof(Value*));
+            int ci = 0;
+            char *p = cjson;
+            while (*p && ci < fn_const_count) {
+                while (*p == ' ' || *p == '[' || *p == ']' || *p == ',') p++;
+                if (*p == '"') { p++; char *s = p; while (*p && *p != '"') p++; *p=0; p++; fn_constants[ci++]=val_string(s); }
+                else if (*p=='-'||(*p>='0'&&*p<='9')) { fn_constants[ci++]=val_number(atof(p)); while(*p&&*p!=','&&*p!=']')p++; }
+                else if (*p=='n'&&strncmp(p,"null",4)==0){fn_constants[ci++]=val_null();p+=4;}
+                else if (*p=='t'&&strncmp(p,"true",4)==0){fn_constants[ci++]=val_bool(true);p+=4;}
+                else if (*p=='f'&&strncmp(p,"false",5)==0){fn_constants[ci++]=val_bool(false);p+=5;}
+                else p++;
+            }
+            fn_const_count = ci;
+            free(cjson);
+        }
+        Instructions fn_insts = read_instructions(f);
+        vm_register_func(fn_name, fn_insts, fn_argc, fn_locals, fn_local_names, fn_constants, fn_const_count);
+        free(fn_name);
     }
 
     fclose(f);
