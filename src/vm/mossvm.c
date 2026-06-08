@@ -142,7 +142,8 @@ enum {
     OP_BUILD_RECORD = 60, OP_BUILD_LIST = 61,
     OP_GET_FIELD = 70, OP_SET_FIELD = 71, OP_GET_INDEX = 72, OP_SET_INDEX = 73,
     OP_RECORD_UPDATE = 74,
-    OP_TRY_PROPAGATE = 90, OP_REQUIRE = 91,
+    OP_TRY_PROPAGATE = 95, OP_REQUIRE = 92,
+    OP_CHECK_EFFECT = 100,
 };
 
 /* ── .mbc deserializer ─────────────────────────────────────────────── */
@@ -347,6 +348,20 @@ static void vm_run(VM *vm) {
         case OP_LTE: { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_bool(to_number(l) <= to_number(r))); break; }
         case OP_GTE: { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_bool(to_number(l) >= to_number(r))); break; }
         case OP_NOT: { Value *v = stack_pop(&vm->stack); stack_push(&vm->stack, val_bool(!is_truthy(v))); break; }
+        case OP_NEG: { Value *v = stack_pop(&vm->stack); stack_push(&vm->stack, val_number(-to_number(v))); break; }
+        case OP_BUILD_RECORD: {
+            Value *rec = val_null(); rec->kind = V_RECORD;
+            rec->as.record.count = arg;
+            rec->as.record.keys = calloc(arg, sizeof(char*));
+            rec->as.record.vals = calloc(arg, sizeof(Value*));
+            for (int i = arg - 1; i >= 0; i--) {
+                rec->as.record.vals[i] = stack_pop(&vm->stack);
+                /* Key is a string constant pushed before the value */
+                Value *key_val = stack_pop(&vm->stack);
+                rec->as.record.keys[i] = strdup(key_val && key_val->kind == V_STRING ? key_val->as.string : "?");
+            }
+            stack_push(&vm->stack, rec); break;
+        }
         case OP_BUILD_LIST: {
             Value *lst = val_null(); lst->kind = V_LIST;
             lst->as.list.items = calloc(arg, sizeof(Value*));
@@ -370,6 +385,34 @@ static void vm_run(VM *vm) {
             Value *v = stack_pop(&vm->stack);
             if (v && v->kind == V_RESULT && !v->as.result.ok) { fprintf(stderr, "mossvm: Err propagation\n"); exit(1); }
             stack_push(&vm->stack, v);
+            break;
+        }
+        case 90: case 91: break; /* TRY/UNWRAP — compile-time, no-op */
+        case 100: case 101: break; /* CHECK_EFFECT — compile-time */
+        case OP_REQUIRE: {
+            int count = arg;
+            char *fk[32]; Value *fv[32];
+            for (int i = count - 1; i >= 0; i--) {
+                fv[i] = stack_pop(&vm->stack);
+                Value *kv = stack_pop(&vm->stack);
+                fk[i] = kv && kv->kind == V_STRING ? strdup(kv->as.string) : strdup("?");
+            }
+            Value *base = stack_pop(&vm->stack);
+            Value *res = val_null(); res->kind = V_RECORD;
+            if (base && base->kind == V_RECORD) {
+                res->as.record.count = base->as.record.count;
+                res->as.record.keys = calloc(base->as.record.count, sizeof(char*));
+                res->as.record.vals = calloc(base->as.record.count, sizeof(Value*));
+                for (int i = 0; i < base->as.record.count; i++) {
+                    res->as.record.keys[i] = strdup(base->as.record.keys[i]);
+                    res->as.record.vals[i] = base->as.record.vals[i];
+                }
+                for (int i = 0; i < count; i++)
+                    for (int j = 0; j < res->as.record.count; j++)
+                        if (strcmp(res->as.record.keys[j], fk[i]) == 0) { res->as.record.vals[j] = fv[i]; break; }
+            }
+            stack_push(&vm->stack, res);
+            for (int i = 0; i < count; i++) free(fk[i]);
             break;
         }
         default:
