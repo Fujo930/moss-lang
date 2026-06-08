@@ -236,8 +236,7 @@ static double to_number(Value *v) {
     }
 }
 
-static void vm_boot_builtins(VM *vm);
-static Value *vm_builtin(const char *name);
+static Value *vm_resolve_global(VM *vm, int idx);
 
 static void vm_run(VM *vm) {
     vm->pc = 0;
@@ -255,14 +254,10 @@ static void vm_run(VM *vm) {
         case OP_LOAD_FALSE: stack_push(&vm->stack, val_bool(false)); break;
         case OP_LOAD_LOCAL:  stack_push(&vm->stack, vm_local(vm, arg)); break;
         case OP_LOAD_GLOBAL: {
-            Value *g = vm_global(vm, arg);
+            Value *g = vm_resolve_global(vm, arg);
             if (!g) {
                 const char *gn = vm_global_name(vm, arg);
-                if (gn) g = vm_builtin(gn);
-            }
-            if (!g) {
-                const char *gn = vm_global_name(vm, arg);
-                fprintf(stderr, "mossvm: undefined global '%s'\n", gn ? gn : "?");
+                fprintf(stderr, "mossvm: undefined global '%s' at %d\n", gn ? gn : "?", arg);
                 exit(1);
             }
             stack_push(&vm->stack, g);
@@ -460,23 +455,25 @@ static bool vm_load(VM *vm, const char *path) {
 
 /* ── Boot builtins ──────────────────────────────────────────────────── */
 
-static void vm_boot_builtins(VM *vm) {
-    /* Register builtins for known names regardless of declared globals.
-       LOAD_GLOBAL resolves these at runtime if the global slot is null. */
-    for (int i = 0; i < vm->global_count; i++) {
-        const char *n = vm->global_names[i];
-        if (!n) continue;
-        if (strcmp(n, "print") == 0)  vm->globals[i] = val_string("print");
-        else if (strcmp(n, "len") == 0)   vm->globals[i] = val_string("len");
-        else if (strcmp(n, "assert") == 0) vm->globals[i] = val_string("assert");
-    }
+/* ── Builtin name table (checked before module globals) ──────────────── */
+static const char *BUILTIN_NAMES[] = {"print", "len", "assert", "textJoin", "textSplit", "textTrim", "textChars", "textSlice", "textContains", "textIndexOf", "textReplace", "textStartsWith", "textEndsWith", "range", "listNew", "listPush", "listGet", "listSet", "listSlice", "listConcat", "listInsert", "listRemove", "mapNew", "mapPut", "mapGet", "mapHas", "mapKeys", "mapValues", "mapRemove", "jsonParse", "jsonStringify", "readText", "writeText", "fileExists", "listFiles", "httpGet", "httpPostJson", "dbPut", "dbGet", "processRun", "processRunJson", NULL};
+#define BUILTIN_COUNT (sizeof(BUILTIN_NAMES)/sizeof(BUILTIN_NAMES[0]) - 1)
+
+static Value *vm_builtin_by_name(const char *name) {
+    if (!name) return NULL;
+    for (int i = 0; BUILTIN_NAMES[i]; i++)
+        if (strcmp(name, BUILTIN_NAMES[i]) == 0) return val_string(name);
+    return NULL;
 }
 
-/* Look up a builtin by name when it's not in declared globals */
-static Value *vm_builtin(const char *name) {
-    if (strcmp(name, "print") == 0)  return val_string("print");
-    if (strcmp(name, "len") == 0)    return val_string("len");
-    if (strcmp(name, "assert") == 0) return val_string("assert");
+/* Look up a builtin by name or fallback index */
+static Value *vm_resolve_global(VM *vm, int idx) {
+    Value *g = vm_global(vm, idx);
+    if (g) return g;
+    const char *gn = vm_global_name(vm, idx);
+    if (gn) return vm_builtin_by_name(gn);
+    /* No global name registered — use fallback: common builtins at low indices */
+    if (idx < (int)BUILTIN_COUNT) return val_string(BUILTIN_NAMES[idx]);
     return NULL;
 }
 
@@ -487,7 +484,6 @@ int main(int argc, char *argv[]) {
 
     VM vm = {0};
     if (!vm_load(&vm, argv[1])) return 1;
-    vm_boot_builtins(&vm);
     vm_run(&vm);
     return 0;
 }
