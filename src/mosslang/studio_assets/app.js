@@ -296,10 +296,9 @@
   $('#traceButton').addEventListener('click', doTrace);
   $('#projectButton').addEventListener('click', doProject);
   $('#compareButton').addEventListener('click', doCompare);
-  $('#saveButton').addEventListener('click', doSave);
-  $('#openButton').addEventListener('click', doOpen);
   $('#newButton').addEventListener('click', doNew);
-  $('#openButton').addEventListener('click', doOpen);
+  $('#importButton').addEventListener('click', doImport);
+  $('#loadPathButton').addEventListener('click', doOpen);
   $('#saveButton').addEventListener('click', doSave);
 
   // ── Init ──

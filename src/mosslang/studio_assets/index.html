@@ -12,7 +12,7 @@
 <main class="shell">
   <header class="topbar">
     <div class="brand">
-      <img class="mark" src="/moss-mark.svg" alt="Moss" />
+      <img class="mark" src="/moss-mark.svg" alt="Moss" width="22" height="22" />
       <span class="brandName">Moss</span>
       <span class="brandSurface">Studio</span>
       <span class="releaseTag" id="releaseTag">0.6</span>
@@ -21,10 +21,11 @@
       <div class="toolGroup sourceTools">
         <select id="exampleSelect" aria-label="Load example" title="Load example"></select>
         <input id="pathInput" class="pathInput" aria-label="Workspace path" title="Workspace path" spellcheck="false" placeholder="path/to/file.moss" />
+        <button id="loadPathButton" title="Open workspace path">Open</button>
       </div>
       <div class="toolGroup">
         <button id="newButton" title="New scratch file">New</button>
-        <button id="openButton" title="Import local .moss file">Open…</button>
+        <button id="importButton" title="Import local .moss file from disk">Import</button>
         <button id="saveButton" title="Save to workspace">Save</button>
       </div>
       <div class="toolGroup actionTools">
