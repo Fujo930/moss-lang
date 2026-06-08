@@ -140,7 +140,6 @@ class Compiler:
         self.emit(Opcode.RETURN)
 
         self._resolve_labels()
-        self._resolve_labels()
         co = CodeObject(
             name=decl.name,
             instructions=list(self.instructions),
@@ -172,7 +171,6 @@ class Compiler:
         self._compile_expression(decl.expr)
         self.emit(Opcode.RETURN)
 
-        self._resolve_labels()
         self._resolve_labels()
         co = CodeObject(
             name=decl.name,
@@ -206,6 +204,9 @@ class Compiler:
 
         elif isinstance(stmt, n.AssignStmt):
             self._compile_expression(stmt.expr)
+            # First assignment in current scope creates a local variable
+            if stmt.name not in self.locals and stmt.name not in self.globals:
+                self._register_local(stmt.name)
             kind, idx = self._find_variable(stmt.name)
             if kind == "local":
                 self.emit(Opcode.STORE_LOCAL, idx)
@@ -263,7 +264,6 @@ class Compiler:
             self.loop_continues.append(continue_label)
 
             self._emit_label(start_label)
-            self._emit_label(continue_label)
 
             # Check index < len(iter)
             self.emit(Opcode.LOAD_LOCAL, idx_local)
@@ -286,6 +286,8 @@ class Compiler:
                 self._compile_statement(s)
 
             # idx_local = idx_local + 1
+            # continue jumps here: execute increment then loop back
+            self._emit_label(continue_label)
             self.emit(Opcode.LOAD_LOCAL, idx_local)
             self._add_constant(1)
             self.emit(Opcode.LOAD_CONST, self._constant_index(1))

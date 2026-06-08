@@ -30,13 +30,14 @@ class EarlyErrSignal(Exception):
 
 
 class Frame:
-    __slots__ = ('code', 'pc', 'stack', 'locals', 'captured')
-    def __init__(self, code, captured=None):
+    __slots__ = ('code', 'pc', 'stack', 'locals', 'captured', 'global_names')
+    def __init__(self, code, captured=None, global_names=None):
         self.code = code
         self.pc = 0
         self.stack = []
         self.locals = [None] * len(code.locals) if code.locals else []
         self.captured = captured or {}
+        self.global_names = global_names or []
 
 
 class VM:
@@ -55,11 +56,17 @@ class VM:
         self.effect_stack = []
         self.tests = []
         self._module = None
+        self._imported_paths: set[Path] = set()
+        self._function_globals: dict[str, list[str]] = {}
+        self._module_globals: dict[str, list[str]] = {}
         
     def load_module(self, module):
         self._module = module
         self.globals.clear()
         self.functions.clear()
+        self._imported_paths = set()
+        self._function_globals.clear()
+        self._module_globals.clear()
         for name in module.globals:
             self.globals[name] = None
         for name, fn_co in module.functions.items():
@@ -69,6 +76,8 @@ class VM:
         # Register moss-defined functions as globals
         for name, fn_co in module.functions.items():
             self.globals[name] = fn_co
+        # Process imports: compile and merge imported modules
+        self._load_imports(module)
         
     def install_builtins(self):
         b = self.globals
@@ -124,7 +133,7 @@ class VM:
         if not self._module:
             raise MossRuntimeError("no module loaded")
         co = self._module.code
-        frame = Frame(co)
+        frame = Frame(co, global_names=self._module.globals)
         try:
             self._execute(frame)
         except ReturnSignal:
@@ -134,7 +143,7 @@ class VM:
         if not self._module:
             raise MossRuntimeError("no module loaded")
         co = self._module.code
-        frame = Frame(co)
+        frame = Frame(co, global_names=self._module.globals)
         # Execute module-level code to register tests
         try:
             self._execute(frame)
@@ -148,7 +157,8 @@ class VM:
                 if fn_co is None:
                     results.append({'name': test_name, 'status': 'fail', 'message': 'test function not found'})
                     continue
-                frame = Frame(fn_co, captured={'globals': self.globals})
+                fn_globals = self._function_globals.get(test_name, self._module.globals if self._module else [])
+                frame = Frame(fn_co, captured={'globals': self.globals}, global_names=fn_globals)
                 self._execute(frame)
                 results.append({'name': test_name, 'status': 'pass', 'message': ''})
             except Exception as exc:
@@ -178,7 +188,8 @@ class VM:
                     raise MossRuntimeError(f"undefined local at index {arg}")
                 frame.stack.append(val)
             elif op == Opcode.LOAD_GLOBAL:
-                name = self._module.globals[arg] if self._module else str(arg)
+                global_names = frame.global_names if frame.global_names else (self._module.globals if self._module else [])
+                name = global_names[arg] if arg < len(global_names) else str(arg)
                 val = self.globals.get(name)
                 if val is not None:
                     frame.stack.append(val)
@@ -189,7 +200,8 @@ class VM:
             elif op == Opcode.STORE_LOCAL:
                 frame.locals[arg] = frame.stack.pop()
             elif op == Opcode.STORE_GLOBAL:
-                name = self._module.globals[arg] if self._module else str(arg)
+                global_names = frame.global_names if frame.global_names else (self._module.globals if self._module else [])
+                name = global_names[arg] if arg < len(global_names) else str(arg)
                 self.globals[name] = frame.stack.pop()
             elif op == Opcode.POP:
                 frame.stack.pop()
@@ -317,7 +329,9 @@ class VM:
         elif isinstance(callee, Variant):
             frame.stack.append(Variant(callee.name, tuple(args)))
         elif isinstance(callee, CodeObject):
-            new_frame = Frame(callee, captured={'globals': self.globals})
+            fn_name = callee.name
+            fn_globals = self._function_globals.get(fn_name, self._module.globals if self._module else [])
+            new_frame = Frame(callee, captured={'globals': self.globals}, global_names=fn_globals)
             for i, arg in enumerate(args):
                 if i < len(new_frame.locals):
                     new_frame.locals[i] = arg
@@ -573,6 +587,37 @@ class VM:
     def builtin_list_files(self, args):
         return [str(p) for p in Path(args[0]).iterdir()]
 
+    def _load_imports(self, module) -> None:
+        """Compile and merge all imported modules into the VM state."""
+        from .parser import parse_source
+        from .compiler import compile_program
+        source_dir = Path(module.source_path).parent if module.source_path else self.base_path
+        for import_path in module.imports:
+            resolved = self._resolve_import_path(import_path, source_dir)
+            if resolved in self._imported_paths:
+                continue
+            self._imported_paths.add(resolved)
+            source = resolved.read_text(encoding="utf-8-sig")
+            program = parse_source(source)
+            imported_mod = compile_program(program, source_path=str(resolved))
+            self._module_globals[str(resolved)] = list(imported_mod.globals)
+            for name, fn_co in imported_mod.functions.items():
+                self.functions[name] = fn_co
+                self.globals[name] = fn_co
+                self._function_globals[name] = list(imported_mod.globals)
+            self.effects.update(imported_mod.effects)
+            self._load_imports(imported_mod)
+
+    def _resolve_import_path(self, import_path: str, source_dir: Path) -> Path:
+        from pathlib import Path as _Path
+        path = _Path(import_path)
+        if path.is_absolute():
+            return path.resolve()
+        candidates = [source_dir / path, self.base_path / path, _Path.cwd() / path]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate.resolve()
+        raise MossRuntimeError(f"import not found: {import_path}")
 
 class _BuiltinFunction:
     def __init__(self, name, fn, co, effect=None):
