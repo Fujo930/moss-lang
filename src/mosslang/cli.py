@@ -195,8 +195,7 @@ def main(argv: list[str] | None = None) -> int:
             diagnostics = check_program(program)
             errors = [d for d in diagnostics if d.level == "error"]
             if errors:
-                for d in diagnostics:
-                    print(d.format(), file=sys.stderr)
+                print_diagnostics(diagnostics, source, file=sys.stderr)
                 return 1
             mod = compile_program(program, source_path=str(args.file.resolve()))
             output_path = args.output or args.file.with_suffix(".mbc")
@@ -216,8 +215,7 @@ def main(argv: list[str] | None = None) -> int:
                 diagnostics = check_program(program)
                 errors = [d for d in diagnostics if d.level == "error"]
                 if errors:
-                    for d in diagnostics:
-                        print(d.format(), file=sys.stderr)
+                    print_diagnostics(diagnostics, source, file=sys.stderr)
                     return 1
                 mod = compile_program(program, source_path=str(args.file.resolve()))
             base = args.source_root or args.file.parent
@@ -323,8 +321,7 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
                 return 1 if any(d.level == "error" for d in diagnostics) else 0
-            for diagnostic in diagnostics:
-                print(diagnostic.format())
+            print_diagnostics(diagnostics, source)
             if any(d.level == "error" for d in diagnostics):
                 return 1
             print(
@@ -341,8 +338,7 @@ def main(argv: list[str] | None = None) -> int:
             diagnostics = check_program(program)
             errors = [d for d in diagnostics if d.level == "error"]
             if errors:
-                for diagnostic in diagnostics:
-                    print(diagnostic.format(), file=sys.stderr)
+                print_diagnostics(diagnostics, source, file=sys.stderr)
                 return 1
             mod = compile_program(program, source_path=str(args.file.resolve()))
             vm = VM(base_path=args.file.parent)
@@ -364,8 +360,7 @@ def main(argv: list[str] | None = None) -> int:
             diagnostics = check_program(program)
             errors = [d for d in diagnostics if d.level == "error"]
             if errors:
-                for diagnostic in diagnostics:
-                    print(diagnostic.format(), file=sys.stderr)
+                print_diagnostics(diagnostics, source, file=sys.stderr)
                 return 1
             mod = compile_program(program, source_path=str(args.file.resolve()))
             vm = VM(output=lambda _text: None, base_path=args.file.parent, trace_rules=True)
@@ -417,6 +412,19 @@ def diagnostic_json(diagnostic) -> dict:
     if diagnostic.location is not None:
         result.update({"line": diagnostic.location.line, "column": diagnostic.location.column})
     return result
+
+
+def print_diagnostics(diagnostics, source=None, file=None):
+    """Print diagnostics with optional source context."""
+    for diagnostic in diagnostics:
+        print(diagnostic.format(), file=file)
+        if source and diagnostic.location and diagnostic.location.line:
+            source_lines = source.split('\n')
+            line_no = diagnostic.location.line
+            col = diagnostic.location.column or 1
+            if line_no <= len(source_lines):
+                print(f"  {line_no:>4} | {source_lines[line_no - 1]}", file=file)
+                print(f"       {' ' * (col - 1)}^--", file=file)
 
 
 def portable_trace_event(event: dict) -> dict:
