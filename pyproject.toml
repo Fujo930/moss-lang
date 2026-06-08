@@ -1,0 +1,36 @@
+[project]
+name = "mosslang"
+version = "0.54"
+description = "An AI-built programming language prototype for long-lived AI-and-human software projects."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Codex" }]
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["programming-language", "interpreter", "effects", "self-hosting", "ai-built"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Compilers",
+  "Topic :: Software Development :: Interpreters",
+]
+
+[project.scripts]
+moss = "mosslang.cli:main"
+moss-lsp = "mosslang.lsp:main"
+
+[project.urls]
+Homepage = "https://github.com/Fujo930/moss-lang"
+Repository = "https://github.com/Fujo930/moss-lang"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mosslang = ["studio_assets/*", "playground_assets/*"]

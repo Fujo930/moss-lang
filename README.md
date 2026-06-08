@@ -5,23 +5,25 @@
 # Moss language prototype
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
-![Self-hosting: compiler written](https://img.shields.io/badge/self--hosting-compiler%20written-f2c14e)
-![Version: 0.54.0](https://img.shields.io/badge/version-0.54.0-4f7edb)
-![Built by DeepSeek & Reasonix](https://img.shields.io/badge/built%20by-DeepSeek%20%26%20Reasonix-222222)
+![Self-hosting: experimental](https://img.shields.io/badge/self--hosting-experimental-f2c14e)
+![Version: 0.54](https://img.shields.io/badge/version-0.54-4f7edb)
+![Branch: ds-Mosslang](https://img.shields.io/badge/branch-ds--Mosslang-222222)
 
 Moss is an experimental programming language for long-lived software projects
-where humans and AI agents work on the same codebase over time. It is the
-first language that can produce machine-verifiable proof that an AI-generated
-program does what it claims.
+where humans and AI agents work on the same codebase over time.
 
-This repository is entirely AI-built: designed, implemented, debugged,
-documented, committed, and pushed by three AIs — DeepSeek Codex, DeepSeek Kun,
-and Reasonix — in collaboration with one human, Fujo930.
+This repository is intentionally AI-built: Moss was designed, implemented,
+debugged, documented, committed, and pushed by three AIs — DeepSeek Codex,
+DeepSeek Kun, and Reasonix — in collaboration with one human, Fujo930.
 
-Version `0.33` marks the pre-1.0 milestone: the Moss-written bytecode compiler
-compiles itself, a C VM exists for native execution, a VS Code extension
-provides one-click trust verification, and the language specification is frozen
-with backward-compatibility commitments.
+Version `0.54` on the `ds-Mosslang` branch is an experimental preview
+containing a bytecode compiler, C VM, trust bundles, Moss-written frontend
+CLI integration, and a Playground trust report viewer. These features are
+experimental. The active interpreter and CLI still run on Python.
+
+The branching M is Moss's language mark: two contributors meeting in a shared
+syntax tree. See `docs/identity.md` for the public description and identity
+rules.
 
 The branching M is Moss's language mark: two contributors meeting in a shared
 syntax tree. See `docs/identity.md` for the public description and identity
@@ -216,19 +218,30 @@ moss-lsp
 
 ## Project status
 
-This is version `0.54`: pre-1.0 with a completed C VM running order.moss, lists_demo,
-match_demo, and text_fs_demo end-to-end. The Moss-written compiler (compiler_core.moss)
-compiles itself, a portable C99 VM exists for native execution, the language spec is
-frozen, and all tooling is unified on the bytecode VM.
+This is version `0.54` on the `ds-Mosslang` experimental branch. It is NOT a
+stable release. The active Moss interpreter and CLI still run on Python.
+
+Key additions on this branch:
+- Bytecode compiler + stack VM (32 opcodes, `.mbc` binary format)
+- C VM prototype (`src/vm/mossvm.c`, ~500 lines C99) — verified on order.moss, lists_demo, match_demo
+- Trust bundles (`moss trust`/`moss trust-project`) — structured evidence combining checks, traces, golden snapshots, lock verification, and self-host comparison
+- Moss Playground — browser-based trust report viewer (`moss playground`)
+- Studio dark theme + Trust tab
+- Moss-written frontend CLI integration (`--frontend moss` on tokens/ast/check/compile/run)
+- `compiler_core.moss` — Moss-written bytecode compiler (499 lines, self-compiles)
+- Enhanced error messages with source context
+- VS Code extension scaffolding
+- Standard library modules
 
 Suitable claims:
+- Moss is AI-designed and AI-built by three AIs across 0.1–0.54.
+- Moss can emit structured trust bundles combining checks, traces, locks, golden outputs, and self-host comparisons.
+- Moss has begun self-hosting, but should not be described as fully self-hosted.
+- Moss has an experimental C VM. Most execution still runs on Python.
+- Moss remains alpha software and should not be described as production-ready.
 
-- Moss is AI-designed and AI-built by three AIs across 0.1–0.54 (71 commits)
-- Moss has a working Moss-written frontend and bytecode compiler
-- Moss has a portable C VM executing order.moss, lists_demo, match_demo natively
-- Moss produces machine-verifiable trust bundles (moss trust/trust-project)
-- Moss is not fully self-hosted — the active compiler and VM still run on Python
-- Moss is pre-1.0 software with a frozen language spec
+This branch is intended for review by Codex before merging into `main`.
+See `docs/ds-branch-review.md` for the full review summary.
 
 See `docs/LANGUAGE_SPEC.md` for the frozen language specification,
 `docs/history.md` for the full commit-by-commit history,
