@@ -183,7 +183,7 @@ def example_source(filename: str) -> str:
 
 def make_handler() -> type[BaseHTTPRequestHandler]:
     class StudioHandler(BaseHTTPRequestHandler):
-        server_version = "MossStudio/0.58"
+        server_version = "MossStudio/0.2.2"
 
         def do_GET(self) -> None:
             if self.path in {"/", "/index.html"}:
@@ -199,7 +199,7 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
                 self.send_asset("moss-mark.svg")
                 return
             if self.path == "/api/version":
-                self.send_json({"moss": __version__, "studio": "0.58"})
+                self.send_json({"moss": __version__, "studio": "0.2.2"})
                 return
             if self.path == "/api/examples":
                 examples = []

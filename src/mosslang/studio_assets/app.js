@@ -334,7 +334,7 @@
     const sub = trusted
       ? 'All five gates passed. Structured evidence of correctness.'
       : 'One or more gates failed — see details below.';
-    const artifact = b.artifact || `Moss Trust Artifact v${b.moss||'0.58'}`;
+    const artifact = b.artifact || `Moss Trust Artifact v${b.moss||'0.73'}`;
 
     let html = `<div class="trust-bar ${trusted ? 'trusted' : 'untrusted'}">
       <div class="trust-icon">${icon}</div>
@@ -413,11 +413,10 @@ print(greet("Moss"))`;
       const rsp = await fetch('/api/version');
       if (rsp.ok) {
         const v = await rsp.json();
-        releaseTag.textContent = v.moss || '0.58';
-      } else {
-        releaseTag.textContent = '0.58';
+        const tag = document.getElementById('releaseTag');
+        const mossTag = document.getElementById('mossVersion');
+        if (tag) tag.textContent = v.studio || '0.2.2';
+        if (mossTag) mossTag.textContent = 'Moss ' + (v.moss || '0.73');
       }
-    } catch (_) {
-      releaseTag.textContent = '0.58';
-    }
+    } catch (_) {}
   })();
