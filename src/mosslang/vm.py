@@ -183,10 +183,7 @@ class VM:
             elif op == Opcode.LOAD_FALSE:
                 frame.stack.append(False)
             elif op == Opcode.LOAD_LOCAL:
-                val = frame.locals[arg]
-                if val is None and arg < len(frame.locals):
-                    raise MossRuntimeError(f"undefined local at index {arg}")
-                frame.stack.append(val)
+                frame.stack.append(frame.locals[arg])
             elif op == Opcode.LOAD_GLOBAL:
                 global_names = frame.global_names if frame.global_names else (self._module.globals if self._module else [])
                 name = global_names[arg] if arg < len(global_names) else str(arg)
@@ -442,8 +439,11 @@ class VM:
         return lst
 
     def builtin_list_get(self, args):
-        lst, idx = args
-        return lst[int(idx)]
+        lst = args[0]
+        idx = int(args[1])
+        if len(args) > 2:
+            return lst[idx] if idx < len(lst) else args[2]
+        return lst[idx]
 
     def builtin_list_set(self, args):
         lst, idx, val = args
@@ -451,7 +451,9 @@ class VM:
         return lst
 
     def builtin_list_slice(self, args):
-        lst, start, end = args
+        lst = args[0]
+        start = int(args[1])
+        end = int(args[2]) if len(args) > 2 else None
         return lst[start:end]
 
     def builtin_list_concat(self, args):
@@ -460,7 +462,7 @@ class VM:
 
     def builtin_list_insert(self, args):
         lst, idx, val = args
-        lst.insert(idx, val)
+        lst.insert(int(idx), val)
         return lst
 
     def builtin_list_remove(self, args):
@@ -518,7 +520,9 @@ class VM:
         return args[0].strip()
 
     def builtin_text_slice(self, args):
-        text, start, end = args
+        text = args[0]
+        start = int(args[1])
+        end = int(args[2]) if len(args) > 2 else None
         return text[start:end]
 
     def builtin_text_contains(self, args):
