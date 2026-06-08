@@ -502,6 +502,23 @@ static void vm_run(VM *vm) {
             for (int i = arg - 1; i >= 0; i--) lst->as.list.items[i] = stack_pop(&vm->stack);
             stack_push(&vm->stack, lst); break;
         }
+        case OP_GET_INDEX: {
+            int idx = (int)to_number(stack_pop(&vm->stack));
+            Value *lst = stack_pop(&vm->stack);
+            if (lst && lst->kind == V_LIST && idx >= 0 && idx < lst->as.list.count)
+                stack_push(&vm->stack, lst->as.list.items[idx]);
+            else stack_push(&vm->stack, val_null());
+            break;
+        }
+        case OP_SET_INDEX: {
+            Value *val = stack_pop(&vm->stack);
+            int idx = (int)to_number(stack_pop(&vm->stack));
+            Value *lst = stack_pop(&vm->stack);
+            if (lst && lst->kind == V_LIST && idx >= 0 && idx < lst->as.list.count)
+                lst->as.list.items[idx] = val;
+            stack_push(&vm->stack, lst);
+            break;
+        }
         case OP_GET_FIELD: {
             Value *rec = stack_pop(&vm->stack);
             const char *field = vm_const(vm, arg)->as.string;
