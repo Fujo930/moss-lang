@@ -1754,6 +1754,29 @@ print(shipped.status, dbGet("A-100").status)"""
         self.assertIn('case OP_ADD', source)
         self.assertIn('case OP_RETURN', source)
 
+    def test_moss_compiler_self_compile(self) -> None:
+        """Moss compiler can parse and compile its own source."""
+        import os
+        from mosslang.selfhost import SelfHostFrontend, moss_nodes_to_program, moss_compiler_to_module
+        from pathlib import Path
+
+        sf = SelfHostFrontend()
+        compiler_src = (Path(__file__).parent.parent / "examples/self_host/compiler_core.moss").read_text(encoding="utf-8")
+
+        # Moss frontend parses compiler_core itself — no errors
+        parsed = sf.parse(compiler_src)
+        self.assertEqual(len(parsed.get("errors", [])), 0, f"self-parse errors: {parsed.get('errors')}")
+        self.assertGreater(len(parsed.get("nodes", [])), 50, "compiler must have 50+ nodes")
+
+        # Verify it compiles through Moss compiler — produces instruction output
+        moss_out = sf.compile_with_moss(compiler_src)
+        self.assertGreater(len(moss_out.get("instructions", [])), 0, "self-compile must produce instructions")
+
+        # Verify the output can be bridged to a valid bytecode module
+        module = moss_compiler_to_module(moss_out, "compiler_core.moss")
+        self.assertGreater(len(module.code.instructions), 0, "module must have instructions")
+        self.assertTrue(True, "self-compile bridge completed")
+
     def test_all_examples_run(self) -> None:
         """Verify all .moss examples can compile and run via VM."""
         import os
