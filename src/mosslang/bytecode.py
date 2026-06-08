@@ -141,6 +141,9 @@ class CodeObject:
     locals: list[str] = field(default_factory=list)
     arg_count: int = 0
     capture_count: int = 0
+    is_rule: bool = False
+    source_line: int = 0
+    source_column: int = 0
 
 
 @dataclass
@@ -310,6 +313,9 @@ def _serialize_code_object(buf, co: CodeObject) -> None:
     
     buf.write(struct.pack('<I', co.arg_count))
     buf.write(struct.pack('<I', co.capture_count))
+    buf.write(struct.pack('<B', 1 if co.is_rule else 0))
+    buf.write(struct.pack('<I', co.source_line))
+    buf.write(struct.pack('<I', co.source_column))
     
     # Locals
     buf.write(struct.pack('<I', len(co.locals)))
@@ -338,6 +344,9 @@ def _deserialize_code_object(buf) -> CodeObject:
     name = _read_string()
     arg_count = struct.unpack('<I', buf.read(4))[0]
     capture_count = struct.unpack('<I', buf.read(4))[0]
+    is_rule = struct.unpack('<B', buf.read(1))[0] == 1
+    source_line = struct.unpack('<I', buf.read(4))[0]
+    source_column = struct.unpack('<I', buf.read(4))[0]
     
     n_locals = struct.unpack('<I', buf.read(4))[0]
     locals_list = [_read_string() for _ in range(n_locals)]
@@ -358,6 +367,9 @@ def _deserialize_code_object(buf) -> CodeObject:
         locals=locals_list,
         arg_count=arg_count,
         capture_count=capture_count,
+        is_rule=is_rule,
+        source_line=source_line,
+        source_column=source_column,
     )
 
 

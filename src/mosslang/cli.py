@@ -27,6 +27,7 @@ from .runtime import Runtime
 from .tokens import tokenize
 from .compiler import compile_program
 from .vm import VM
+from io import StringIO
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -273,9 +274,11 @@ def main(argv: list[str] | None = None) -> int:
                 for diagnostic in diagnostics:
                     print(diagnostic.format(), file=sys.stderr)
                 return 1
-            runtime = Runtime(output=lambda _text: None, base_path=args.file.parent, trace_rules=True)
-            runtime.run(program, source_path=args.file.resolve())
-            events = [portable_trace_event(event) for event in runtime.trace_events]
+            mod = compile_program(program, source_path=str(args.file.resolve()))
+            vm = VM(output=lambda _text: None, base_path=args.file.parent, trace_rules=True)
+            vm.load_module(mod)
+            vm.run()
+            events = [portable_trace_event(event) for event in vm.trace_events]
             if args.json:
                 print(json.dumps({"file": args.file.as_posix(), "events": events}))
             else:
@@ -471,9 +474,11 @@ def run_project_run(directory: Path, *, locked: bool = False) -> int:
         for diagnostic in diagnostics:
             print(diagnostic.format(), file=sys.stderr)
         return 1
-    Runtime(base_path=manifest.entry.parent, import_paths=[*manifest.source_roots, manifest.root]).run(program)
+    vm = VM(base_path=manifest.entry.parent, import_paths=[*manifest.source_roots, manifest.root])
+    mod = compile_program(program, source_path=str(manifest.entry.resolve()))
+    vm.load_module(mod)
+    vm.run()
     return 0
-
 
 def run_project_test(directory: Path, *, locked: bool = False) -> int:
     manifest_path = find_manifest(directory)
@@ -493,8 +498,11 @@ def run_project_test(directory: Path, *, locked: bool = False) -> int:
         for diagnostic in diagnostics:
             print(diagnostic.format(), file=sys.stderr)
         return 1
-    runtime = Runtime(base_path=manifest.entry.parent, import_paths=[*manifest.source_roots, manifest.root])
-    results = runtime.run_tests(graph.programs[manifest.entry])
+    program = graph.programs[manifest.entry]
+    vm = VM(base_path=manifest.entry.parent, import_paths=[*manifest.source_roots, manifest.root])
+    mod = compile_program(program, source_path=str(manifest.entry.resolve()))
+    vm.load_module(mod)
+    results = vm.run_tests()
     for result in results:
         marker = "PASS" if result["status"] == "pass" else "FAIL"
         detail = f": {result['message']}" if result["message"] else ""
@@ -564,8 +572,12 @@ def run_golden(path: Path, *, update: bool = False) -> int:
             print(diagnostic.format(), file=sys.stderr)
         return 1
     output: list[str] = []
-    Runtime(output.append, base_path=path.parent).run(program)
-    actual = "\n".join(output) + ("\n" if output else "")
+    buf = StringIO()
+    vm = VM(output=buf.write, base_path=path.parent)
+    mod = compile_program(program, source_path=str(path.resolve()))
+    vm.load_module(mod)
+    vm.run()
+    actual = buf.getvalue()
     golden_path = path.with_suffix(path.suffix + ".golden")
     if update:
         golden_path.write_text(actual, encoding="utf-8")
@@ -673,8 +685,10 @@ def run_selfhost_checks_from_root(root: Path, quick: bool) -> int:
                 print(f"{display_installation_path(path, root)}: {diagnostic.format()}")
             continue
 
-        runtime = Runtime(base_path=root)
-        results = runtime.run_tests(program)
+        vm = VM(base_path=root)
+        mod = compile_program(program, source_path=str(path.resolve()))
+        vm.load_module(mod)
+        results = vm.run_tests()
         test_failures = [r for r in results if r["status"] == "fail"]
         if test_failures:
             failed = failed + 1

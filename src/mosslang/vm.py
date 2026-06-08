@@ -43,7 +43,7 @@ class Frame:
 class VM:
     """Stack-based bytecode virtual machine for Moss."""
     
-    def __init__(self, output=None, base_path=None, trace_rules=False):
+    def __init__(self, output=None, base_path=None, trace_rules=False, import_paths=None):
         self.globals = {}
         self.functions = {}
         self.effects = set()
@@ -51,6 +51,7 @@ class VM:
         self.db = {}
         self.output = output or print
         self.base_path = Path(base_path) if base_path else Path.cwd()
+        self.import_paths = [Path(p) for p in import_paths] if import_paths else []
         self.trace_rules = trace_rules
         self.trace_events = []
         self.effect_stack = []
@@ -59,6 +60,7 @@ class VM:
         self._imported_paths: set[Path] = set()
         self._function_globals: dict[str, list[str]] = {}
         self._module_globals: dict[str, list[str]] = {}
+        self._function_source_paths: dict[str, str] = {}
         
     def load_module(self, module):
         self._module = module
@@ -66,11 +68,13 @@ class VM:
         self.functions.clear()
         self._imported_paths = set()
         self._function_globals.clear()
+        self._function_source_paths.clear()
         self._module_globals.clear()
         for name in module.globals:
             self.globals[name] = None
         for name, fn_co in module.functions.items():
             self.functions[name] = fn_co
+            self._function_source_paths[name] = module.source_path
         self.effects = set(module.effects)
         self.tests = list(module.tests)
         self.install_builtins()
@@ -277,7 +281,13 @@ class VM:
             elif op == Opcode.GET_INDEX:
                 idx = int(frame.stack.pop())
                 lst = frame.stack.pop()
-                frame.stack.append(lst[idx])
+                try:
+                    frame.stack.append(lst[idx])
+                except (IndexError, TypeError) as e:
+                    raise MossRuntimeError(
+                        f"index {idx} out of range for {type(lst).__name__} of length {len(lst)} "
+                        f"in '{frame.code.name}' at instruction {frame.pc - 1}"
+                    ) from e
             elif op == Opcode.SET_INDEX:
                 idx = frame.stack.pop()
                 lst = frame.stack.pop()
@@ -333,13 +343,37 @@ class VM:
             for i, arg in enumerate(args):
                 if i < len(new_frame.locals):
                     new_frame.locals[i] = arg
+            # Record argument names/values for potential trace
+            arg_names = list(new_frame.code.locals[:callee.arg_count]) if callee.is_rule else []
+            arg_values = list(args[:callee.arg_count]) if callee.is_rule else []
             try:
                 self._execute(new_frame)
-                # Normal return: transfer result from child frame stack
                 if new_frame.stack:
-                    frame.stack.append(new_frame.stack.pop())
+                    result = new_frame.stack.pop()
+                    if callee.is_rule and self.trace_rules:
+                        source_path = self._function_source_paths.get(fn_name, self._module.source_path if self._module else "")
+                        self.trace_events.append({
+                            "rule": fn_name,
+                            "arguments": {name: format_value(val) for name, val in zip(arg_names, arg_values)},
+                            "result": format_value(result),
+                            "file": source_path,
+                            "line": callee.source_line,
+                            "column": callee.source_column,
+                        })
+                    frame.stack.append(result)
             except ReturnSignal as sig:
-                frame.stack.append(sig.value)
+                result = sig.value
+                if callee.is_rule and self.trace_rules:
+                    source_path = self._function_source_paths.get(fn_name, self._module.source_path if self._module else "")
+                    self.trace_events.append({
+                        "rule": fn_name,
+                        "arguments": {name: format_value(val) for name, val in zip(arg_names, arg_values)},
+                        "result": format_value(result),
+                        "file": source_path,
+                        "line": callee.source_line,
+                        "column": callee.source_column,
+                    })
+                frame.stack.append(result)
             except BreakSignal:
                 raise MossRuntimeError("break outside loop")
             except ContinueSignal:
@@ -520,7 +554,11 @@ class VM:
         return list(args[0])
 
     def builtin_text_join(self, args):
-        sep, parts = args
+        if len(args) == 0:
+            return ""
+        if len(args) == 1:
+            return "".join(args[0])
+        parts, sep = args
         return sep.join(parts)
 
     def builtin_text_split(self, args):
@@ -620,7 +658,9 @@ class VM:
                 self.functions[name] = fn_co
                 self.globals[name] = fn_co
                 self._function_globals[name] = list(imported_mod.globals)
+                self._function_source_paths[name] = str(resolved)
             self.effects.update(imported_mod.effects)
+            self.tests.extend(imported_mod.tests)
             self._load_imports(imported_mod)
 
     def _resolve_import_path(self, import_path: str, source_dir: Path) -> Path:
@@ -629,6 +669,8 @@ class VM:
         if path.is_absolute():
             return path.resolve()
         candidates = [source_dir / path, self.base_path / path, _Path.cwd() / path]
+        for search_path in self.import_paths:
+            candidates.append(search_path / path)
         for candidate in candidates:
             if candidate.exists():
                 return candidate.resolve()

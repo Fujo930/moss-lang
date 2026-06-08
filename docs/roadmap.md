@@ -5,6 +5,24 @@ implemented, repaired, documented, committed, and pushed the current repository
 in collaboration with Fujo930. Development on the ds-Mosslang branch is
 continued by Reasonix as of 0.5.5.
 
+## Version 0.5.6: VM execution unified
+
+Implemented:
+
+- `moss trace`, `moss golden`, `moss project-run`, `moss project-test`,
+  `moss selfhost` switched to bytecode VM
+- short-circuit `and`/`or` compilation (jump-based, matching Runtime semantics)
+- `textJoin(parts)` single-argument support with correct `(parts, sep)` order
+- VM `import_paths` support for multi-root projects
+- imported module test block merging in `_load_imports`
+- `CodeObject.is_rule` flag for rule detection at runtime
+- `CodeObject.source_line`/`source_column` for source-mapped traces
+- `moss trace` rule evaluation events on VM with file/line/column
+- 116 tests pass; selfhost 5/5 sketches pass
+
+`moss repl` and `moss selfhost-compare` remain on Runtime pending API
+refactoring (0.5.7).
+
 ## Version 0.5.5: backtick interpolation and VM default
 
 Implemented:

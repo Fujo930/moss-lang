@@ -20,7 +20,6 @@ BINARY_OP_MAP = {
     "+": Opcode.ADD, "-": Opcode.SUB, "*": Opcode.MUL, "/": Opcode.DIV,
     "%": Opcode.MOD, "==": Opcode.EQ, "!=": Opcode.NEQ,
     "<": Opcode.LT, ">": Opcode.GT, "<=": Opcode.LTE, ">=": Opcode.GTE,
-    "and": Opcode.AND, "or": Opcode.OR,
 }
 
 
@@ -242,12 +241,16 @@ class Compiler:
         self.emit(Opcode.RETURN)
 
         self._resolve_labels()
+        loc = decl.location
         co = CodeObject(
             name=decl.name,
             instructions=list(self.instructions),
             constants=list(self.constants),
             locals=list(self.locals),
             arg_count=len(decl.params),
+            is_rule=True,
+            source_line=loc.line if loc else 0,
+            source_column=loc.column if loc else 0,
         )
 
         self.locals = saved_locals
@@ -433,12 +436,15 @@ class Compiler:
             elif expr.op == "with":
                 self._compile_record_update(expr)
             else:
-                self._compile_expression(expr.left)
-                self._compile_expression(expr.right)
-                opcode = BINARY_OP_MAP.get(expr.op)
-                if opcode is None:
-                    raise ValueError(f"Unknown binary operator: {expr.op}")
-                self.emit(opcode)
+                if expr.op in ("and", "or"):
+                    self._compile_short_circuit(expr)
+                else:
+                    self._compile_expression(expr.left)
+                    self._compile_expression(expr.right)
+                    opcode = BINARY_OP_MAP.get(expr.op)
+                    if opcode is None:
+                        raise ValueError(f"Unknown binary operator: {expr.op}")
+                    self.emit(opcode)
 
         elif isinstance(expr, n.UnaryExpr):
             self._compile_expression(expr.right)
@@ -496,6 +502,45 @@ class Compiler:
         else:
             self._add_constant(value)
             self.emit(Opcode.LOAD_CONST, self._constant_index(value))
+
+    def _compile_short_circuit(self, expr) -> None:
+        """Compile 'and'/'or' with short-circuit evaluation.
+
+        ``A and B``:
+          compile A → JUMP_IF_FALSE skip → compile B → JUMP_IF_FALSE skip
+          → LOAD_TRUE → JUMP done
+          skip: LOAD_FALSE
+          done:
+
+        ``A or B``:
+          compile A → JUMP_IF_TRUE skip → compile B → JUMP_IF_TRUE skip
+          → LOAD_FALSE → JUMP done
+          skip: LOAD_TRUE
+          done:
+        """
+        self._compile_expression(expr.left)
+        if expr.op == "and":
+            skip_label = self._new_label()
+            done_label = self._new_label()
+            self.emit(Opcode.JUMP_IF_FALSE, skip_label)
+            self._compile_expression(expr.right)
+            self.emit(Opcode.JUMP_IF_FALSE, skip_label)
+            self.emit(Opcode.LOAD_TRUE)
+            self.emit(Opcode.JUMP, done_label)
+            self._emit_label(skip_label)
+            self.emit(Opcode.LOAD_FALSE)
+            self._emit_label(done_label)
+        else:  # or
+            skip_label = self._new_label()
+            done_label = self._new_label()
+            self.emit(Opcode.JUMP_IF_TRUE, skip_label)
+            self._compile_expression(expr.right)
+            self.emit(Opcode.JUMP_IF_TRUE, skip_label)
+            self.emit(Opcode.LOAD_FALSE)
+            self.emit(Opcode.JUMP, done_label)
+            self._emit_label(skip_label)
+            self.emit(Opcode.LOAD_TRUE)
+            self._emit_label(done_label)
 
     def _compile_field_access(self, expr: n.BinaryExpr) -> None:
         """Compile base.field into GET_FIELD."""

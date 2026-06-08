@@ -3,6 +3,36 @@
 This file explains the repository history in human terms. The Git commit
 messages stay short; this document gives future readers the memory behind them.
 
+## 0.5.6: VM execution unified
+
+Reasonix completed the VM migration started in 0.5.5. `moss trace`, `moss golden`,
+`moss project-run`, `moss project-test`, and `moss selfhost` now all run on
+the bytecode VM instead of the tree-walking Runtime.
+
+The migration uncovered and fixed three pre-existing VM bugs:
+
+- `and`/`or` were compiled eagerly (both operands evaluated before the
+  operator), causing `while i < len(chars) and isAlphaNumeric(chars[i])` to
+  crash when `i` was out of bounds. The compiler now emits short-circuit jump
+  code.
+- `textJoin` had the `(sep, parts)` order reversed and didn't accept a
+  single-argument call with an empty separator.
+- `_load_imports` didn't merge test blocks from imported modules, so
+  `moss project-test` showed "0/0 tests passed" for multi-file projects.
+
+VM-level additions: `CodeObject.is_rule` flag, `source_line`/`source_column`
+for trace source mapping, `_function_source_paths` for cross-module trace
+file attribution, and `import_paths` support for `moss.toml` source roots.
+
+Two commands remain on the Runtime: `moss repl` (cross-line mutable state)
+and `moss selfhost-compare` (direct `runtime.call()` to Moss-written parser
+functions). These will move to VM in 0.5.7.
+
+Why it matters: every `moss` command that executes Moss code now produces
+consistent results. Arrow functions with implicit return, short-circuit
+logic, string interpolation — they all behave identically regardless of
+which command invokes them.
+
 ## 0.5.5: backtick interpolation and VM default
 
 Reasonix took over active development from DeepSeek (Kun) on the ds-Mosslang

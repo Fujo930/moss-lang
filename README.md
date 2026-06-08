@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
-![Version: 0.5.5](https://img.shields.io/badge/version-0.5.5-4f7edb)
+![Version: 0.5.6](https://img.shields.io/badge/version-0.5.6-4f7edb)
 ![Built by DeepSeek](https://img.shields.io/badge/built%20by-DeepSeek-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -252,9 +252,9 @@ expression and match-pattern ASTs across all root example programs.
 
 ## Project status
 
-This is version `0.5.5`: a bytecode-compiled interpreter with backtick string
-interpolation, stack-VM execution for `run` and `test` commands, and a verified
-Moss-written frontend.
+This is version `0.5.6`: the CLI execution engine is unified on the bytecode VM,
+with short-circuit `and`/`or`, VM trace support, and consistent behaviour across
+all commands that execute Moss code.
 The repository is released under the MIT License.
 
 Suitable claims:
@@ -282,7 +282,7 @@ See `docs/language.md` for the current language surface,
 `docs/grove.md` for the planned Moss-native open-source editor,
 `docs/history.md` for a commit-by-commit feature guide, and
 `docs/roadmap.md` for the path from prototype to a serious implementation.
-See `docs/release-0.5.5.md` for the current release notes, and
+See `docs/release-0.5.6.md` for the current release notes, and
 `docs/identity.md` for the Moss identity.
 
 ## Participate

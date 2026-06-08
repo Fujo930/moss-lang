@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.5.6
+
+Moss `0.5.6` unifies the CLI execution engine: `run`, `test`, `trace`,
+`golden`, `project-run`, `project-test`, and `selfhost` all run on the
+bytecode VM. See `docs/release-0.5.6.md` for details.
+
 ## 0.5.5
 
 Moss `0.5.5` adds backtick string interpolation and switches `moss run` and
