@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## v0.56.1 — V5 + V8 Root-Cause Fix
+
+### Fixed
+- **V5 (High)**: Self-host `parseNamedLine` rewritten to parse signatures token-by-token.
+  Stops at `{` (calls `parseBlockStatements` with correct state) or `=` (reads arrow body).
+  Also strips trailing `}` from `readLineTokens` output in `parseBlockStatements`
+  to avoid "unexpected token" errors from `parseExpressionTokens`.
+- **V8 (P0)**: Self-host expression parser `parsePrimaryExpr` now handles `\` (SYMBOL)
+  by calling new `parseLambdaExpr` that parses params up to `->` and body via `parseUpdateExpr`.
+  `normalize_selfhost_expr` added Lambda branch for AST comparison.
+
+### Root causes
+- V5: Old `lineText` consumed `{...}` block before `parseBlockStatements` was called,
+  causing it to parse subsequent top-level lines as block body.
+- V8: Selfhost lexer classifies `\` as SYMBOL (not LAMBDA), and expression parser
+  had no backslash handler. Host lexer produces LAMBDA token.
+
+### Verification
+- **133 tests, 22 subtests pass**
+- **Selfhost-compare 9/9 passed** (examples/)
+- **Selfhost 5/5 sketches pass**
+- **v5_arrow_boundary.moss**: trust=true, bodies_match=true
+- **v8_lambda.moss**: trust=true, expressions_match=true
+
 ## v0.56.0 — Saturation Audit Fixes (TAAv2)
 
 ### Fixed Vulnerabilities (Round 2 — saturation_tests/)

@@ -13,7 +13,7 @@
         "examples/self_host/lexer_core.moss"
       ],
       "path": "examples/self_host/expression_core.moss",
-      "sha256": "16e3676717dd4f955064b22c2feea86aec3399befce1ff0edc8ec09012550429"
+      "sha256": "18c0b6619c15b8a0d95612892f61e4819382b3cfa1488ed7f0b21382c1cc3d29"
     },
     {
       "imports": [
@@ -27,7 +27,7 @@
         "examples/self_host/statement_core.moss"
       ],
       "path": "examples/self_host/parser_core.moss",
-      "sha256": "02a5b0d47bd0ee164df18e902c74bffdc8586fa33e6de0b2af561a7567b0e581"
+      "sha256": "9c8e4b391b18fb1f9ca2b0c1998814775f1c362944ac227f3927223dee11c4bc"
     },
     {
       "imports": [

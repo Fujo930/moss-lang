@@ -222,6 +222,9 @@ fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
   if item.value == "{" {
     return parseRecordExpr(exprAdvance(state))
   }
+  if item.value == "\\" {
+    return parseLambdaExpr(exprAdvance(state))
+  }
   if item.value == "(" {
     nested = parseUpdateExpr(exprAdvance(state))
     if exprCurrent(nested.state).value != ")" {
@@ -233,6 +236,23 @@ fn parsePrimaryExpr(state: ExprParseState) -> ExprParseResult {
 
   failed = exprError(state, "expected expression")
   return exprResult(exprAdvance(failed), missingExpr())
+}
+
+fn parseLambdaExpr(state: ExprParseState) -> ExprParseResult {
+  paramNames = []
+  while exprCurrent(state).kind != "EOF" and exprCurrent(state).value != "->" {
+    if exprCurrent(state).kind == "IDENT" {
+      paramNames = listPush(paramNames, exprCurrent(state).value)
+    }
+    state = exprAdvance(state)
+  }
+  if exprCurrent(state).value != "->" {
+    state = exprError(state, "expected -> after lambda parameters")
+    return exprResult(state, expr("Lambda", "", missingExpr(), paramNames))
+  }
+  state = exprAdvance(state)
+  body = parseUpdateExpr(state)
+  return exprResult(body.state, expr("Lambda", "", body.expr, paramNames))
 }
 
 fn parseCallArguments(state: ExprParseState) -> ExprListParseResult {

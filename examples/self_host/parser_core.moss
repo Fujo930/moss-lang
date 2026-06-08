@@ -227,6 +227,9 @@ fn parseBlockStatements(state: ParseState) -> BlockParseResult {
           state = continuation.state
         }
       }
+      if len(lineTokens) > 0 and listGet(lineTokens, len(lineTokens) - 1, token("EOF", "", 0, 0)).value == "}" {
+        lineTokens = listSlice(lineTokens, 0, len(lineTokens) - 1)
+      }
       lineTokens = listPush(lineTokens, token("EOF", "", 0, 0))
       parsed = parseStatementTokens(lineTokens)
       if len(parsed.errors) == 0 {
@@ -277,19 +280,39 @@ fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
   }
 
   state = advance(state)
-  value = lineText(state)
-  state = advanceToNextLine(state)
   data = null
-  if kind == "Type" and textTrim(value) == "=" {
-    value = typeFieldText(state)
-    state = skipTypeContinuation(state)
-  }
-  if kind == "Function" or kind == "Test" {
-    if not textContains(value, "=") {
+  value = ""
+  if kind == "Type" {
+    value = lineText(state)
+    state = advanceToNextLine(state)
+    if textTrim(value) == "=" {
+      value = typeFieldText(state)
+      state = skipTypeContinuation(state)
+    }
+  } else if kind == "Function" or kind == "Test" {
+    while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" and currentToken(state).value != "{" and currentToken(state).value != "=" {
+      value = tokenText(value, currentToken(state))
+      state = advance(state)
+    }
+    if currentToken(state).value == "{" {
+      state = advance(state)
       block = parseBlockStatements(state)
       state = block.state
       data = block.statements
+    } else if currentToken(state).value == "=" {
+      value = tokenText(value, currentToken(state))
+      state = advance(state)
+      while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" {
+        value = tokenText(value, currentToken(state))
+        state = advance(state)
+      }
     }
+    if currentToken(state).kind == "NEWLINE" {
+      state = advance(state)
+    }
+  } else {
+    value = lineText(state)
+    state = advanceToNextLine(state)
   }
   return addNode(state, node(kind, name.value, value, data))
 }

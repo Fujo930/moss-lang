@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: experimental](https://img.shields.io/badge/self--hosting-experimental-f2c14e)
-![Version: 0.56](https://img.shields.io/badge/version-0.56-4f7edb)
+![Version: 0.56.1](https://img.shields.io/badge/version-0.56.1-4f7edb)
 ![Branch: ds-Mosslang](https://img.shields.io/badge/branch-ds--Mosslang-222222)
 
 Moss is an experimental programming language for long-lived software projects

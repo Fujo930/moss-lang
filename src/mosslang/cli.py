@@ -1403,6 +1403,8 @@ def normalize_selfhost_expr(expr):
         return (kind, normalize_selfhost_expr(expr["left"]))
     if kind == "Match":
         return (kind, normalize_selfhost_expr(expr["left"]), tuple((normalize_selfhost_pattern(case["pattern"]), normalize_selfhost_expr(case["expression"])) for case in expr["right"]))
+    if kind == "Lambda":
+        return (kind, tuple(expr.get("right", [])), normalize_selfhost_expr(expr["left"]))
     raise ValueError(f"unknown self-host expression kind {kind}")
 
 

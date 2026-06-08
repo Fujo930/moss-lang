@@ -1,21 +1,28 @@
-# Moss 0.56.0 Release — Saturation Audit Fixes (TAAv2)
+# Moss 0.56.1 Release — V5 + V8 Root-Cause Fix
 
-Moss `0.56.0` is the second Trust Artifact Alpha snapshot. All 8 vulnerabilities
-from the round-2 adversarial audit (saturation attack) have been addressed.
+Moss `0.56.1` fixes the last two reproducible vulnerabilities from the saturation audit:
+arrow-function body parsing (V5) and lambda expression support (V8) in the self-host parser.
 
-## Round 2 fixes
+## Fixed
 
-| # | Severity | Issue | Fix |
-|---|----------|-------|-----|
-| V9 | P0 | Pipe operator parser crash | `self.match_kind("IDENT")` in pipe handler |
-| V8 | P0 | LambdaExpr crashes trust pipeline | `render_expr` + `normalize_host_expr` support |
-| V10 | P0 | Chain record update VM crash | Result always initialized in `RECORD_UPDATE` |
-| V7 | P1 | Null representation mismatch | Selfhost Null unified to `""` |
-| V11 | P2 | Type params not validated | `check_param_types()` with warnings |
-| V5 | P1 | Arrow-function body boundary | `=` detection skips block parse |
-| V6 | P3 | source_sha256 decorative | Round-trip verified (v0.55.0) |
+### V5 — Self-host arrow-function body boundary (High)
+**Root cause**: `parseNamedLine` used `lineText` which consumed `{...}` block tokens,
+then `advanceToNextLine` skipped past the block entirely. `parseBlockStatements` was
+called AFTER the block line, causing it to parse subsequent top-level declarations
+as the function body.
 
-Plus V2/V3/V4 already fixed in v0.55.0.
+**Fix**: Rewrote `parseNamedLine` for Function/Test declarations to parse signature
+tokens token-by-token, stopping at `{` (then calling `parseBlockStatements` with
+correct state) or `=` (then reading arrow expression). Also strips trailing `}`
+from `readLineTokens` output to prevent "unexpected token" errors.
+
+### V8 — Lambda expression support (P0)
+**Root cause**: Selfhost lexer classifies `\` as SYMBOL, not LAMBDA. Expression
+parser had no handler for `\`.
+
+**Fix**: Added `\` detection in `parsePrimaryExpr` → new `parseLambdaExpr` parses
+params up to `->` and body via `parseUpdateExpr`. Added Lambda branch to
+`normalize_selfhost_expr` for AST comparison.
 
 ## Verification
 
@@ -28,12 +35,13 @@ python -m mosslang.cli selfhost-compare examples
 
 python -m mosslang.cli selfhost --quick
 # 5/5 sketch tests pass
+
+python -m mosslang.cli trust audit_tests/v5_arrow_boundary.moss
+# trust=true, bodies_match=true
+
+python -m mosslang.cli trust audit_tests/v8_lambda.moss
+# trust=true, expressions_match=true
 ```
-
-## Known limitations
-
-- Self-host parser: single-line block bodies (`fn f() { expr }`) produce empty statement data — trust correctly reports selfhost mismatch
-- Cross-file type resolution: V11 uses warnings for undeclared types, not errors (imported types not resolved)
 
 ## Install
 
