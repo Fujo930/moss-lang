@@ -157,9 +157,11 @@ static Instructions read_instructions(FILE *f) {
     uint8_t *code = malloc(count * sizeof(uint8_t));
     int32_t *args = malloc(count * sizeof(int32_t));
     for (uint32_t i = 0; i < count; i++) {
-        uint32_t word = read_u32(f);
-        code[i] = (uint8_t)(word & 0xFF);
-        args[i] = (int32_t)(word >> 8);
+        code[i] = (uint8_t)fgetc(f);             /* opcode: 1 byte */
+        args[i] = (int32_t)read_u32(f);           /* arg: 4 bytes */
+        read_u32(f);                              /* line: 4 bytes (skip) */
+        uint16_t col; fread(&col, 1, 2, f);       /* column: 2 bytes (skip) */
+        (void)col;
     }
     return (Instructions){code, args, (int32_t)count};
 }
@@ -241,6 +243,7 @@ static Value *vm_resolve_global(VM *vm, int idx);
 static void vm_run(VM *vm) {
     vm->pc = 0;
     vm->running = true;
+    int steps = 0;
     while (vm->running && vm->pc < vm->insts.length) {
         int op = vm->insts.code[vm->pc];
         int arg = vm->insts.args[vm->pc];
@@ -483,7 +486,8 @@ int main(int argc, char *argv[]) {
     if (argc < 2) { fprintf(stderr, "usage: mossvm program.mbc\n"); return 1; }
 
     VM vm = {0};
-    if (!vm_load(&vm, argv[1])) return 1;
+    if (!vm_load(&vm, argv[1])) { fprintf(stderr, "LOAD FAILED\n"); fflush(stderr); return 1; }
+    fprintf(stderr, "LOAD OK, starting vm_run\n"); fflush(stderr);
     vm_run(&vm);
     return 0;
 }
