@@ -11,3 +11,4 @@ installer/SHA256SUMS.txt
 reasonix.toml
 .codegraph/
 .reasonix/
+bin/

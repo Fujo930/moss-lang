@@ -267,33 +267,31 @@ static void vm_run(VM *vm) {
             if (!is_truthy(cond)) vm->pc = arg;
             break;
         }
-        case OP_JUMP_IF_TRUE: {
-            Value *cond = stack_pop(&vm->stack);
-            if (is_truthy(cond)) vm->pc = arg;
-            break;
-        }
+        case OP_JUMP_IF_TRUE:
+            { Value *cond = stack_pop(&vm->stack); if (is_truthy(cond)) vm->pc = arg; break; }
         case OP_RETURN: vm->running = false; break;
         case OP_CALL: {
+            /* Pop args first (reverse order), then callee — matches Python VM */
+            Value *fn_args[32] = {0};
+            for (int i = arg - 1; i >= 0; i--) fn_args[i] = stack_pop(&vm->stack);
             Value *callee = stack_pop(&vm->stack);
             if (callee && callee->kind == V_STRING) {
-                /* builtin lookup */
                 const char *name = callee->as.string;
                 if (strcmp(name, "print") == 0) {
                     for (int i = 0; i < arg; i++) {
-                        Value *a = stack_pop(&vm->stack);
                         if (i > 0) printf(" ");
-                        val_print(stdout, a);
+                        val_print(stdout, fn_args[i]);
                     }
-                    printf("\n");
+                    printf("\n"); fflush(stdout);
                     stack_push(&vm->stack, val_null());
                 } else if (strcmp(name, "len") == 0) {
-                    Value *a = stack_pop(&vm->stack);
+                    Value *a = fn_args[0];
                     if (a && a->kind == V_LIST) stack_push(&vm->stack, val_number(a->as.list.count));
                     else if (a && a->kind == V_STRING) stack_push(&vm->stack, val_number(strlen(a->as.string)));
                     else stack_push(&vm->stack, val_number(0));
                 } else if (strcmp(name, "assert") == 0) {
-                    Value *msg = (arg > 1) ? stack_pop(&vm->stack) : NULL;
-                    Value *cond = stack_pop(&vm->stack);
+                    Value *msg = (arg > 1) ? fn_args[1] : NULL;
+                    Value *cond = fn_args[0];
                     if (!is_truthy(cond)) { fprintf(stderr, "mossvm: assertion failed"); if (msg) { fprintf(stderr, ": "); val_print(stderr, msg); } fprintf(stderr, "\n"); exit(1); }
                     stack_push(&vm->stack, val_null());
                 }
