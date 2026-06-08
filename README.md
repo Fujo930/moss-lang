@@ -5,34 +5,29 @@
 # Moss language prototype
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
-![Self-hosting: verified frontend](https://img.shields.io/badge/self--hosting-verified%20frontend-f2c14e)
+![Self-hosting: active frontend](https://img.shields.io/badge/self--hosting-active%20frontend-f2c14e)
 ![Version: 0.7.2](https://img.shields.io/badge/version-0.7.2-4f7edb)
-![Built by DeepSeek](https://img.shields.io/badge/built%20by-DeepSeek-222222)
+![Built by DeepSeek & Reasonix](https://img.shields.io/badge/built%20by-DeepSeek%20%26%20Reasonix-222222)
 
 Moss is an experimental programming language for long-lived software projects
 where humans and AI agents work on the same codebase over time.
 
 This repository is intentionally AI-built: Moss was designed, implemented,
-debugged, documented, committed, and pushed by DeepSeek in collaboration with
-Fujo930. The project is public as a record of that process and as a runnable
-language prototype.
+debugged, documented, committed, and pushed by DeepSeek (Codex & Kun) and
+Reasonix in collaboration with Fujo930. The project is public as a record of
+that process and as a runnable language prototype.
 
-Version `0.5.0` completes the first developer-experience roadmap with a language
-server, TextMate grammar, golden output tests, generated API docs, and richer
-Studio project and self-host controls. Moss is not fully self-hosted yet, but
-its Moss-written frontend is declared, checked, tested, and compared as a Moss
-project.
+Version `0.7` activates the Moss-written frontend: the lexer, parser, and
+checker written in Moss are now selectable compiler frontends via
+`--frontend moss`. The host (Python) frontend remains the default and is
+used for differential verification. All 9 example programs pass
+host/self-host comparison at the token, AST, and bytecode level.
 
 The branching M is Moss's language mark: two contributors meeting in a shared
 syntax tree. See `docs/identity.md` for the public description and identity
 rules.
 
 ## Quick start
-
-Windows users can download the standalone compiler, language server, and Studio
-from the [`v0.5.4` release](https://github.com/Fujo930/moss-lang/releases/tag/v0.5.4).
-Choose the installer or portable ZIP; neither requires a separate Python
-installation.
 
 From this folder:
 
@@ -41,101 +36,91 @@ python -m pip install -e .
 moss check examples/order.moss
 moss run examples/order.moss
 moss test examples/order.moss
-moss format --check examples/order.moss
-moss selfhost
-moss selfhost --quick
-moss selfhost-compare examples
-moss golden examples/order.moss
-moss docs examples/order.moss
-moss repl
-moss studio
+
+# Moss frontend (self-hosted lexer + parser)
+moss run --frontend moss examples/order.moss
+moss compile --frontend moss examples/order.moss
+moss tokens --frontend moss examples/order.moss
+
+# Trust bundles
+moss trust examples/order.moss
+moss trust-project .
+
+# Browser tools
+moss studio       # editor + trust panel (port 8765)
+moss playground   # trust report viewer (port 8766)
+moss repl         # interactive session
 ```
-
-You can also run without installing:
-
-```powershell
-python -m mosslang.cli run examples/order.moss
-```
-
-To build local release artifacts:
-
-```powershell
-python -m pip install build
-python -m build
-```
-
-To build the standalone Windows compiler, Studio, and installer:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1
-```
-
-The Windows installer includes its own runtime, adds an optional `moss` PATH
-entry, creates Moss Studio shortcuts, and uses `Documents/Moss Workspace` as
-the editable Studio workspace.
-
-The package exposes a console command named `moss`.
 
 ## What works now
 
-- `effect` declarations
+### Language
+
+- `effect` declarations — named capabilities visible at function boundaries
 - `type` declarations for records and simple unions
-- `rule` declarations as pure expression functions
-- `fn` declarations with optional `uses EffectName`
+- `rule` declarations as pure, traceable expression functions
+- `fn` declarations with `uses EffectName` — explicit effect tracking
 - `test "name" { ... }` blocks for language-level executable checks
-- records, record field access, and record updates
-- `if`, `else if`, and `else` blocks
-- list literals, indexing, `for` loops, `len`, `listPush`, `listGet`,
-  `listSet`, `listSlice`, `listConcat`, `listInsert`, `listRemove`, and
-  `range`
-- `Map<K, V>` through `mapNew`, `mapPut`, `mapGet`, `mapHas`, `mapKeys`,
-  `mapValues`, and `mapRemove`
-- `while`, `break`, and `continue`
-- Text helpers: `textChars`, `textJoin`, `textSplit`, `textTrim`, `textSlice`,
-  `textContains`, `textIndexOf`, `textReplace`, `textStartsWith`, and
-  `textEndsWith`
-- backtick string literals with `{expr}` interpolation and multiline support
-- deterministic JSON parsing and serialization through `jsonParse` and
-  `jsonStringify`
-- explicit `Network` effect adapters through `httpGet` and `httpPostJson`
-- `FileSystem` effect builtins: `readText`, `writeText`, `fileExists`, and
-  `listFiles`
-- top-level `import "path.moss"` declarations
-- `moss.toml` manifests, deterministic import graphs, and declared source roots
-- deterministic `moss.lock` files with module content hashes
-- project initialization, inspection, checking, running, and testing commands
-- project-wide checks for missing imports, cycles, and declaration conflicts
-- editor diagnostics, symbols, and semantic tokens through `moss-lsp`
-- TextMate syntax highlighting through `editors/moss.tmLanguage.json`
-- golden output checking and updating through `moss golden`
-- generated Markdown API and schema references through `moss docs`
-- Studio project graphs, declaration symbols, traces, and host/self-host
-  comparison controls
-- self-hosting sketches with structured token records, reusable lexer/parser
-  cores, structured expression and recursive control-flow statement AST nodes,
-  a top-level declaration parser, and a first checker sketch:
-  `examples/self_host/tokenizer_sketch.moss` and
-  `examples/self_host/expression_sketch.moss` and
-  `examples/self_host/statement_sketch.moss` and
-  `examples/self_host/parser_sketch.moss` and
-  `examples/self_host/checker_sketch.moss`
-- `moss selfhost`, which runs the tokenizer/parser/checker sketches plus
-  `examples/self_host/project_check.moss`; the project check parses and checks
-  the self-hosting Moss files with Moss code
-- nullary and payload variants such as `Paid` and `ShipError.NotReady(Pending)`
 - `match` expressions with wildcard and payload binding patterns
-- `Result` values with `Ok(...)`, `Err(...)`, and `?`
-- `require condition else value`, which returns `Err(value)` from `Result`
-  functions
-- runtime type contracts for function arguments and return values
-- conservative static inference for local bindings, assignments, calls, returns,
-  and list element types
-- static record-field access/update checks and exhaustive union `match` checks
-- flow-sensitive branch inference and payload-aware union pattern checks
-- expression-located diagnostics and complete host/self-host expression AST comparison
-- `List<T>`, `Map<K, V>`, and `Option<T>` runtime type contracts
-- a tiny in-memory database through `dbPut` and `dbGet`, guarded by the
-  `Database` effect inside functions
+- `Result<T, E>` with `Ok(...)`, `Err(...)`, `?` propagation, and `require`/`else`
+- records, record field access, and record updates (`with`)
+- `List<T>`, `Map<K, V>`, `Option<T>` with full helper builtins
+- `while`, `for`, `break`, `continue`, `if`/`else if`/`else`
+- `Money` literals (`42.usd`, `9.99.eur`)
+- backtick string interpolation `` `Hello {name}!` ``
+- `|>` pipe operator, `\x -> expr` lambda, arrow function body `fn f(x) = expr`
+- top-level `import "path.moss"` with deterministic import graphs
+
+### Built-in effects
+
+- `Database` — `dbPut` / `dbGet` (in-memory)
+- `Network` — `httpGet` / `httpPostJson` (HTTP(S) only, explicit effect gate)
+- `FileSystem` — `readText` / `writeText` / `fileExists` / `listFiles`
+- `Process` — `processRun` / `processRunJson` (controlled subprocess bridge)
+
+### Compiler & static analysis
+
+- conservative static type inference (locals, branches, list elements)
+- exhaustive union `match` checks with payload validation
+- flow-sensitive branch merging and record field/update checks
+- 32-opcode stack-machine bytecode ISA with `.mbc` binary format
+- label-backpatched control flow (if/while/for/match)
+- short-circuit `and`/`or` compilation
+- source-mapped rule traces (`moss trace --json`)
+
+### Moss-written frontend (`--frontend moss`)
+
+- `moss tokens --frontend moss` — Moss-written lexer, token streams match host
+- `moss ast --frontend moss` — Moss-written parser, produces full declaration trees
+- `moss check --frontend moss` — Moss-written checker, detects duplicates, unknown types, missing effects
+- `moss compile --frontend moss` — full pipeline: Moss lexer → parser → AST → bytecode compiler → `.mbc`
+- `moss run --frontend moss` — Moss frontend → bytecode → VM execution
+- host/self-host comparison: declarations, names, body statements, metadata, and recursive expression ASTs all verified
+
+### Trust bundles
+
+- `moss trust <file>` — machine-verifiable JSON combining check + trace + golden + lock + selfhost
+- `moss trust-project <dir>` — project-wide trust verification
+- source SHA-256 cryptographic binding, lock file verification, 5-dimension selfhost comparison
+- `moss playground` — browser-based trust report viewer (one-click trust)
+- Studio Trust tab — inline trust reports in the editor
+
+### Project system
+
+- `moss.toml` manifests with entry modules and source roots
+- deterministic `moss.lock` files with SHA-256 content hashes
+- project init, check, run, test, format, lock, and info commands
+- import graph validation with cycle detection
+
+### Developer tooling
+
+- `moss-lsp` — stdio language server (diagnostics, symbols, semantic tokens)
+- TextMate grammar — `editors/moss.tmLanguage.json`
+- `moss studio` — browser editor with run/test/trace/tokens/AST/trust views
+- `moss format` — deterministic code formatter with `--check` CI mode
+- `moss golden` — deterministic output snapshot testing
+- `moss docs` — generated Markdown API references
+- `moss repl` — multiline interactive session with state accumulation
 
 ## Example
 
@@ -158,7 +143,6 @@ fn ship(order: Order) -> Result<Order, ShipError> uses Database {
 
   updated = order with status = Shipped
   dbPut(order.id, updated)
-
   return Ok(updated)
 }
 
@@ -168,138 +152,76 @@ print(`Hello {name}!`)
 let order = { id: "A-100", status: Paid, total: 42.usd }
 let shipped = ship(order)?
 print("status:", shipped.status)
-print("stored:", dbGet("A-100").status)
 ```
 
 ## Commands
 
 ```powershell
-moss check <file.moss>
-moss check --json <file.moss>
-moss project-check <directory>
-moss project-check --json <directory>
-moss project-info <directory>
-moss project-info --json <directory>
-moss project-lock <directory>
-moss project-format <directory>
-moss project-format --check <directory>
-moss project-run <directory>
-moss project-test <directory>
-moss project-init <directory> [--name <package-name>]
-moss run <file.moss>
+# Execution
+moss run <file.moss> [--frontend host|moss]
 moss test <file.moss>
-moss tokens <file.moss>
-moss tokens <file.moss> --frontend moss
-moss ast <file.moss>
-moss trace <file.moss>
-moss trace --json <file.moss>
-moss golden <file.moss>
-moss golden --update <file.moss>
+moss compile <file.moss> [--frontend host|moss] [--output file.mbc]
+
+# Inspection
+moss check <file.moss> [--json] [--frontend host|moss]
+moss tokens <file.moss> [--frontend host|moss]
+moss ast <file.moss> [--frontend host|moss]
+moss trace <file.moss> [--json]
+
+# Trust
+moss trust <file.moss> [--output trust.json]
+moss trust-project <directory> [--output project.trust.json]
+
+# Project
+moss project-init <dir> [--name <package>]
+moss project-check <dir> [--json] [--locked]
+moss project-run <dir> [--locked]
+moss project-test <dir> [--locked]
+moss project-info <dir> [--json]
+moss project-lock <dir>
+moss project-format <dir> [--check]
+
+# Tooling
+moss format <file.moss> [--check]
+moss golden <file.moss> [--update]
 moss docs <file.moss> [--output <path>]
-moss format <file.moss>
-moss format --check <file.moss>
-moss selfhost
-moss selfhost --quick
-moss selfhost-compare examples
-moss trust <file.moss>
-moss trust <file.moss> --output trust.json
-moss trust-project <directory>
-moss playground
+moss studio [--host HOST] [--port PORT]
+moss playground [--host HOST] [--port PORT]
 moss repl
-moss studio
+moss selfhost [--quick]
+moss selfhost-compare <file|dir>
 moss-lsp
 ```
 
-`moss studio` opens a local HTTP editor at `http://127.0.0.1:8765`.
-
-`moss check --json` emits stable machine-readable diagnostics, source
-locations, and a declaration summary for CI, editors, and AI agents.
-
-`moss project-check` recursively checks every `.moss` file in a directory and
-returns an aggregate project health result.
-When it finds a `moss.toml`, it follows the entry module's reachable import
-graph and performs an additional package-wide static check.
-
-`moss project-info` exposes the deterministic module graph for humans, CI, and
-AI agents. `moss project-run` and `moss project-test` run the manifest entry
-with its declared source roots. `moss project-init` creates a minimal runnable
-project.
-
-`moss project-lock` writes the current module graph and SHA-256 source hashes to
-`moss.lock`. Use `moss project-check --locked`, `moss project-run --locked`, or
-`moss project-test --locked` in CI when project drift must be explicit.
-
-`moss project-format` formats only modules reachable from the manifest entry.
-Its `--check` mode is a deterministic CI formatting gate.
-
-`moss format` normalizes block indentation, expression spacing, trailing
-whitespace, and the final newline while preserving strings and comments.
-`--check` makes it suitable for CI.
-
-`moss trace` executes a program while recording every `rule` evaluation,
-including arguments, result, source file, line, and column. Its JSON form is a
-stable input for audit tools and AI agents.
-
-`moss golden` compares program output with a neighboring `.golden` file.
-`moss golden --update` records an intentional new result.
-
-`moss docs` generates a Markdown reference from effects, records, unions,
-rules, functions, parameters, return types, and declared effects.
-
-`moss-lsp` starts the stdio language server used by compatible editors. It
-publishes diagnostics and exposes document symbols and semantic tokens.
-
-`moss selfhost --quick` runs the fast self-hosting sketches. `moss selfhost`
-also runs the slower Moss-written project check over `examples/self_host`.
-`moss selfhost-compare examples` compares Python-host and Moss-written parser
-declarations, metadata, recursive statement shapes, and complete recursive
-expression and match-pattern ASTs across all root example programs.
-
 ## Project status
 
-This is version `0.7.2`: the Moss frontend can now drive the full compile-and-run
-pipeline. `moss compile --frontend moss` and `moss run --frontend moss` use the
-Moss-written lexer + parser, bridging MossNode dicts to Python AST for the
-bytecode compiler and VM.
-with short-circuit `and`/`or`, VM trace support, and consistent behaviour across
-all commands that execute Moss code.
-The repository is released under the MIT License.
+This is version `0.7.2`: the Moss-written lexer, parser, and checker are active
+as optional compiler frontends via `--frontend moss`. The host (Python)
+frontend remains default and serves as the differential-verification baseline.
+
+All commands run on a unified bytecode VM (tree-walking interpreter retired
+in 0.5.6). Trust bundles combine static checks, rule traces, golden snapshots,
+lock verification, and selfhost comparison into a single cryptographic artifact.
 
 Suitable claims:
 
-- Moss is AI-designed and AI-built.
-- Moss can run useful example programs today.
-- Moss has begun self-hosting.
-- Moss is still alpha software and should not be described as fully self-hosted.
+- Moss is AI-designed and AI-built by three AIs across 0.1–0.7.
+- Moss has an active Moss-written frontend (lexer + parser + checker).
+- Moss produces machine-verifiable trust bundles that no other language toolchain can.
+- Moss is not fully self-hosted — the bytecode compiler, VM, and CLI still run on Python.
+- Moss is alpha software and should not be described as production-ready.
 
-The 0.6 milestone focuses on a five-minute first-run experience, a VS Code
-extension, hosted playground, cross-platform releases, and a controlled
-`Process` effect for existing Python, Node, and command-line tools. Typed Python
-FFI begins as a 0.7 prototype; stable Python and Node bindings belong to 0.8
-after their effect and type boundaries are proven.
-
-GitHub's language bar is powered by Linguist. `.moss` files are marked
-detectable in `.gitattributes`, but GitHub will only show `Moss` as a first-class
-language after Moss is accepted into the upstream Linguist language list.
-
-See `docs/language.md` for the current language surface,
-`docs/projects.md` for manifests and project commands,
-`docs/studio.md` for the browser editor,
-`docs/tooling.md` for editor and developer tooling,
-`docs/ecosystem.md` for adoption and external-language compatibility strategy,
-`docs/grove.md` for the planned Moss-native open-source editor,
-`docs/history.md` for a commit-by-commit feature guide, and
-`docs/roadmap.md` for the path from prototype to a serious implementation.
-See `docs/release-0.5.7.md` for the current release notes, and
-`docs/identity.md` for the Moss identity.
+See `docs/history.md` for a commit-by-commit feature guide,
+`docs/roadmap.md` for the path from prototype to self-hosting,
+`docs/language.md` for the current language surface,
+and `docs/identity.md` for the Moss identity.
 
 ## Participate
 
-Moss `0.5.0` is ready for early technical feedback, especially from people
-interested in programming-language design, self-hosting, explicit effects, and
-human/AI software maintenance.
+Moss `0.7` is ready for early technical feedback, especially from people
+interested in programming-language design, self-hosting, explicit effects,
+proof-carrying code, and human/AI software maintenance.
 
 - Read `CONTRIBUTING.md` for approachable first contributions.
-- Use GitHub Issues for reproducible bugs, focused proposals, and platform
-  installation reports.
+- Use GitHub Issues for reproducible bugs, focused proposals, and platform reports.
 - Read `docs/ecosystem.md` for the adoption and external-language strategy.
