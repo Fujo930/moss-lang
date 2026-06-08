@@ -5,6 +5,17 @@ implemented, repaired, documented, committed, and pushed the current repository
 in collaboration with Fujo930. Development on the ds-Mosslang branch is
 continued by Reasonix as of 0.5.5.
 
+## Version 0.5.7: trust bundles
+
+Implemented:
+
+- `moss trust <file.moss>` — unified trust bundle combining check, trace,
+  golden, and selfhost comparison into a single JSON artifact
+- trust bundle exit code: 0 = all gates passed, 1 = at least one failure
+- `moss trust --output path.json` writes bundle to file
+- `moss repl` and `moss selfhost-compare` fully migrated to VM
+- 2 trust bundle tests; 118 tests, 9 subtests pass
+
 ## Version 0.5.6: VM execution unified
 
 Implemented:

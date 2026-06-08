@@ -103,6 +103,10 @@ def main(argv: list[str] | None = None) -> int:
     compile_cmd.add_argument("file", type=Path)
     compile_cmd.add_argument("--output", "-o", type=Path, help="output .mbc file path")
 
+    trust_cmd = sub.add_parser("trust", help="produce a trust bundle (check + trace + golden + selfhost)")
+    trust_cmd.add_argument("file", type=Path)
+    trust_cmd.add_argument("--output", "-o", type=Path, help="write trust bundle to file (default: stdout)")
+
     run_vm_cmd = sub.add_parser("run-vm", help="execute compiled bytecode module")
     run_vm_cmd.add_argument("file", type=Path)
     run_vm_cmd.add_argument("--source-root", type=Path, help="source root for resolving imports")
@@ -121,6 +125,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "selfhost-compare":
             return run_selfhost_compare(args.file)
+
+        if args.command == "trust":
+            return run_trust(args.file, output=args.output)
 
         if args.command == "project-check":
             return run_project_check(args.directory, json_output=args.json, locked=args.locked)
@@ -591,6 +598,98 @@ def run_golden(path: Path, *, update: bool = False) -> int:
         return 1
     print(f"PASS {path}")
     return 0
+
+
+def run_trust(path: Path, *, output: Path | None = None) -> int:
+    """Produce a trust bundle for a Moss program."""
+    source = path.read_text(encoding="utf-8-sig")
+    bundle: dict = {
+        "moss": __version__,
+        "file": path.as_posix(),
+        "trust": True,
+    }
+
+    # 1. Static check
+    program = parse_source(source)
+    diagnostics = check_program(program)
+    chk_errors = [d for d in diagnostics if d.level == "error"]
+    bundle["check"] = {
+        "ok": len(chk_errors) == 0,
+        "diagnostics": [
+            {"level": d.level, "message": d.message,
+             "line": d.location.line if d.location else None,
+             "column": d.location.column if d.location else None}
+            for d in diagnostics
+        ],
+        "summary": {
+            "effects": sum(1 for item in program.items if type(item).__name__ == "EffectDecl"),
+            "imports": sum(1 for item in program.items if type(item).__name__ == "ImportDecl"),
+            "types": sum(1 for item in program.items if type(item).__name__ == "TypeDecl"),
+            "callables": sum(1 for item in program.items if type(item).__name__ in ("RuleDecl", "FunctionDecl")),
+            "tests": sum(1 for item in program.items if type(item).__name__ == "TestDecl"),
+        },
+    }
+
+    # 2. Trace rule evaluations
+    if not chk_errors:
+        vm_trace = VM(output=lambda _t: None, base_path=path.parent, trace_rules=True)
+        mod_trace = compile_program(program, source_path=str(path.resolve()))
+        vm_trace.load_module(mod_trace)
+        vm_trace.run()
+        bundle["trace"] = {
+            "ok": True,
+            "events": [
+                portable_trace_event(e) for e in vm_trace.trace_events
+            ],
+        }
+    else:
+        bundle["trace"] = {"ok": False, "events": []}
+        bundle["trust"] = False
+
+    # 3. Golden snapshot
+    if not chk_errors:
+        buf = StringIO()
+        vm_golden = VM(output=buf.write, base_path=path.parent)
+        mod_golden = compile_program(program, source_path=str(path.resolve()))
+        vm_golden.load_module(mod_golden)
+        vm_golden.run()
+        actual = buf.getvalue()
+        golden_path = path.with_suffix(path.suffix + ".golden")
+        if golden_path.is_file():
+            expected = golden_path.read_text(encoding="utf-8")
+            golden_ok = expected == actual
+            if not golden_ok:
+                bundle["trust"] = False
+            bundle["golden"] = {
+                "ok": golden_ok,
+                "snapshot": actual,
+                "expected": expected if not golden_ok else None,
+            }
+        else:
+            bundle["golden"] = {"ok": None, "snapshot": actual, "note": "no .golden file"}
+    else:
+        bundle["golden"] = {"ok": False, "snapshot": None}
+        bundle["trust"] = False
+
+    # 4. Self-host comparison (silence its stdout)
+    _saved_stdout = sys.stdout
+    sys.stdout = StringIO()
+    try:
+        selfhost_ok = compare_selfhost_file(path)
+    finally:
+        sys.stdout = _saved_stdout
+    bundle["selfhost"] = {"ok": selfhost_ok}
+    if not selfhost_ok:
+        bundle["trust"] = False
+
+    trust_json = json.dumps(bundle, indent=2)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(trust_json, encoding="utf-8")
+        print(f"trust bundle written: {output}")
+    else:
+        print(trust_json)
+    return 0 if bundle["trust"] else 1
 
 
 def run_docs(path: Path, *, output: Path | None = None) -> int:

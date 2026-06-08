@@ -1504,6 +1504,47 @@ print(shipped.status, dbGet("A-100").status)"""
         )
         self.assertEqual(out, "mOss\n")
 
+    def test_trust_bundle_produces_valid_json(self) -> None:
+        """moss trust produces a valid, complete trust bundle."""
+        import json, tempfile
+        from pathlib import Path
+
+        order_path = Path(__file__).parent.parent / "examples" / "order.moss"
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            out_path = f.name
+        try:
+            code = cli_main(["trust", str(order_path), "-o", out_path])
+            bundle = json.loads(Path(out_path).read_text())
+            self.assertIn("trust", bundle)
+            self.assertIn("check", bundle)
+            self.assertIn("trace", bundle)
+            self.assertIn("golden", bundle)
+            self.assertIn("selfhost", bundle)
+            self.assertTrue(bundle["trust"])
+            self.assertTrue(bundle["check"]["ok"])
+            self.assertEqual(code, 0)
+        finally:
+            Path(out_path).unlink(missing_ok=True)
+
+    def test_trust_bundle_rejects_invalid_program(self) -> None:
+        """moss trust returns trust=false for programs with errors."""
+        import json, tempfile
+        from pathlib import Path
+
+        with tempfile.NamedTemporaryFile(suffix=".moss", mode="w", delete=False) as f:
+            f.write("fn x() uses Bad { return 1 }\n")
+            src_path = f.name
+        out_path = src_path + ".trust.json"
+        try:
+            code = cli_main(["trust", src_path, "-o", out_path])
+            bundle = json.loads(Path(out_path).read_text())
+            self.assertFalse(bundle["trust"])
+            self.assertFalse(bundle["check"]["ok"])
+            self.assertEqual(code, 1)
+        finally:
+            Path(src_path).unlink(missing_ok=True)
+            Path(out_path).unlink(missing_ok=True)
+
     def test_all_examples_run(self) -> None:
         """Verify all .moss examples can compile and run via VM."""
         import os

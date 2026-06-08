@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.5.7
+
+Moss `0.5.7` introduces `moss trust`, which produces a machine-verifiable
+JSON bundle combining static check, rule trace, golden snapshot, and
+host/self-host comparison. See `docs/release-0.5.7.md` for details.
+
 ## 0.5.6
 
 Moss `0.5.6` unifies the CLI execution engine: `run`, `test`, `trace`,

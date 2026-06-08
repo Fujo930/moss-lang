@@ -3,6 +3,17 @@
 This file explains the repository history in human terms. The Git commit
 messages stay short; this document gives future readers the memory behind them.
 
+## 0.5.7: trust bundles
+
+`moss trust <file.moss>` produces a machine-verifiable JSON bundle combining
+static check, rule trace, golden snapshot, and host/self-host comparison. Exit
+code 0 means every gate passed. `moss trust --output file.json` writes the
+bundle to disk.
+
+Why it matters: the trust bundle is the first step toward proof-carrying AI
+code. No other language toolchain bundles static analysis, runtime trace,
+deterministic output verification, and compiler integrity into one artifact.
+
 ## 0.5.6: VM execution unified
 
 Reasonix completed the VM migration started in 0.5.5. `moss trace`, `moss golden`,
