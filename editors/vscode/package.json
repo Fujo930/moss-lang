@@ -1,0 +1,31 @@
+{
+  "name": "moss-lang",
+  "displayName": "Moss",
+  "description": "Moss language support — proof-carrying code for AI-generated programs",
+  "version": "0.23.0",
+  "publisher": "fujo930",
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:moss"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [{ "id": "moss", "extensions": [".moss"], "aliases": ["Moss"], "configuration": "./moss-language-configuration.json" }],
+    "grammars": [{ "language": "moss", "scopeName": "source.moss", "path": "./moss.tmLanguage.json" }],
+    "commands": [
+      { "command": "moss.trust", "title": "Moss: Trust this file" },
+      { "command": "moss.run", "title": "Moss: Run" }
+    ],
+    "configuration": {
+      "title": "Moss",
+      "properties": {
+        "moss.serverPath": { "type": "string", "default": "moss-lsp", "description": "Path to moss-lsp executable" }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": { "typescript": "^5.0.0", "@types/vscode": "^1.80.0" }
+}
