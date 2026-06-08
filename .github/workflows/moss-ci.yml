@@ -1,0 +1,59 @@
+name: Moss CI
+
+on:
+  push:
+    branches: [main, ds-Mosslang]
+  pull_request:
+    branches: [main, ds-Mosslang]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install Moss
+      run: pip install -e .
+    - name: Run tests
+      run: python -m pytest tests/test_mosslang.py -q --tb=short
+    - name: Selfhost checks
+      run: python -m mosslang.cli selfhost --quick
+    - name: Selfhost compare
+      run: python -m mosslang.cli selfhost-compare examples
+    - name: Trust artifact
+      run: python -m mosslang.cli artifact examples/order.moss | python -c "import sys,json; d=json.load(sys.stdin); assert d['trust'], 'trust failed'; print('OK')"
+
+  c-vm-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build C VM
+      run: cc -O2 -Wall -Wextra -std=c99 -o bin/mossvm src/vm/mossvm.c -lm
+
+  artifact-verify:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install Moss
+      run: pip install -e .
+    - name: Generate and verify Trust Artifact
+      run: |
+        python -m mosslang.cli artifact -o order_artifact.json examples/order.moss
+        python -m mosslang.cli artifact-verify --strict order_artifact.json
+    - name: Upload Trust Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: trust-artifact
+        path: order_artifact.json
