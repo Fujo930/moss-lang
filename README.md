@@ -212,6 +212,7 @@ Suitable claims:
 - Moss is alpha software and should not be described as production-ready.
 
 See `docs/history.md` for a commit-by-commit feature guide,
+`docs/moss-guide.md` for the language guide,
 `docs/roadmap.md` for the path from prototype to self-hosting,
 `docs/language.md` for the current language surface,
 and `docs/identity.md` for the Moss identity.
