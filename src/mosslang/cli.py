@@ -124,6 +124,10 @@ def main(argv: list[str] | None = None) -> int:
     run_vm_cmd.add_argument("file", type=Path)
     run_vm_cmd.add_argument("--source-root", type=Path, help="source root for resolving imports")
 
+    bench_cmd = sub.add_parser("bench", help="benchmark Moss VM execution time")
+    bench_cmd.add_argument("file", type=Path)
+    bench_cmd.add_argument("--iterations", "-n", type=int, default=10, help="number of iterations (default: 10)")
+
     args = parser.parse_args(argv)
 
     try:
@@ -222,6 +226,45 @@ def main(argv: list[str] | None = None) -> int:
             vm = VM(base_path=base)
             vm.load_module(mod)
             vm.run()
+            return 0
+
+        if args.command == "bench":
+            import time
+            source = args.file.read_text(encoding="utf-8-sig")
+            program = parse_source(source)
+            diagnostics = check_program(program)
+            errors = [d for d in diagnostics if d.level == "error"]
+            if errors:
+                print_diagnostics(diagnostics, source, file=sys.stderr)
+                return 1
+            mod = compile_program(program, source_path=str(args.file.resolve()))
+
+            # Warm-up
+            vm = VM(output=lambda _: None, base_path=args.file.parent)
+            vm.load_module(mod)
+            vm.run()
+
+            times = []
+            for i in range(args.iterations):
+                vm = VM(output=lambda _: None, base_path=args.file.parent)
+                vm.load_module(mod)
+                start = time.perf_counter()
+                vm.run()
+                elapsed = time.perf_counter() - start
+                times.append(elapsed)
+
+            times.sort()
+            mean = sum(times) / len(times)
+            median = times[len(times) // 2]
+            fastest = times[0]
+            slowest = times[-1]
+
+            print(f"file:     {args.file}")
+            print(f"iters:    {args.iterations}")
+            print(f"fastest:  {fastest * 1000:.2f} ms")
+            print(f"median:   {median * 1000:.2f} ms")
+            print(f"mean:     {mean * 1000:.2f} ms")
+            print(f"slowest:  {slowest * 1000:.2f} ms")
             return 0
 
         source = args.file.read_text(encoding="utf-8")
