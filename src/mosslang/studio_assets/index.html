@@ -1,88 +1,76 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Local editor and execution workbench for the Moss programming language." />
-    <title>Moss Studio</title>
-    <link rel="icon" href="/moss-mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/app.css" />
-  </head>
-  <body>
-    <main class="shell">
-      <header class="topbar">
-        <div class="brand">
-          <img class="mark" src="/moss-mark.svg" alt="" />
-          <span class="brandName">Moss</span>
-          <span class="brandSurface">Studio</span>
-          <span class="releaseTag" title="Moss 0.5.0 developer-experience build">0.5</span>
-        </div>
-        <div class="toolbar">
-          <div class="toolGroup sourceTools">
-            <select id="exampleSelect" aria-label="Load example" title="Load example"></select>
-            <input id="pathInput" class="pathInput" aria-label="Workspace path" title="Workspace path" spellcheck="false" />
-          </div>
-          <div class="toolGroup" aria-label="File commands">
-            <button id="newButton" title="New scratch file">New</button>
-            <button id="loadPathButton" title="Open workspace path">Open</button>
-            <button id="savePathButton" title="Save workspace path">Save</button>
-            <button id="openButton" title="Import local .moss file">Import</button>
-            <button id="saveButton" title="Download current .moss file">Download</button>
-          </div>
-          <div class="toolGroup actionTools" aria-label="Moss commands">
-            <button id="checkButton" title="Check current source">Check</button>
-            <button id="traceButton" title="Trace rule evaluations">Trace</button>
-            <button id="projectButton" title="Inspect current Moss project">Project</button>
-            <button id="compareButton" title="Compare host and self-host frontends">Self-host</button>
-            <button id="testButton" title="Run Moss test blocks">Test</button>
-            <button id="runButton" class="primary" title="Run current source">Run</button>
-          </div>
-          <input id="fileInput" type="file" accept=".moss,text/plain" hidden />
-        </div>
-      </header>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Local editor and execution workbench for the Moss programming language." />
+<title>Moss Studio</title>
+<link rel="icon" href="/moss-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+<main class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <img class="mark" src="/moss-mark.svg" alt="Moss" />
+      <span class="brandName">Moss</span>
+      <span class="brandSurface">Studio</span>
+      <span class="releaseTag" id="releaseTag">0.6</span>
+    </div>
+    <div class="toolbar">
+      <div class="toolGroup sourceTools">
+        <select id="exampleSelect" aria-label="Load example" title="Load example"></select>
+        <input id="pathInput" class="pathInput" aria-label="Workspace path" title="Workspace path" spellcheck="false" placeholder="path/to/file.moss" />
+      </div>
+      <div class="toolGroup">
+        <button id="newButton" title="New scratch file">New</button>
+        <button id="openButton" title="Import local .moss file">Open…</button>
+        <button id="saveButton" title="Save to workspace">Save</button>
+      </div>
+      <div class="toolGroup actionTools">
+        <button id="checkButton" title="Check current source">Check</button>
+        <button id="traceButton" title="Trace rule evaluations">Trace</button>
+        <button id="testButton" title="Run Moss test blocks">Test</button>
+        <button id="projectButton" title="Inspect project graph">Project</button>
+        <button id="compareButton" title="Host vs self-host diff">Compare</button>
+        <button id="runButton" class="primary" title="Run current source">▶ Run</button>
+      </div>
+      <input id="fileInput" type="file" accept=".moss,text/plain" hidden />
+    </div>
+  </header>
 
-      <section class="workspace">
-        <div class="editorPane">
-          <div class="paneHead">
-            <span id="fileName">scratch.moss</span>
-            <span id="cursorStatus">Ln 1, Col 1</span>
-          </div>
-          <div class="editorWrap">
-            <pre id="lineNumbers" aria-hidden="true">1</pre>
-            <textarea id="editor" aria-label="Moss source editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-          </div>
-          <div class="statusbar">
-            <span id="health">Ready</span>
-            <span id="summary">0 effects | 0 imports | 0 types | 0 callables | 0 tests</span>
-          </div>
-        </div>
+  <section class="workspace">
+    <div class="editorPane">
+      <div class="paneHead">
+        <span id="fileName">scratch.moss</span>
+        <span id="cursorStatus">Ln 1, Col 1</span>
+      </div>
+      <div class="editorWrap">
+        <pre id="lineNumbers" aria-hidden="true">1</pre>
+        <textarea id="editor" aria-label="Moss source editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      </div>
+      <div class="statusbar">
+        <span id="health">Ready</span>
+        <span id="summary">0 effects | 0 imports | 0 types | 0 callables | 0 tests</span>
+      </div>
+    </div>
 
-        <aside class="sidePane">
-          <nav class="tabs" aria-label="Result views">
-            <button class="tab active" data-tab="output">Output</button>
-            <button class="tab" data-tab="diagnostics">Diagnostics <span id="diagnosticCount" class="tabCount">0</span></button>
-            <button class="tab" data-tab="ast">AST</button>
-            <button class="tab" data-tab="tokens">Tokens</button>
-            <button class="tab" data-tab="symbols">Symbols</button>
-          </nav>
-          <section id="outputPanel" class="panel active">
-            <pre id="output"></pre>
-          </section>
-          <section id="diagnosticsPanel" class="panel">
-            <div id="diagnostics"></div>
-          </section>
-          <section id="astPanel" class="panel">
-            <pre id="ast"></pre>
-          </section>
-          <section id="tokensPanel" class="panel">
-            <div id="tokens"></div>
-          </section>
-          <section id="symbolsPanel" class="panel">
-            <div id="symbols"></div>
-          </section>
-        </aside>
-      </section>
-    </main>
-    <script src="/app.js"></script>
-  </body>
+    <aside class="sidePane">
+      <nav class="tabs">
+        <button class="tab active" data-tab="output">Output</button>
+        <button class="tab" data-tab="diagnostics">Diagnostics <span id="diagnosticCount" class="tabCount">0</span></button>
+        <button class="tab" data-tab="ast">AST</button>
+        <button class="tab" data-tab="tokens">Tokens</button>
+        <button class="tab" data-tab="symbols">Symbols</button>
+      </nav>
+      <section id="outputPanel" class="panel active"><pre id="output"></pre></section>
+      <section id="diagnosticsPanel" class="panel"><div id="diagnostics"></div></section>
+      <section id="astPanel" class="panel"><pre id="ast"></pre></section>
+      <section id="tokensPanel" class="panel"><div id="tokens"></div></section>
+      <section id="symbolsPanel" class="panel"><div id="symbols"></div></section>
+    </aside>
+  </section>
+</main>
+<script src="/app.js"></script>
+</body>
 </html>

@@ -1,446 +1,327 @@
-const editor = document.querySelector("#editor");
-const lineNumbers = document.querySelector("#lineNumbers");
-const output = document.querySelector("#output");
-const diagnostics = document.querySelector("#diagnostics");
-const ast = document.querySelector("#ast");
-const tokens = document.querySelector("#tokens");
-const health = document.querySelector("#health");
-const summary = document.querySelector("#summary");
-const cursorStatus = document.querySelector("#cursorStatus");
-const fileName = document.querySelector("#fileName");
-const pathInput = document.querySelector("#pathInput");
-const fileInput = document.querySelector("#fileInput");
-const exampleSelect = document.querySelector("#exampleSelect");
-const diagnosticCount = document.querySelector("#diagnosticCount");
-const symbols = document.querySelector("#symbols");
+/* Moss Studio — browser workbench for the Moss language */
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
 
-let currentName = "scratch.moss";
-let debounceId = 0;
-let lastResult = null;
+  const editor = $('#editor');
+  const output = $('#output');
+  const diagnosticsEl = $('#diagnostics');
+  const astEl = $('#ast');
+  const tokensEl = $('#tokens');
+  const symbolsEl = $('#symbols');
+  const healthEl = $('#health');
+  const summaryEl = $('#summary');
+  const fileName = $('#fileName');
+  const cursorStatus = $('#cursorStatus');
+  const lineNumbers = $('#lineNumbers');
+  const diagCount = $('#diagnosticCount');
+  const exampleSelect = $('#exampleSelect');
+  const pathInput = $('#pathInput');
+  const fileInput = $('#fileInput');
+  const releaseTag = $('#releaseTag');
 
-const fallbackSource = `effect Database
+  let currentPath = '';
+  let lastResponse = null;
 
-type Order =
-  id: Text
-  status: Pending | Paid | Shipped | Cancelled
-  total: Money
-
-type ShipError = NotReady | Missing
-
-rule canShip(order: Order) -> Bool =
-  order.status == Paid and order.total > 0.usd
-
-rule statusLabel(status) =
-  match status {
-    Pending -> "waiting"
-    Paid -> "ready"
-    Shipped -> "sent"
-    _ -> "closed"
+  // ── API ──
+  async function api(path, body) {
+    const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+    const resp = await fetch(path, init);
+    if (!resp.ok) {
+      try { return await resp.json(); } catch (_) { return { ok: false, diagnostics: [{ level: 'error', message: `HTTP ${resp.status}` }] }; }
+    }
+    return resp.json();
   }
 
-fn ship(order: Order) -> Result<Order, ShipError> uses Database {
-  require canShip(order)
-    else ShipError.NotReady(order.status)
+  async function upload(source) {
+    const resp = await fetch('/api/file/read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source }) });
+    return resp.json();
+  }
 
-  updated = order with status = Shipped
-  dbPut(order.id, updated)
-  return Ok(updated)
-}
-
-let order = { id: "A-100", status: Paid, total: 42.usd }
-let shipped = ship(order)?
-print("status:", shipped.status)
-print("label:", statusLabel(shipped.status))
-print("stored:", dbGet("A-100").status)
-
-test "ships paid orders" {
-  result = ship(order)?
-  assert(result.status == Shipped, "paid order should ship")
-}
-`;
-
-function init() {
-  const saved = localStorage.getItem("moss.source");
-  editor.value = saved || fallbackSource;
-  currentName = localStorage.getItem("moss.fileName") || currentName;
-  fileName.textContent = currentName;
-  pathInput.value = currentName;
-  bindEvents();
-  loadExamples();
-  updateEditorChrome();
-  scheduleCheck();
-}
-
-function bindEvents() {
-  editor.addEventListener("input", () => {
-    localStorage.setItem("moss.source", editor.value);
-    updateEditorChrome();
-    scheduleCheck();
-  });
-  editor.addEventListener("scroll", () => {
-    lineNumbers.scrollTop = editor.scrollTop;
-  });
-  editor.addEventListener("keyup", updateCursor);
-  editor.addEventListener("click", updateCursor);
-  editor.addEventListener("keydown", event => {
-    if (event.key === "Tab") {
-      event.preventDefault();
-      insertText("  ");
-      return;
-    }
-    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-      event.preventDefault();
-      runSource();
-      return;
-    }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
-      event.preventDefault();
-      saveWorkspacePath();
-    }
-  });
-
-  document.querySelector("#runButton").addEventListener("click", runSource);
-  document.querySelector("#testButton").addEventListener("click", testSource);
-  document.querySelector("#checkButton").addEventListener("click", checkSource);
-  document.querySelector("#traceButton").addEventListener("click", traceSource);
-  document.querySelector("#projectButton").addEventListener("click", inspectProject);
-  document.querySelector("#compareButton").addEventListener("click", compareSelfhost);
-  document.querySelector("#newButton").addEventListener("click", newFile);
-  document.querySelector("#loadPathButton").addEventListener("click", loadWorkspacePath);
-  document.querySelector("#savePathButton").addEventListener("click", saveWorkspacePath);
-  document.querySelector("#openButton").addEventListener("click", () => fileInput.click());
-  document.querySelector("#saveButton").addEventListener("click", downloadSource);
-  pathInput.addEventListener("change", () => {
-    currentName = pathInput.value.trim() || "scratch.moss";
-    persistFile();
-  });
-  fileInput.addEventListener("change", openFile);
-  exampleSelect.addEventListener("change", loadSelectedExample);
-
-  document.querySelectorAll(".tab").forEach(tab => {
-    tab.addEventListener("click", () => activateTab(tab.dataset.tab));
-  });
-}
-
-async function loadExamples() {
-  try {
-    const data = await fetchJson("/api/examples");
-    exampleSelect.innerHTML = "";
-    const scratch = document.createElement("option");
-    scratch.value = "";
-    scratch.textContent = "Examples";
-    exampleSelect.appendChild(scratch);
-    data.examples.forEach(example => {
-      const option = document.createElement("option");
-      option.value = example.filename;
-      option.textContent = example.label;
-      option.dataset.source = example.source;
-      exampleSelect.appendChild(option);
+  // ── Tab switching ──
+  $$('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      $$('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      $$('.panel').forEach(p => p.classList.remove('active'));
+      $(`#${tab.dataset.tab}Panel`).classList.add('active');
     });
-  } catch {
-    exampleSelect.innerHTML = "<option>Examples</option>";
-  }
-}
-
-function loadSelectedExample() {
-  const option = exampleSelect.selectedOptions[0];
-  if (!option || !option.dataset.source) {
-    return;
-  }
-  editor.value = option.dataset.source;
-  currentName = option.value;
-  persistFile();
-  updateEditorChrome();
-  checkSource();
-}
-
-function newFile() {
-  editor.value = "";
-  currentName = "scratch.moss";
-  persistFile();
-  updateEditorChrome();
-  renderResult({
-    ok: true,
-    output: [],
-    diagnostics: [],
-    ast: "",
-    tokens: [],
-    summary: { effects: 0, imports: 0, types: 0, callables: 0, tests: 0 },
   });
-}
 
-function openFile() {
-  const file = fileInput.files[0];
-  if (!file) {
-    return;
+  // ── Diagnostics click → cursor jump ──
+  diagnosticsEl.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-line]');
+    if (!row) return;
+    const line = parseInt(row.dataset.line);
+    if (!line) return;
+    const lines = editor.value.split('\n');
+    let pos = 0;
+    for (let i = 0; i < Math.min(line - 1, lines.length); i++) pos += lines[i].length + 1;
+    editor.focus();
+    editor.setSelectionRange(pos, pos);
+  });
+
+  // ── Line numbers sync ──
+  function updateLineNumbers() {
+    const count = editor.value.split('\n').length;
+    const current = lineNumbers.textContent.split('\n').length;
+    if (count === current) return;
+    let txt = '';
+    for (let i = 1; i <= count; i++) txt += i + '\n';
+    lineNumbers.textContent = txt;
   }
-  const reader = new FileReader();
-  reader.onload = () => {
-    editor.value = String(reader.result || "");
-    currentName = file.name;
-    persistFile();
-    updateEditorChrome();
-    checkSource();
-  };
-  reader.readAsText(file);
-  fileInput.value = "";
-}
 
-function downloadSource() {
-  const blob = new Blob([editor.value], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = currentName.endsWith(".moss") ? currentName : `${currentName}.moss`;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
+  editor.addEventListener('input', updateLineNumbers);
+  editor.addEventListener('scroll', () => { lineNumbers.scrollTop = editor.scrollTop; });
 
-function persistFile() {
-  fileName.textContent = currentName;
-  pathInput.value = currentName;
-  localStorage.setItem("moss.fileName", currentName);
-  localStorage.setItem("moss.source", editor.value);
-}
+  editor.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); doRun(); }
+    if (e.ctrlKey && e.key === 's') { e.preventDefault(); doSave(); }
+  });
 
-function insertText(text) {
-  const start = editor.selectionStart;
-  const end = editor.selectionEnd;
-  editor.value = editor.value.slice(0, start) + text + editor.value.slice(end);
-  editor.selectionStart = editor.selectionEnd = start + text.length;
-  editor.dispatchEvent(new Event("input"));
-}
+  editor.addEventListener('click', updateCursor);
+  editor.addEventListener('keyup', updateCursor);
+  function updateCursor() {
+    const val = editor.value.substring(0, editor.selectionStart);
+    const line = val.split('\n').length;
+    const col = editor.selectionStart - val.lastIndexOf('\n');
+    cursorStatus.textContent = `Ln ${line}, Col ${col}`;
+  }
 
-function updateEditorChrome() {
+  // ── Health ──
+  function setHealth(ok) {
+    healthEl.textContent = ok ? 'OK' : 'Errors';
+    healthEl.className = ok ? 'pass' : 'fail';
+  }
+
+  // ── Actions ──
+  async function doCheck() {
+    healthEl.textContent = 'Checking…';
+    healthEl.className = '';
+    const r = await api('/api/check', { source: editor.value, path: currentPath });
+    lastResponse = r;
+    render(r, false);
+    setHealth(r.ok);
+  }
+
+  async function doRun() {
+    healthEl.textContent = 'Running…';
+    healthEl.className = '';
+    const r = await api('/api/run', { source: editor.value, path: currentPath });
+    lastResponse = r;
+    render(r, true);
+    setHealth(r.ok);
+  }
+
+  async function doTest() {
+    healthEl.textContent = 'Testing…';
+    healthEl.className = '';
+    const r = await api('/api/test', { source: editor.value, path: currentPath });
+    lastResponse = r;
+    render(r, true);
+    setHealth(r.ok);
+  }
+
+  async function doTrace() {
+    healthEl.textContent = 'Tracing…';
+    healthEl.className = '';
+    const r = await api('/api/trace', { source: editor.value, path: currentPath });
+    lastResponse = r;
+    render(r, true);
+    setHealth(r.ok);
+  }
+
+  async function doProject() {
+    const p = currentPath || pathInput.value || 'examples';
+    const r = await api('/api/project/info', { path: p });
+    output.textContent = JSON.stringify(r, null, 2);
+    $('#outputPanel').classList.add('active');
+    setHealth(r.ok);
+  }
+
+  async function doCompare() {
+    output.textContent = 'Running self-host comparison…';
+    try {
+      const r = await fetch('/api/selfhost/compare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const d = await r.json();
+      output.textContent = (d.output || ['Done']).join('\n');
+      setHealth(d.ok);
+    } catch (e) {
+      output.textContent = 'Compare failed: ' + e;
+      setHealth(false);
+    }
+  }
+
+  // ── Render ──
+  function render(r, showOutput) {
+    // Output
+    if (showOutput) {
+      output.textContent = (r.output || []).join('\n');
+      $('#outputPanel').classList.add('active');
+      $$('.tab').forEach(t => t.classList.remove('active'));
+      $('[data-tab="output"]').classList.add('active');
+      $$('.panel').forEach(p => p.classList.remove('active'));
+      $('#outputPanel').classList.add('active');
+    }
+
+    // Diagnostics
+    diagCount.textContent = (r.diagnostics || []).length;
+    let diagHtml = '';
+    for (const d of (r.diagnostics || [])) {
+      const loc = d.line ? `<div class="diag-loc">Ln ${d.line}${d.column ? ', Col ' + d.column : ''}</div>` : '';
+      diagHtml += `<div class="diagnostic ${d.level}" data-line="${d.line || ''}">${loc}<div class="diag-msg">${esc(d.message)}</div></div>`;
+    }
+    diagnosticsEl.innerHTML = diagHtml || '';
+
+    // AST
+    astEl.textContent = (r.ast || '');
+
+    // Tokens
+    let tokHtml = '';
+    for (const t of (r.tokens || [])) {
+      tokHtml += `<div class="token-row"><span class="token-kind">${esc(t.kind)}</span><span class="token-value">${esc(String(t.value))}</span><span class="token-loc">${t.line}:${t.column}</span></div>`;
+    }
+    tokensEl.innerHTML = tokHtml;
+
+    // Symbols
+    let symHtml = '';
+    for (const s of (r.symbols || [])) {
+      symHtml += `<div class="symbol-row"><span class="symbol-kind">${esc(s.kind)}</span><span class="symbol-name">${esc(s.name)}</span></div>`;
+    }
+    symbolsEl.innerHTML = symHtml;
+
+    // Summary
+    const s = r.summary || {};
+    summaryEl.textContent = `${s.effects || 0} effects | ${s.imports || 0} imports | ${s.types || 0} types | ${s.callables || 0} callables | ${s.tests || 0} tests`;
+  }
+
+  // ── File operations ──
+  async function doSave() {
+    const p = currentPath || pathInput.value;
+    if (!p) { healthEl.textContent = 'Enter a path to save'; return; }
+    try {
+      const r = await fetch('/api/file/write', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: p, source: editor.value })
+      });
+      const d = await r.json();
+      if (d.ok) { currentPath = d.path; pathInput.value = d.path; fileName.textContent = d.path; healthEl.textContent = 'Saved'; }
+      else { healthEl.textContent = d.message || 'Save failed'; }
+    } catch (e) { healthEl.textContent = 'Save error: ' + e; }
+  }
+
+  async function doOpen() {
+    const p = pathInput.value;
+    if (!p) return;
+    try {
+      const r = await fetch('/api/file/read', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: p })
+      });
+      const d = await r.json();
+      if (d.ok) { editor.value = d.source; currentPath = d.path; fileName.textContent = d.path; updateLineNumbers(); doCheck(); }
+      else { healthEl.textContent = d.message || 'Open failed'; }
+    } catch (e) { healthEl.textContent = 'Open error: ' + e; }
+  }
+
+  function doNew() {
+    editor.value = '';
+    currentPath = '';
+    pathInput.value = '';
+    fileName.textContent = 'scratch.moss';
+    output.textContent = '';
+    diagnosticsEl.innerHTML = '';
+    astEl.textContent = '';
+    tokensEl.innerHTML = '';
+    symbolsEl.innerHTML = '';
+    diagCount.textContent = '0';
+    summaryEl.textContent = '0 effects | 0 imports | 0 types | 0 callables | 0 tests';
+    healthEl.textContent = 'Ready';
+    healthEl.className = '';
+    updateLineNumbers();
+  }
+
+  // ── Import local file ──
+  function doImport() { fileInput.click(); }
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      editor.value = e.target.result;
+      currentPath = f.name;
+      fileName.textContent = f.name;
+      updateLineNumbers();
+      doCheck();
+    };
+    reader.readAsText(f);
+  });
+
+  // ── Examples ──
+  async function loadExamples() {
+    try {
+      const r = await fetch('/api/examples');
+      const data = await r.json();
+      exampleSelect.innerHTML = '<option value="">— Load example —</option>';
+      for (const ex of (data.examples || [])) {
+        const opt = document.createElement('option');
+        opt.value = ex.filename;
+        opt.textContent = ex.label;
+        exampleSelect.appendChild(opt);
+      }
+    } catch (_) {}
+  }
+  exampleSelect.addEventListener('change', async () => {
+    const filename = exampleSelect.value;
+    if (!filename) return;
+    try {
+      const r = await fetch('/api/examples');
+      const data = await r.json();
+      const ex = (data.examples || []).find(e => e.filename === filename);
+      if (ex) {
+        editor.value = ex.source;
+        currentPath = 'examples/' + filename;
+        fileName.textContent = filename;
+        pathInput.value = 'examples/' + filename;
+        updateLineNumbers();
+        doCheck();
+      }
+    } catch (_) {}
+  });
+
+  // ── Buttons ──
+  $('#runButton').addEventListener('click', doRun);
+  $('#checkButton').addEventListener('click', doCheck);
+  $('#testButton').addEventListener('click', doTest);
+  $('#traceButton').addEventListener('click', doTrace);
+  $('#projectButton').addEventListener('click', doProject);
+  $('#compareButton').addEventListener('click', doCompare);
+  $('#saveButton').addEventListener('click', doSave);
+  $('#openButton').addEventListener('click', doOpen);
+  $('#newButton').addEventListener('click', doNew);
+  $('#openButton').addEventListener('click', doOpen);
+  $('#saveButton').addEventListener('click', doSave);
+
+  // ── Init ──
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  loadExamples();
   updateLineNumbers();
   updateCursor();
-}
 
-function updateLineNumbers() {
-  const count = Math.max(1, editor.value.split("\n").length);
-  lineNumbers.textContent = Array.from({ length: count }, (_, index) => index + 1).join("\n");
-}
-
-function updateCursor() {
-  const before = editor.value.slice(0, editor.selectionStart);
-  const lines = before.split("\n");
-  cursorStatus.textContent = `Ln ${lines.length}, Col ${lines[lines.length - 1].length + 1}`;
-}
-
-function scheduleCheck() {
-  clearTimeout(debounceId);
-  debounceId = setTimeout(checkSource, 450);
-}
-
-async function checkSource() {
-  setBusy("Checking");
-  try {
-    renderResult(await fetchJson("/api/check", { source: editor.value, path: currentName }));
-  } catch (error) {
-    renderFailure(error);
+  // Default scratch content
+  if (!editor.value.trim()) {
+    editor.value = `fn greet(name) = \`Hello {name}!\`
+print(greet("Moss"))`;
+    updateLineNumbers();
   }
-}
 
-async function runSource() {
-  setBusy("Running");
-  activateTab("output");
-  try {
-    renderResult(await fetchJson("/api/run", { source: editor.value, path: currentName }));
-  } catch (error) {
-    renderFailure(error);
-  }
-}
-
-async function testSource() {
-  setBusy("Testing");
-  activateTab("output");
-  try {
-    renderResult(await fetchJson("/api/test", { source: editor.value, path: currentName }));
-  } catch (error) {
-    renderFailure(error);
-  }
-}
-
-async function traceSource() {
-  setBusy("Tracing");
-  activateTab("output");
-  try {
-    renderResult(await fetchJson("/api/trace", { source: editor.value, path: currentName }));
-  } catch (error) {
-    renderFailure(error);
-  }
-}
-
-async function inspectProject() {
-  setBusy("Inspecting");
-  activateTab("output");
-  try {
-    const result = await fetchJson("/api/project/info", { path: currentName });
-    output.textContent = `${result.package.name} ${result.package.version}\n` + result.modules.map(item => `${item.path} -> ${item.imports.join(", ") || "-"}`).join("\n");
-    health.textContent = "Project OK";
-    health.className = "okText";
-  } catch (error) {
-    renderFailure(error);
-  }
-}
-
-async function compareSelfhost() {
-  setBusy("Comparing");
-  activateTab("output");
-  try {
-    const result = await fetchJson("/api/selfhost/compare", {});
-    output.textContent = result.output.join("\n");
-    health.textContent = result.ok ? "Self-host OK" : "Mismatch";
-    health.className = result.ok ? "okText" : "errorText";
-  } catch (error) {
-    renderFailure(error);
-  }
-}
-
-async function loadWorkspacePath() {
-  const path = pathInput.value.trim();
-  if (!path) {
-    return;
-  }
-  setBusy("Opening");
-  try {
-    const result = await fetchJson("/api/file/read", { path });
-    editor.value = result.source || "";
-    currentName = result.path || path;
-    persistFile();
-    updateEditorChrome();
-    checkSource();
-  } catch (error) {
-    renderFailure(error);
-  }
-}
-
-async function saveWorkspacePath() {
-  const path = pathInput.value.trim() || currentName;
-  setBusy("Saving");
-  try {
-    const result = await fetchJson("/api/file/write", { path, source: editor.value });
-    currentName = result.path || path;
-    persistFile();
-    health.textContent = "Saved";
-    health.className = "okText";
-  } catch (error) {
-    renderFailure(error);
-  }
-}
-
-async function fetchJson(url, payload) {
-  const options = payload
-    ? {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }
-    : {};
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
-  }
-  return response.json();
-}
-
-function renderResult(result) {
-  lastResult = result;
-  const hasErrors = result.diagnostics.some(item => item.level === "error");
-  health.textContent = result.ok && !hasErrors ? "OK" : "Issue";
-  health.className = result.ok && !hasErrors ? "okText" : "errorText";
-  summary.textContent = `${result.summary.effects} effects | ${result.summary.imports || 0} imports | ${result.summary.types} types | ${result.summary.callables} callables | ${result.summary.tests || 0} tests`;
-  output.textContent = result.output.length ? result.output.join("\n") : "";
-  ast.textContent = result.ast || "";
-  renderDiagnostics(result.diagnostics, result.ok);
-  renderTokens(result.tokens);
-  renderSymbols(result.symbols || []);
-}
-
-function renderFailure(error) {
-  health.textContent = "Offline";
-  health.className = "errorText";
-  output.textContent = String(error);
-  renderDiagnostics([{ level: "error", message: String(error) }], false);
-}
-
-function renderDiagnostics(items, ok) {
-  diagnostics.innerHTML = "";
-  diagnosticCount.textContent = String(items.length);
-  diagnosticCount.classList.toggle("hasIssues", items.length > 0);
-  const list = items.length ? items : [{ level: ok ? "ok" : "warning", message: ok ? "No diagnostics" : "No result" }];
-  list.forEach(item => {
-    const node = document.createElement("div");
-    node.className = `diag ${item.level}`;
-    const level = document.createElement("span");
-    level.className = "diagLevel";
-    level.textContent = item.level;
-    const message = document.createElement("span");
-    const location = item.line ? `${item.line}:${item.column || 1}: ` : "";
-    message.textContent = location + item.message;
-    if (item.line) {
-      node.classList.add("located");
-      node.title = "Go to source location";
-      node.addEventListener("click", () => focusLocation(item.line, item.column || 1));
-    }
-    node.append(level, message);
-    diagnostics.appendChild(node);
-  });
-}
-
-function focusLocation(line, column) {
-  const lines = editor.value.split("\n");
-  const safeLine = Math.max(1, Math.min(line, lines.length));
-  const safeColumn = Math.max(1, Math.min(column, lines[safeLine - 1].length + 1));
-  const offset = lines.slice(0, safeLine - 1).reduce((total, value) => total + value.length + 1, 0) + safeColumn - 1;
-  editor.focus();
-  editor.setSelectionRange(offset, offset);
-  updateCursor();
-}
-
-function renderTokens(items) {
-  tokens.innerHTML = "";
-  const grid = document.createElement("div");
-  grid.className = "tokenGrid";
-  ["Kind", "Value", "Loc"].forEach(label => {
-    const cell = document.createElement("span");
-    cell.className = "tokenHead";
-    cell.textContent = label;
-    grid.appendChild(cell);
-  });
-  items.forEach(token => {
-    const kind = document.createElement("span");
-    kind.textContent = token.kind;
-    const value = document.createElement("span");
-    value.textContent = token.value === "\n" ? "\\n" : token.value;
-    const loc = document.createElement("span");
-    loc.textContent = `${token.line}:${token.column}`;
-    grid.append(kind, value, loc);
-  });
-  tokens.appendChild(grid);
-}
-
-function renderSymbols(items) {
-  symbols.innerHTML = "";
-  items.forEach(item => {
-    const node = document.createElement("button");
-    node.className = "symbol";
-    node.textContent = item.name;
-    node.title = "Go to declaration";
-    node.addEventListener("click", () => focusLocation(item.range.start.line + 1, item.range.start.character + 1));
-    symbols.appendChild(node);
-  });
-}
-
-function setBusy(label) {
-  health.textContent = label;
-  health.className = "";
-}
-
-function activateTab(name) {
-  document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.tab === name));
-  document.querySelectorAll(".panel").forEach(panel => panel.classList.remove("active"));
-  document.querySelector(`#${name}Panel`).classList.add("active");
-}
-
-init();
+  // Update release tag from version in response
+  fetch('/api/examples').then(r => r.json()).then(() => {
+    releaseTag.textContent = '0.6';
+  }).catch(() => {});
+})();
