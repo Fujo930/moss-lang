@@ -240,6 +240,9 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
             if self.path == "/api/trace":
                 self.send_json(analyze_trace(source, path=path))
                 return
+            if self.path == "/api/trust":
+                self.handle_trust(source)
+                return
             self.send_error(HTTPStatus.NOT_FOUND)
 
         def handle_file_read(self, payload: dict[str, Any]) -> None:
@@ -282,6 +285,10 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
             with redirect_stdout(output):
                 code = run_selfhost_compare(root / "examples")
             self.send_json({"ok": code == 0, "output": output.getvalue().splitlines()})
+
+        def handle_trust(self, source: str) -> None:
+            from .playground import run_trust_from_source
+            self.send_json(run_trust_from_source(source))
 
         def send_asset(self, name: str) -> None:
             data = asset_bytes(name)

@@ -30,6 +30,7 @@
       </div>
       <div class="toolGroup actionTools">
         <button id="checkButton" title="Check current source">Check</button>
+        <button id="trustButton" title="Verify with trust bundle" style="color:var(--moss)">Trust</button>
         <button id="traceButton" title="Trace rule evaluations">Trace</button>
         <button id="testButton" title="Run Moss test blocks">Test</button>
         <button id="projectButton" title="Inspect project graph">Project</button>
@@ -60,12 +61,14 @@
       <nav class="tabs">
         <button class="tab active" data-tab="output">Output</button>
         <button class="tab" data-tab="diagnostics">Diagnostics <span id="diagnosticCount" class="tabCount">0</span></button>
+        <button class="tab" data-tab="trust">Trust</button>
         <button class="tab" data-tab="ast">AST</button>
         <button class="tab" data-tab="tokens">Tokens</button>
         <button class="tab" data-tab="symbols">Symbols</button>
       </nav>
       <section id="outputPanel" class="panel active"><pre id="output"></pre></section>
       <section id="diagnosticsPanel" class="panel"><div id="diagnostics"></div></section>
+      <section id="trustPanel" class="panel"><div id="trustContent"></div></section>
       <section id="astPanel" class="panel"><pre id="ast"></pre></section>
       <section id="tokensPanel" class="panel"><div id="tokens"></div></section>
       <section id="symbolsPanel" class="panel"><div id="symbols"></div></section>

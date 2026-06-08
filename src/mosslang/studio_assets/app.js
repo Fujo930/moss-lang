@@ -292,6 +292,7 @@
   // ── Buttons ──
   $('#runButton').addEventListener('click', doRun);
   $('#checkButton').addEventListener('click', doCheck);
+  $('#trustButton').addEventListener('click', doTrust);
   $('#testButton').addEventListener('click', doTest);
   $('#traceButton').addEventListener('click', doTrace);
   $('#projectButton').addEventListener('click', doProject);
@@ -300,6 +301,90 @@
   $('#importButton').addEventListener('click', doImport);
   $('#loadPathButton').addEventListener('click', doOpen);
   $('#saveButton').addEventListener('click', doSave);
+
+  // ── Trust ──
+  async function doTrust() {
+    healthEl.textContent = 'Trusting…';
+    healthEl.className = '';
+    const r = await api('/api/trust', { source: editor.value, path: currentPath });
+    renderTrust(r);
+    // Switch to Trust tab
+    $$('.tab').forEach(t => t.classList.remove('active'));
+    $('[data-tab="trust"]').classList.add('active');
+    $$('.panel').forEach(p => p.classList.remove('active'));
+    $('#trustPanel').classList.add('active');
+    setHealth(r.trust);
+    // Also render diagnostics from check
+    diagCount.textContent = (r.check?.diagnostics || []).length;
+    let diagHtml = '';
+    for (const d of (r.check?.diagnostics || [])) {
+      const loc = d.line ? `<div class="diag-loc">Ln ${d.line}${d.column ? ', Col ' + d.column : ''}</div>` : '';
+      diagHtml += `<div class="diagnostic ${d.level}" data-line="${d.line || ''}">${loc}<div class="diag-msg">${esc(d.message)}</div></div>`;
+    }
+    diagnosticsEl.innerHTML = diagHtml || '';
+    const s = r.check?.summary || {};
+    summaryEl.textContent = `${s.effects || 0} effects | ${s.imports || 0} imports | ${s.types || 0} types | ${s.callables || 0} callables | ${s.tests || 0} tests`;
+  }
+
+  function renderTrust(b) {
+    const tc = $('#trustContent');
+    const trusted = b.trust;
+    const icon = trusted ? '&#x2705;' : '&#x274C;';
+    const msg = trusted ? 'Trust Verified' : 'Trust Failed';
+    const sub = trusted ? 'All gates passed. This program is provably correct.' : 'One or more gates failed.';
+
+    let html = `<div class="trust-bar ${trusted ? 'trusted' : 'untrusted'}">
+      <div class="trust-icon">${icon}</div>
+      <div>
+        <div class="trust-text ${trusted ? 'trusted' : 'untrusted'}">${msg}</div>
+        <div class="trust-sub">${sub}</div>
+        <div class="trust-sub" style="margin-top:4px">sha256 <code>${(b.source_sha256||'').substring(0,16)}...</code></div>
+      </div>
+    </div><div class="gates">`;
+
+    html += _gate('static-check', 'Static Check', b.check?.ok, `${_summaryText(b.check?.summary)}`, b.check?.diagnostics);
+    if (b.lock && b.lock.ok !== null) {
+      html += _gate('lock', 'Lock', b.lock.ok, b.lock.ok ? `${b.lock.modules||0} modules locked` : (b.lock.error||''));
+    }
+    html += _gate('trace', 'Rule Trace', b.trace?.ok, `${(b.trace?.events||[]).length} rule(s)`);
+    html += _gate('golden', 'Golden', b.golden?.ok === true, b.golden?.note || (b.golden?.ok ? 'matches' : 'mismatch'));
+    html += _gate('selfhost', 'Selfhost', b.selfhost?.ok, b.selfhost?.ok ? 'all 5 dimensions match' : 'discrepancy', null, b.selfhost?.expression_error);
+
+    // Trace events
+    if (b.trace?.events?.length) {
+      html += `<details class="detail-block" style="margin:0 0 8px 0"><summary>${b.trace.events.length} rule evaluation(s)</summary><pre style="max-height:180px">`;
+      for (const e of b.trace.events) {
+        const args = Object.entries(e.arguments||{}).map(([k,v])=>`${k}=${v}`).join(', ');
+        html += `${e.rule}(${args}) → ${e.result}  [${e.file}:${e.line}]\n`;
+      }
+      html += `</pre></details>`;
+    }
+    html += '</div>';
+    tc.innerHTML = html;
+    tc.style.display = 'block';
+  }
+
+  function _gate(id, name, ok, detail, diagnostics, extra) {
+    const cls = ok === true ? 'pass' : (ok === false ? 'fail' : 'unknown');
+    const icon = ok === true ? '✓' : (ok === false ? '✗' : '—');
+    const badge = ok === true ? 'PASS' : (ok === false ? 'FAIL' : 'SKIP');
+    const badgeCls = ok === true ? 'pass' : (ok === false ? 'fail' : 'warn');
+    let h = `<div class="trust-gate ${cls}"><div class="g-icon">${icon}</div><div class="g-name">${name}</div><div class="g-badge ${badgeCls}">${badge}</div>`;
+    if (detail) h += `<div class="g-detail">${detail}</div>`;
+    if (diagnostics && diagnostics.length) {
+      h += `<div style="grid-column:2;font-size:0.72rem;color:var(--fail);margin-top:2px">`;
+      for (const d of diagnostics) h += `${d.level}: ${esc(d.message)} `;
+      h += `</div>`;
+    }
+    if (extra) h += `<div style="grid-column:2;font-size:0.7rem;color:var(--muted);margin-top:2px">${esc(extra)}</div>`;
+    h += `</div>`;
+    return h;
+  }
+
+  function _summaryText(s) {
+    if (!s) return '';
+    return `${s.effects||0} effects, ${s.types||0} types, ${s.callables||0} callables, ${s.tests||0} tests`;
+  }
 
   // ── Init ──
   function esc(s) {
