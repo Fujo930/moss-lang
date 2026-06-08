@@ -1,0 +1,499 @@
+// Moss bytecode compiler — AST → flat instruction list
+// Produces a dict that Python can convert to BytecodeModule
+
+import "examples/self_host/token_tools.moss"
+
+// ── Types ──
+
+type CompilerState =
+  instructions: List<Any>
+  constants: List<Any>
+  locals: List<Text>
+  globals: List<Text>
+  functions: Any  // Map<Text, Any>  — compiled function dicts
+  tests: List<Text>
+  effects: List<Text>
+  imports: List<Text>
+  ip: Number
+
+fn newState() -> CompilerState {
+  return {
+    instructions: [],
+    constants: [],
+    locals: [],
+    globals: [],
+    functions: mapNew(),
+    tests: [],
+    effects: [],
+    imports: [],
+    ip: 0
+  }
+}
+
+// ── Opcode numbers (must match Python bytecode.py Opcode enum) ──
+
+let OP_NOP = 0
+let OP_LOAD_CONST = 1
+let OP_LOAD_NULL = 2
+let OP_LOAD_TRUE = 3
+let OP_LOAD_FALSE = 4
+let OP_LOAD_LOCAL = 5
+let OP_LOAD_GLOBAL = 6
+let OP_STORE_LOCAL = 7
+let OP_STORE_GLOBAL = 8
+let OP_POP = 9
+let OP_DUP = 10
+let OP_JUMP = 20
+let OP_JUMP_IF_FALSE = 21
+let OP_CALL = 23
+let OP_RETURN = 24
+let OP_ADD = 30
+let OP_SUB = 31
+let OP_MUL = 32
+let OP_DIV = 33
+let OP_EQ = 35
+let OP_NEQ = 36
+let OP_LT = 37
+let OP_GT = 38
+let OP_LTE = 39
+let OP_GTE = 40
+let OP_AND = 41
+let OP_OR = 42
+let OP_NOT = 51
+let OP_BUILD_RECORD = 60
+let OP_BUILD_LIST = 61
+let OP_GET_FIELD = 70
+let OP_RECORD_UPDATE = 74
+let OP_TRY_PROPAGATE = 90
+let OP_REQUIRE = 91
+let OP_EFFECT_ENTER = 100
+let OP_EFFECT_EXIT = 101
+let OP_BREAK = 25
+let OP_CONTINUE = 26
+let OP_STORE_LOCAL_IDX = 7
+
+// ── Instruction helpers ──
+
+fn emit(st: CompilerState, opcode: Number, arg: Number) -> CompilerState {
+  inst = { opcode: opcode, arg: arg }
+  return st with instructions = listPush(st.instructions, inst), ip = st.ip + 1
+}
+
+fn patchJump(st: CompilerState, jumpIndex: Number) -> CompilerState {
+  inst = listGet(st.instructions, jumpIndex, { opcode: 0, arg: 0 })
+  newInst = inst with arg = st.ip
+  return st with instructions = listSet(st.instructions, jumpIndex, newInst)
+}
+
+fn emitJump(st: CompilerState, opcode: Number) -> CompilerState {
+  newSt = emit(st, opcode, 9999)
+  return newSt
+}
+
+// ── Constant pool ──
+
+fn addConstant(st: CompilerState, value: Any) -> CompilerState {
+  idx = indexOf(st.constants, value)
+  if idx >= 0 {
+    return st
+  }
+  return st with constants = listPush(st.constants, value)
+}
+
+fn indexOf(list: List<Any>, value: Any) -> Number {
+  i = 0
+  while i < len(list) {
+    if list[i] == value {
+      return i
+    }
+    i = i + 1
+  }
+  return -1
+}
+
+fn constIdx(st: CompilerState, value: Any) -> Number {
+  addConstant(st, value)
+  return indexOf(st.constants, value)
+}
+
+// ── Locals ──
+
+fn registerLocal(st: CompilerState, name: Text) -> CompilerState {
+  if indexOf(st.locals, name) >= 0 {
+    return st
+  }
+  return st with locals = listPush(st.locals, name)
+}
+
+fn localIdx(st: CompilerState, name: Text) -> Number {
+  return indexOf(st.locals, name)
+}
+
+// ── Globals ──
+
+fn registerGlobal(st: CompilerState, name: Text) -> CompilerState {
+  if indexOf(st.globals, name) >= 0 {
+    return st
+  }
+  return st with globals = listPush(st.globals, name)
+}
+
+fn globalIdx(st: CompilerState, name: Text) -> Number {
+  return indexOf(st.globals, name)
+}
+
+// ── Expression compilation ──
+
+fn compileExpr(st: CompilerState, expr: Any) -> CompilerState {
+  kind = expr.kind
+
+  if kind == "Identifier" {
+    name = expr.value
+    lidx = localIdx(st, name)
+    if lidx >= 0 {
+      return emit(st, OP_LOAD_LOCAL, lidx)
+    }
+    // Not in locals — assume global (builtins/variants resolved at runtime)
+    gidx = globalIdx(st, name)
+    if gidx < 0 {
+      st = registerGlobal(st, name)
+      gidx = globalIdx(st, name)
+    }
+    return emit(st, OP_LOAD_GLOBAL, gidx)
+  }
+
+  if kind == "Text" {
+    cidx = constIdx(st, expr.value)
+    return emit(st, OP_LOAD_CONST, cidx)
+  }
+
+  if kind == "Number" {
+    cidx = constIdx(st, expr.value)
+    return emit(st, OP_LOAD_CONST, cidx)
+  }
+
+  if kind == "Bool" {
+    if expr.value == "true" {
+      return emit(st, OP_LOAD_TRUE, 0)
+    }
+    return emit(st, OP_LOAD_FALSE, 0)
+  }
+
+  if kind == "Binary" {
+    st = compileExpr(st, expr.left)
+    st = compileExpr(st, expr.right)
+    op = expr.value
+    if op == "+" { return emit(st, OP_ADD, 0) }
+    if op == "-" { return emit(st, OP_SUB, 0) }
+    if op == "*" { return emit(st, OP_MUL, 0) }
+    if op == "/" { return emit(st, OP_DIV, 0) }
+    if op == "==" { return emit(st, OP_EQ, 0) }
+    if op == "!=" { return emit(st, OP_NEQ, 0) }
+    if op == "<" { return emit(st, OP_LT, 0) }
+    if op == ">" { return emit(st, OP_GT, 0) }
+    if op == "<=" { return emit(st, OP_LTE, 0) }
+    if op == ">=" { return emit(st, OP_GTE, 0) }
+    if op == "and" { return emit(st, OP_AND, 0) }
+    if op == "or" { return emit(st, OP_OR, 0) }
+    return st
+  }
+
+  if kind == "Unary" {
+    st = compileExpr(st, expr.right)
+    if expr.value == "not" {
+      return emit(st, OP_NOT, 0)
+    }
+    return st
+  }
+
+  if kind == "Call" {
+    // Push callee first, then args. VM expects: [callee, arg0, arg1, ...]
+    st = compileExpr(st, expr.left)
+    args = expr.right
+    if args == null {
+      args = []
+    }
+    argCount = len(args)
+    i = 0
+    while i < argCount {
+      st = compileExpr(st, args[i])
+      i = i + 1
+    }
+    return emit(st, OP_CALL, argCount)
+  }
+
+  if kind == "Field" {
+    st = compileExpr(st, expr.left)
+    fieldName = expr.value
+    cidx = constIdx(st, fieldName)
+    return emit(st, OP_GET_FIELD, cidx)
+  }
+
+  if kind == "Try" {
+    st = compileExpr(st, expr.left)
+    return emit(st, OP_TRY_PROPAGATE, 0)
+  }
+
+  if kind == "Record" {
+    fields = expr.right
+    if fields == null {
+      fields = mapNew()
+    }
+    fieldCount = 0
+    // Store field names as string constants, then values
+    // BUILD_RECORD pops N name/value pairs from stack
+    // We push: name1, val1, name2, val2, ...
+    keys = mapKeys(fields)
+    i = 0
+    while i < len(keys) {
+      k = keys[i]
+      v = mapGet(fields, k, { kind: "Identifier", value: "null", left: null, right: null })
+      cidx = constIdx(st, k)
+      st = emit(st, OP_LOAD_CONST, cidx)
+      st = compileExpr(st, v)
+      fieldCount = fieldCount + 1
+      i = i + 1
+    }
+    return emit(st, OP_BUILD_RECORD, fieldCount)
+  }
+
+  if kind == "RecordUpdate" {
+    st = compileExpr(st, expr.left)
+    updates = expr.right
+    if updates == null {
+      updates = mapNew()
+    }
+    fieldCount = 0
+    keys = mapKeys(updates)
+    i = 0
+    while i < len(keys) {
+      k = keys[i]
+      v = mapGet(updates, k, { kind: "Identifier", value: "null", left: null, right: null })
+      st = compileExpr(st, v)
+      cidx = constIdx(st, k)
+      st = emit(st, OP_LOAD_CONST, cidx)
+      fieldCount = fieldCount + 1
+      i = i + 1
+    }
+    return emit(st, OP_RECORD_UPDATE, fieldCount)
+  }
+
+  if kind == "List" {
+    items = expr.right
+    if items == null {
+      items = []
+    }
+    i = 0
+    while i < len(items) {
+      st = compileExpr(st, items[i])
+      i = i + 1
+    }
+    return emit(st, OP_BUILD_LIST, len(items))
+  }
+
+  // Default: push null
+  return emit(st, OP_LOAD_NULL, 0)
+}
+
+// ── Statement compilation ──
+
+fn compileStmt(st: CompilerState, stmt: Any) -> CompilerState {
+  kind = stmt.kind
+
+  if kind == "Expr" {
+    st = compileExpr(st, stmt.value)
+    return emit(st, OP_POP, 0)
+  }
+
+  if kind == "Let" {
+    st = compileExpr(st, stmt.value)
+    st = registerLocal(st, stmt.name)
+    lidx = localIdx(st, stmt.name)
+    st = emit(st, OP_DUP, 0)
+    st = emit(st, OP_STORE_LOCAL, lidx)
+    gidx = globalIdx(st, stmt.name)
+    return emit(st, OP_STORE_GLOBAL, gidx)
+  }
+
+  if kind == "Assign" {
+    std = compileExpr(st, stmt.value)
+    lidx = localIdx(st, stmt.name)
+    if lidx >= 0 {
+      return emit(st, OP_STORE_LOCAL, lidx)
+    }
+    gidx = globalIdx(st, stmt.name)
+    return emit(st, OP_STORE_GLOBAL, gidx)
+  }
+
+  if kind == "Return" {
+    st = compileExpr(st, stmt.value)
+    return emit(st, OP_RETURN, 0)
+  }
+
+  if kind == "Require" {
+    val = stmt.value
+    st = compileExpr(st, val.condition)
+    // COND_EXPR → POP if true, else push error and raise
+    // We need: LOAD condition, JUMP_IF_TRUE skip, LOAD error, REQUIRE, skip:
+    skipLabel = st.ip
+    st = emit(st, OP_JUMP_IF_FALSE, 0)
+    errSt = compileExpr(st, val.error)
+    errSt = emit(errSt, OP_REQUIRE, 0)
+    return st
+  }
+
+  if kind == "If" {
+    val = stmt.value
+    st = compileExpr(st, val.expression)
+    // JUMP_IF_FALSE → else body
+    jumpToElse = st.ip
+    st = emit(st, OP_JUMP_IF_FALSE, 0)
+    // then body
+    thenBody = val.then_body
+    i = 0
+    while i < len(thenBody) {
+      st = compileStmt(st, thenBody[i])
+      i = i + 1
+    }
+    // jump past else
+    jumpPastElse = st.ip
+    st = emit(st, OP_JUMP, 0)
+    // patch jumpToElse → here
+    st = patchJump(st, jumpToElse)
+    // else body
+    elseBody = val.else_body
+    i = 0
+    while i < len(elseBody) {
+      st = compileStmt(st, elseBody[i])
+      i = i + 1
+    }
+    // patch jumpPastElse → here
+    return patchJump(st, jumpPastElse)
+  }
+
+  if kind == "For" {
+    val = stmt.value
+    // LOOP_START
+    loopStart = st.ip
+    st = compileExpr(st, val.expression)
+    st = registerLocal(st, stmt.name)
+    lidx = localIdx(st, stmt.name)
+    st = emit(st, OP_STORE_LOCAL, lidx)
+    // body
+    body = val.body
+    i = 0
+    while i < len(body) {
+      st = compileStmt(st, body[i])
+      i = i + 1
+    }
+    // jump back to loop start
+    return emit(st, OP_JUMP, loopStart)
+  }
+
+  // Fallback
+  return st
+}
+
+// ── Function/rule compilation ──
+
+fn compileFunction(st: CompilerState, node: Any) -> CompilerState {
+  name = node.name
+  // Register params as locals
+  value = node.value
+  // Simple param extraction from value text: "(name: Type, ...) -> ... {"
+  // Skip: register placeholder local for each param
+  body = node.data
+  st = registerLocal(st, "__self")
+  i = 0
+  while i < len(body) {
+    st = compileStmt(st, body[i])
+    i = i + 1
+  }
+  st = emit(st, OP_LOAD_NULL, 0)
+  return emit(st, OP_RETURN, 0)
+}
+
+// ── Main compile function ──
+
+fn compileProgram(nodes: List<Any>) -> Any {
+  st = newState()
+
+  // First pass: register all globals
+  i = 0
+  while i < len(nodes) {
+    node = nodes[i]
+    kind = node.kind
+    if kind == "Effect" {
+      names = textSplit(node.value, ",")
+      j = 0
+      while j < len(names) {
+        st = st with effects = listPush(st.effects, names[j])
+        j = j + 1
+      }
+    }
+    if kind == "Function" or kind == "Rule" or kind == "Test" or kind == "Type" {
+      st = registerGlobal(st, node.name)
+    }
+    i = i + 1
+  }
+
+  // Second pass: compile function/rule bodies and top-level statements
+  i = 0
+  while i < len(nodes) {
+    node = nodes[i]
+    kind = node.kind
+
+    if kind == "Function" {
+      // Compile function body into a separate code object stored in functions map
+      st = st with functions = mapPut(st.functions, node.name, node.data)
+    }
+
+    if kind == "Rule" {
+      // Rule body is a single expression — compile inline
+      if node.data != null {
+        st = compileExpr(st, node.data)
+        st = emit(st, OP_RETURN, 0)
+      }
+    }
+
+    if kind == "Test" {
+      body = node.data
+      st = st with functions = mapPut(st.functions, node.name, node.data)
+      st = st with tests = listPush(st.tests, node.name)
+    }
+
+    if kind == "Let" {
+      st = compileExpr(st, node.data)
+      st = registerLocal(st, node.name)
+      st = registerGlobal(st, node.name)
+      lidx = localIdx(st, node.name)
+      gidx = globalIdx(st, node.name)
+      st = emit(st, OP_DUP, 0)
+      st = emit(st, OP_STORE_LOCAL, lidx)
+      st = emit(st, OP_STORE_GLOBAL, gidx)
+    }
+
+    if kind == "Expr" {
+      exp = node.data
+      if exp != null {
+        st = compileExpr(st, exp)
+        st = emit(st, OP_POP, 0)
+      }
+    }
+
+    i = i + 1
+  }
+
+  st = emit(st, OP_RETURN, 0)
+
+  return {
+    instructions: st.instructions,
+    constants: st.constants,
+    locals: st.locals,
+    globals: st.globals,
+    functions: st.functions,
+    tests: st.tests,
+    effects: st.effects,
+    imports: st.imports
+  }
+}

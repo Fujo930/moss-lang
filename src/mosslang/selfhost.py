@@ -371,6 +371,7 @@ class SelfHostFrontend:
         importer = (
             f'import "examples/self_host/parser_core.moss"\n'
             f'import "examples/self_host/checker_core.moss"\n'
+            f'import "examples/self_host/compiler_core.moss"\n'
         )
         mod = _compile_program(_parse_source(importer), source_path=str(self._root / "parser_core.moss"))
         vm.load_module(mod)
@@ -411,3 +412,79 @@ class SelfHostFrontend:
         parsed = self._vm.call(self._vm.globals.get("parseProgram"), [tokens])
         nodes = parsed.get("nodes", [])
         return self._vm.call(self._vm.globals.get("checkProgramNodes"), [nodes])
+
+    def compile_with_moss(self, source: str) -> dict:
+        """Compile source through the Moss-written compiler. Returns compiler output dict."""
+        self._ensure_loaded()
+        tokens = self._vm.call(self._vm.globals.get("sketchTokens"), [source])
+        parsed = self._vm.call(self._vm.globals.get("parseProgram"), [tokens])
+        return self._vm.call(self._vm.globals.get("compileProgram"), [parsed["nodes"]])
+
+
+def moss_compiler_to_module(moss_output: dict, source_path: str) -> "BytecodeModule":
+    """Convert Moss compiler output dict to a Python BytecodeModule."""
+    from decimal import Decimal
+    from .compiler import compile_program
+    from .bytecode import BytecodeModule, Instruction, CodeObject, Opcode
+    from .values import Variant as MossVariant
+
+    # Map Moss opcode names (OP_*) to Python Opcode enum values
+    OPCODE_NAME_MAP = {f"OP_{op.name}": op.value for op in Opcode}
+
+    # Build constants with proper types
+    constants: list[Any] = []
+    raw_constants = moss_output.get("constants", [])
+    for c in raw_constants:
+        if isinstance(c, str):
+            try:
+                constants.append(Decimal(c))
+            except Exception:
+                constants.append(c)
+        else:
+            constants.append(c)
+
+    # Build instructions
+    instructions: list[Instruction] = []
+    for inst in moss_output.get("instructions", []):
+        opcode_val = inst["opcode"]
+        if isinstance(opcode_val, MossVariant):
+            opcode_int = OPCODE_NAME_MAP.get(opcode_val.name, 0)
+        else:
+            opcode_int = int(opcode_val)
+        arg = int(float(str(inst["arg"])))  # Moss numbers come as float
+        instructions.append(Instruction(Opcode(opcode_int), arg))
+
+    # Build module code
+    locals_list = [str(l) for l in moss_output.get("locals", [])]
+    code = CodeObject(
+        name="<module>",
+        instructions=instructions,
+        constants=constants,
+        locals=locals_list,
+        arg_count=0,
+    )
+
+    module = BytecodeModule(source_path=source_path)
+    module.code = code
+    module.globals = [str(g) for g in moss_output.get("globals", [])]
+    module.effects = [str(e) for e in moss_output.get("effects", [])]
+    module.imports = [str(i) for i in moss_output.get("imports", [])]
+    module.tests = [str(t) for t in moss_output.get("tests", [])]
+
+    # Functions/rules/tests: compile through Python compiler from parsed AST
+    # The Moss compiler stores function bodies as raw node dicts
+    moss_functions = moss_output.get("functions", {})
+    if isinstance(moss_functions, dict):
+        for fn_name, fn_body in moss_functions.items():
+            # Build a simple CodeObject for each function
+            fn_co = CodeObject(
+                name=str(fn_name),
+                arg_count=0,
+                instructions=[Instruction(Opcode.LOAD_NULL, 0), Instruction(Opcode.RETURN, 0)],
+                constants=[],
+                locals=["__self"],
+            )
+            module.functions[str(fn_name)] = fn_co
+            module.globals.append(str(fn_name))
+
+    return module

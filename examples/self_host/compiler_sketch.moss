@@ -1,0 +1,29 @@
+import "examples/self_host/compiler_core.moss"
+
+// Test compiler with a simple expression
+let src1 = "1 + 2 * 3"
+
+let tokens = sketchTokens(src1)
+let parsed = parseProgram(tokens)
+let result = compileProgram(parsed.nodes)
+
+print("--- compileProgram result ---")
+print("instructions:", len(result.instructions))
+print("constants:", len(result.constants))
+print("locals:", len(result.locals))
+print("globals:", result.globals)
+
+i = 0
+while i < len(result.instructions) and i < 10 {
+  inst = result.instructions[i]
+  print("  inst[", i, "]: opcode=", inst.opcode, " arg=", inst.arg)
+  i = i + 1
+}
+
+test "compiler produces instructions" {
+  assert(len(result.instructions) > 0, "should produce instructions")
+}
+
+test "compiler has constants" {
+  assert(len(result.constants) > 0, "should have constants")
+}
