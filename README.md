@@ -6,7 +6,7 @@
 
 ![Language: Moss](https://img.shields.io/badge/language-Moss-71d6a2)
 ![Self-hosting: compiler written](https://img.shields.io/badge/self--hosting-compiler%20written-f2c14e)
-![Version: 0.33.0](https://img.shields.io/badge/version-0.33.0-4f7edb)
+![Version: 0.54.0](https://img.shields.io/badge/version-0.54.0-4f7edb)
 ![Built by DeepSeek & Reasonix](https://img.shields.io/badge/built%20by-DeepSeek%20%26%20Reasonix-222222)
 
 Moss is an experimental programming language for long-lived software projects
@@ -216,18 +216,19 @@ moss-lsp
 
 ## Project status
 
-This is version `0.33`: the pre-1.0 milestone. The Moss-written bytecode compiler
-compiles itself, a C VM exists for native execution, the language spec is frozen,
-and all tooling is unified on the bytecode VM.
+This is version `0.54`: pre-1.0 with a completed C VM running order.moss, lists_demo,
+match_demo, and text_fs_demo end-to-end. The Moss-written compiler (compiler_core.moss)
+compiles itself, a portable C99 VM exists for native execution, the language spec is
+frozen, and all tooling is unified on the bytecode VM.
 
 Suitable claims:
 
-- Moss is AI-designed and AI-built by three AIs across 0.1–0.33.
-- Moss has a working Moss-written frontend and bytecode compiler.
-- Moss has a portable C VM capable of executing .mbc files natively.
-- Moss produces machine-verifiable trust bundles that no other language toolchain can.
-- Moss is not fully self-hosted — the active compiler and VM still run on Python.
-- Moss is pre-1.0 software. The language spec is frozen; implementations are stabilizing.
+- Moss is AI-designed and AI-built by three AIs across 0.1–0.54 (71 commits)
+- Moss has a working Moss-written frontend and bytecode compiler
+- Moss has a portable C VM executing order.moss, lists_demo, match_demo natively
+- Moss produces machine-verifiable trust bundles (moss trust/trust-project)
+- Moss is not fully self-hosted — the active compiler and VM still run on Python
+- Moss is pre-1.0 software with a frozen language spec
 
 See `docs/LANGUAGE_SPEC.md` for the frozen language specification,
 `docs/history.md` for the full commit-by-commit history,
