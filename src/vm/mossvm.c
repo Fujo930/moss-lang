@@ -188,7 +188,7 @@ typedef struct {
 static const char *vm_global_name(VM *vm, int idx) {
     if (idx >= 0 && idx < vm->global_count && vm->global_names[idx])
         return vm->global_names[idx];
-    return "?";
+    return NULL;
 }
 
 static Value *vm_global(VM *vm, int idx) {
@@ -236,6 +236,9 @@ static double to_number(Value *v) {
     }
 }
 
+static void vm_boot_builtins(VM *vm);
+static Value *vm_builtin(const char *name);
+
 static void vm_run(VM *vm) {
     vm->pc = 0;
     vm->running = true;
@@ -253,7 +256,15 @@ static void vm_run(VM *vm) {
         case OP_LOAD_LOCAL:  stack_push(&vm->stack, vm_local(vm, arg)); break;
         case OP_LOAD_GLOBAL: {
             Value *g = vm_global(vm, arg);
-            if (!g) { fprintf(stderr, "mossvm: undefined global '%s'\n", vm_global_name(vm, arg)); exit(1); }
+            if (!g) {
+                const char *gn = vm_global_name(vm, arg);
+                if (gn) g = vm_builtin(gn);
+            }
+            if (!g) {
+                const char *gn = vm_global_name(vm, arg);
+                fprintf(stderr, "mossvm: undefined global '%s'\n", gn ? gn : "?");
+                exit(1);
+            }
             stack_push(&vm->stack, g);
             break;
         }
@@ -450,10 +461,23 @@ static bool vm_load(VM *vm, const char *path) {
 /* ── Boot builtins ──────────────────────────────────────────────────── */
 
 static void vm_boot_builtins(VM *vm) {
+    /* Register builtins for known names regardless of declared globals.
+       LOAD_GLOBAL resolves these at runtime if the global slot is null. */
     for (int i = 0; i < vm->global_count; i++) {
-        if (vm->global_names[i] && strcmp(vm->global_names[i], "print") == 0)
-            vm->globals[i] = val_string("print");
+        const char *n = vm->global_names[i];
+        if (!n) continue;
+        if (strcmp(n, "print") == 0)  vm->globals[i] = val_string("print");
+        else if (strcmp(n, "len") == 0)   vm->globals[i] = val_string("len");
+        else if (strcmp(n, "assert") == 0) vm->globals[i] = val_string("assert");
     }
+}
+
+/* Look up a builtin by name when it's not in declared globals */
+static Value *vm_builtin(const char *name) {
+    if (strcmp(name, "print") == 0)  return val_string("print");
+    if (strcmp(name, "len") == 0)    return val_string("len");
+    if (strcmp(name, "assert") == 0) return val_string("assert");
+    return NULL;
 }
 
 /* ── Main ──────────────────────────────────────────────────────────── */
