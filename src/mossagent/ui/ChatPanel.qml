@@ -26,6 +26,33 @@ Rectangle {
             model: chatModel; boundsBehavior: Flickable.StopAtBounds
             bottomMargin: 64  // space for floating input bar
 
+            // Empty state: welcome message, centered
+            Rectangle {
+                anchors.fill: parent
+                color: "transparent"
+                visible: chatModel.count === 0
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 6
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "你好，AI时代"
+                        color: window.cFg1
+                        font.pixelSize: 28
+                        font.weight: Font.Light
+                    }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "Hi, AI Time"
+                        color: window.cFg2
+                        font.pixelSize: 20
+                        font.weight: Font.Light
+                    }
+                }
+            }
+
             delegate: Item {
                 width: messageList.width
                 height: contentColumn.height + 8
