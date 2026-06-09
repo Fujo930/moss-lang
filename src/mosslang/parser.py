@@ -45,7 +45,7 @@ from .nodes import (
 from .tokens import Token, tokenize
 
 
-DECL_START = {"effect", "type", "rule", "fn", "test", "import"}
+DECL_START = {"effect", "type", "rule", "fn", "test", "import", "extern"}
 STMT_START = {"let", "return", "require", "if", "for", "while", "break", "continue"}
 
 
@@ -70,6 +70,8 @@ class Parser:
                 items.append(self.parse_function_decl())
             elif self.check_value("test"):
                 items.append(self.parse_test_decl())
+            elif self.check_value("extern"):
+                items.append(self.parse_extern_decl())
             else:
                 items.append(self.parse_statement())
             self.skip_newlines()
@@ -167,6 +169,30 @@ class Parser:
         body = self.parse_block()
         self.consume_statement_end()
         return TestDecl(name, body)
+
+    def parse_extern_decl(self):
+        """Parse extern \"python\" fn name(params) -> T = \"target\" """
+        from .nodes import PythonExternDecl
+        location = self.peek().location
+        self.expect_value("extern")
+        lang = self.expect_string()
+        if lang != "python":
+            raise self.error(f"extern language must be \"python\", got \"{lang}\"")
+        self.expect_value("fn")
+        name = self.expect_ident()
+        params = self.parse_params()
+        return_type = None
+        if self.match_value("->"):
+            return_type = self.parse_type_text_until({"="})
+        self.expect_value("=")
+        target = self.expect_string()
+        self.consume_statement_end()
+        return PythonExternDecl(name, params, return_type, target, location=location)
+
+    def expect_string(self) -> str:
+        if not self.match_kind("STRING"):
+            raise self.error("expected string literal")
+        return self.previous().value
 
     def parse_params(self) -> list[Param]:
         params: list[Param] = []

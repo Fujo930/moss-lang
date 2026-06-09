@@ -8,6 +8,8 @@ import json
 from .bytecode import Opcode, CodeObject, BytecodeModule
 from .errors import MossRuntimeError, SourceLocation
 from .values import Money, Result, Variant, format_value
+import importlib
+import math
 
 
 class ReturnSignal(Exception):
@@ -235,6 +237,8 @@ class VM:
                     frame.pc = arg
             elif op == Opcode.CALL:
                 self._do_call(frame, arg)
+            elif op == Opcode.CALL_PYTHON:
+                self._do_call_python(frame, arg)
             elif op == Opcode.RETURN:
                 return
             elif op == Opcode.BREAK:
@@ -405,6 +409,74 @@ class VM:
                 frame.stack.append(Result(False, sig.value))
         else:
             raise MossRuntimeError(f"cannot call {type(callee).__name__}")
+
+    def _do_call_python(self, frame, arg_count):
+        """Execute a Python extern call. Target module.function is on stack."""
+        args = [frame.stack.pop() for _ in range(arg_count)]
+        args.reverse()
+        target = frame.stack.pop()  # "module.function" path
+
+        if not isinstance(target, str):
+            raise MossRuntimeError(f"python extern target must be a string, got {type(target).__name__}")
+
+        # Resolve module and function
+        parts = target.rsplit(".", 1)
+        if len(parts) == 2:
+            mod_name, fn_name = parts
+        else:
+            mod_name, fn_name = "builtins", parts[0]
+
+        try:
+            mod = importlib.import_module(mod_name)
+            fn = getattr(mod, fn_name, None)
+        except (ImportError, AttributeError) as e:
+            raise MossRuntimeError(f"python extern '{target}': {e}")
+
+        if fn is None:
+            raise MossRuntimeError(f"python extern '{target}': function not found")
+
+        # Convert Moss args to Python types
+        py_args = [self._moss_to_python(a) for a in args]
+        try:
+            result = fn(*py_args)
+        except Exception as e:
+            raise MossRuntimeError(f"python extern '{target}' error: {e}")
+
+        frame.stack.append(self._python_to_moss(result))
+
+    def _moss_to_python(self, value: Any) -> Any:
+        """Convert Moss value to Python value."""
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float, str, list, dict)):
+            return value
+        if isinstance(value, Decimal):
+            return float(value)
+        if isinstance(value, Variant):
+            return value.name if not value.payload else (value.name, self._moss_to_python(value.payload))
+        if isinstance(value, Result):
+            return self._moss_to_python(value.value)
+        if isinstance(value, Money):
+            return float(value.amount)
+        return str(value)
+
+    def _python_to_moss(self, value: Any) -> Any:
+        """Convert Python value to Moss value."""
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return Decimal(str(value))
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (list, tuple)):
+            return list(self._python_to_moss(v) for v in value)
+        if isinstance(value, dict):
+            return {str(k): self._python_to_moss(v) for k, v in value.items()}
+        return str(value)
 
     def _resolve_callable(self, name, frame):
         # Check frame locals for lambda / closure values

@@ -188,6 +188,7 @@ enum {
     OP_RECORD_UPDATE = 74,
     OP_TRY_PROPAGATE = 95, OP_REQUIRE = 92,
     OP_CHECK_EFFECT = 100,
+    OP_CALL_PYTHON = 110,
 };
 
 /* ── .mbc deserializer ─────────────────────────────────────────────── */
@@ -908,6 +909,14 @@ static void vm_run(VM *vm) {
         }
         case 90: case 91: break; /* TRY/UNWRAP — compile-time, no-op */
         case 100: case 101: break; /* CHECK_EFFECT — compile-time */
+        case 110: { /* CALL_PYTHON — push null for now (C VM has no Python C API) */
+            for (int i = 0; i < arg; i++) { Value *d = stack_pop(&vm->stack); } /* pop args */
+            Value *target = stack_pop(&vm->stack); /* pop target string */
+            fprintf(stderr, "mossvm: CALL_PYTHON '%s' not supported in C VM\n",
+                    target && target->kind == V_STRING ? target->as.string : "?");
+            stack_push(&vm->stack, val_null());
+            break;
+        }
         case OP_REQUIRE: {
             Value *err_val = stack_pop(&vm->stack);
             fprintf(stderr, "mossvm: require failed: "); val_print(stderr, err_val); fprintf(stderr, "\n"); exit(1);

@@ -1,0 +1,3 @@
+// Moss JSON bindings — wraps Python json module
+extern "python" fn jsonLoads(s: Text) -> Any = "json.loads"
+extern "python" fn jsonDumps(v: Any) -> Text = "json.dumps"

@@ -90,6 +90,9 @@ class Opcode(IntEnum):
     # ── Effect guards ──
     CHECK_EFFECT = 100  # Verify effect is allowed in current context
 
+    # ── FFI / External ──
+    CALL_PYTHON = 110   # Pop args, call Python function resolved via constant table, push result
+
     # ── Import ──
     IMPORT = 110        # Import and run module
 

@@ -40,6 +40,7 @@ class Compiler:
         self.constants: list[Any] = []        # constant pool
         self.instructions: list[Instruction] = []
         self.label_counter = 0
+        self.python_externs: dict[str, str] = {}  # name → target for extern "python" fn
         # For resolving break/continue targets
         self.loop_breaks: list[int] = []      # stack of label ids for break targets
         self.loop_continues: list[int] = []   # stack of label ids for continue targets
@@ -107,7 +108,8 @@ class Compiler:
     # ── declarations ──
 
     def _compile_declarations(self, program: n.Program) -> None:
-        """Pre-compile all function/rule/test declarations into code objects."""
+        """Pre-compile all function/rule/test declarations into code objects.
+        Register Python extern declarations for OP_CALL_PYTHON dispatch."""
         for item in program.items:
             if isinstance(item, n.RuleDecl):
                 self.module.declare_function(
@@ -122,6 +124,8 @@ class Compiler:
                     self._compile_test(item)
                 )
                 self.module.tests.append(item.name)
+            elif isinstance(item, n.PythonExternDecl):
+                self.python_externs[item.name] = item.target
 
     def _compile_function(self, decl: n.FunctionDecl) -> CodeObject:
         """Compile a function declaration into a CodeObject."""
@@ -569,9 +573,19 @@ class Compiler:
         self.emit(Opcode.RECORD_UPDATE, len(expr.updates))
 
     def _compile_call_expression(self, callee: Any, args: list[Any]) -> None:
-        """Compile a function call: push name, push args, CALL."""
+        """Compile a function call: push name, push args, CALL or CALL_PYTHON."""
         if isinstance(callee, n.Identifier):
-            name_idx = self._add_constant(callee.name)
+            name = callee.name
+            if name in self.python_externs:
+                # Python extern call: push target module.function string + args
+                target = self.python_externs[name]
+                target_idx = self._add_constant(target)
+                self.emit(Opcode.LOAD_CONST, target_idx)
+                for arg in args:
+                    self._compile_expression(arg)
+                self.emit(Opcode.CALL_PYTHON, len(args))
+                return
+            name_idx = self._add_constant(name)
             self.emit(Opcode.LOAD_CONST, name_idx)
         elif isinstance(callee, n.FieldAccess):
             self._compile_expression(callee.target)

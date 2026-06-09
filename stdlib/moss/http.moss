@@ -1,0 +1,2 @@
+// Moss HTTP bindings — wraps Python urllib.request
+extern "python" fn urlOpen(url: Text) -> Text = "urllib.request.urlopen"

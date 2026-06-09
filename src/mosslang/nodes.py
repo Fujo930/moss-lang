@@ -63,6 +63,16 @@ class TestDecl:
 
 
 @dataclass(frozen=True)
+class PythonExternDecl:
+    """extern \"python\" fn declaration. Calls a Python function at runtime."""
+    name: str
+    params: list[Param]
+    return_type: str | None
+    target: str  # fully-qualified Python callable, e.g. "math.sqrt"
+    location: SourceLocation | None = None
+
+
+@dataclass(frozen=True)
 class LetStmt:
     name: str
     expr: Any

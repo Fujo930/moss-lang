@@ -27,6 +27,7 @@ from .nodes import (
     Literal,
     NumberLiteral,
     Program,
+    PythonExternDecl,
     RecordLiteral,
     RecordUpdate,
     RequireStmt,
@@ -81,7 +82,7 @@ def check_program(program: Program) -> list[Diagnostic]:
             if item.name in types:
                 diagnostics.append(Diagnostic("error", f"duplicate type '{item.name}'", item.location))
             types.add(item.name)
-        elif isinstance(item, (FunctionDecl, RuleDecl)):
+        elif isinstance(item, (FunctionDecl, RuleDecl, PythonExternDecl)):
             if item.name in functions:
                 diagnostics.append(Diagnostic("error", f"duplicate callable '{item.name}'", item.location))
             functions[item.name] = item
@@ -109,6 +110,9 @@ def check_program(program: Program) -> list[Diagnostic]:
         elif isinstance(item, RuleDecl):
             check_rule_effect_calls(item, diagnostics)
             check_param_types(item, types, diagnostics)
+        elif isinstance(item, PythonExternDecl):
+            # extern declarations are trusted — skip type/effect checks
+            pass
 
     check_static_types(program, functions, diagnostics)
     return diagnostics
