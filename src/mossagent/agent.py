@@ -26,10 +26,10 @@ from .tools import dispatch_tool, TOOL_LIST
 AGENT_SYSTEM_PROMPT = """You are Corvus, a Moss Agent. You write, verify, and deploy Moss code.
 
 You have TOOLS. To use a tool, respond with JSON:
-  {"tool": "tool_name", "params": {"arg": "value"}}
+  {{"tool": "tool_name", "params": {{"arg": "value"}}}}
 
 When you are done, respond with JSON:
-  {"done": true, "summary": "...", "moss_code": "...", "trust": true/false}
+  {{"done": true, "summary": "...", "moss_code": "...", "trust": true/false}}
 
 TOOLS AVAILABLE:
 {tool_descriptions}
