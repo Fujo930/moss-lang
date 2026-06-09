@@ -556,7 +556,7 @@ def summarize(program):
         "effects": sum(1 for item in program.items if item.__class__.__name__ == "EffectDecl"),
         "imports": sum(1 for item in program.items if item.__class__.__name__ == "ImportDecl"),
         "types": sum(1 for item in program.items if item.__class__.__name__ == "TypeDecl"),
-        "callables": sum(1 for item in program.items if item.__class__.__name__ in {"RuleDecl", "FunctionDecl"}),
+        "callables": sum(1 for item in program.items if item.__class__.__name__ in {"RuleDecl", "FunctionDecl", "PythonExternDecl"}),
         "tests": sum(1 for item in program.items if item.__class__.__name__ == "TestDecl"),
     }
 
@@ -1699,7 +1699,7 @@ def _build_trust_bundle(source: str, source_hash: str, path: Path, bundle: dict)
             "effects": sum(1 for item in program.items if type(item).__name__ == "EffectDecl"),
             "imports": sum(1 for item in program.items if type(item).__name__ == "ImportDecl"),
             "types": sum(1 for item in program.items if type(item).__name__ == "TypeDecl"),
-            "callables": sum(1 for item in program.items if type(item).__name__ in ("RuleDecl", "FunctionDecl")),
+            "callables": sum(1 for item in program.items if type(item).__name__ in ("RuleDecl", "FunctionDecl", "PythonExternDecl")),
             "tests": sum(1 for item in program.items if type(item).__name__ == "TestDecl"),
         },
     }
@@ -1867,7 +1867,7 @@ def run_trust_project(directory: Path, *, output: Path | None = None) -> int:
                     "effects": sum(1 for item in program.items if type(item).__name__ == "EffectDecl"),
                     "imports": sum(1 for item in program.items if type(item).__name__ == "ImportDecl"),
                     "types": sum(1 for item in program.items if type(item).__name__ == "TypeDecl"),
-                    "callables": sum(1 for item in program.items if type(item).__name__ in ("RuleDecl", "FunctionDecl")),
+                    "callables": sum(1 for item in program.items if type(item).__name__ in ("RuleDecl", "FunctionDecl", "PythonExternDecl")),
                     "tests": sum(1 for item in program.items if type(item).__name__ == "TestDecl"),
                 },
             },
