@@ -1129,11 +1129,43 @@ static Value *vm_resolve_global(VM *vm, int idx) {
 /* ── Main ──────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) { fprintf(stderr, "usage: mossvm program.mbc\n"); return 1; }
+    if (argc < 2) { fprintf(stderr, "usage: mossvm program.mbc [--source file.moss]\n"); return 1; }
+
+    const char *input = argv[1];
+    char temp_mbc[256] = "";
+    int used_temp = 0;
+
+    /* --source mode: compile .moss via Python CLI, then run */
+    if (argc >= 3 && strcmp(argv[1], "--source") == 0) {
+        input = argv[2];
+        /* Check if it's a .moss file (not .mbc) */
+        const char *dot = strrchr(input, '.');
+        if (dot && strcmp(dot, ".moss") == 0) {
+            /* Auto-compile via moss CLI */
+            snprintf(temp_mbc, sizeof(temp_mbc), "%s.mbc_tmp", input);
+            char cmd[1024];
+            snprintf(cmd, sizeof(cmd), "python -m mosslang.cli compile \"%s\" -o \"%s\" 2>nul", input, temp_mbc);
+            int ret = system(cmd);
+            if (ret != 0) {
+                /* Try pip-installed moss */
+                snprintf(cmd, sizeof(cmd), "moss compile \"%s\" -o \"%s\" 2>nul", input, temp_mbc);
+                ret = system(cmd);
+            }
+            if (ret == 0) {
+                input = temp_mbc;
+                used_temp = 1;
+            } else {
+                fprintf(stderr, "mossvm: cannot compile %s (need Python/moss installed)\n", input);
+                return 1;
+            }
+        }
+    }
 
     VM vm = {0};
-    if (!vm_load(&vm, argv[1])) { fprintf(stderr, "LOAD FAILED\n"); fflush(stderr); return 1; }
+    if (!vm_load(&vm, input)) { fprintf(stderr, "LOAD FAILED\n"); fflush(stderr); return 1; }
     fprintf(stderr, "LOAD OK, starting vm_run\n"); fflush(stderr);
     vm_run(&vm);
+
+    if (used_temp) remove(temp_mbc);
     return 0;
 }

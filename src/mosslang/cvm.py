@@ -142,3 +142,73 @@ def trust_artifact_cvm(source_path: str | Path) -> dict:
             bundle["golden"] = {"ok": False, "python": py_out, "c_vm": None}
 
     return bundle
+
+
+def native_artifact(source_path: str | Path) -> dict:
+    """Complete Trust Artifact with Moss selfhost compiler metrics."""
+    import hashlib
+    source_path = Path(source_path)
+    source = source_path.read_text(encoding="utf-8-sig")
+    source_hash = hashlib.sha256(source.encode()).hexdigest()
+
+    from mosslang.parser import parse_source
+    from mosslang.checker import check_program
+    from mosslang.compiler import compile_program
+    from mosslang.vm import VM
+    from mosslang.cli import portable_trace_event
+    from io import StringIO
+
+    program = parse_source(source)
+    diagnostics = check_program(program)
+
+    # Moss selfhost compiler metrics
+    from mosslang.selfhost import SelfHostFrontend
+    sf = SelfHostFrontend()
+    try:
+        moss_out = sf.compile_with_moss(source)
+        moss_insts = len(moss_out.get('instructions', []))
+        moss_funcs = moss_out.get('functions', {})
+        moss_func_insts = sum(len(v.get('instructions', [])) for v in (moss_funcs.values() if isinstance(moss_funcs, dict) else []))
+    except Exception:
+        moss_insts, moss_func_insts = 0, 0
+
+    bundle = {
+        "artifact": f"Moss Trust Artifact (Native) v{__import__('mosslang').__version__}",
+        "source_sha256": source_hash,
+        "check": {"ok": not any(d.level == "error" for d in diagnostics)},
+        "trust": True,
+        "selfhost_compile": {
+            "module_instructions": moss_insts,
+            "function_instructions": moss_func_insts,
+            "total_instructions": moss_insts + moss_func_insts,
+        },
+    }
+
+    if not bundle["check"]["ok"]:
+        bundle["trust"] = False
+        return bundle
+
+    # Trace
+    vm_trace = VM(output=lambda _: None, base_path=source_path.parent, trace_rules=True)
+    mod = compile_program(program, source_path=str(source_path.resolve()))
+    vm_trace.load_module(mod)
+    vm_trace.run()
+    bundle["trace"] = {"ok": True, "events": [portable_trace_event(e) for e in vm_trace.trace_events]}
+
+    # Golden via C VM
+    try:
+        c_out, code = compile_and_run(source_path)
+        py_buf = StringIO()
+        vm_py = VM(output=py_buf.write, base_path=source_path.parent)
+        mod2 = compile_program(program, source_path=str(source_path.resolve()))
+        vm_py.load_module(mod2)
+        vm_py.run()
+        py_out = py_buf.getvalue()
+        bundle["golden"] = {"ok": py_out.rstrip() == c_out.rstrip(), "python": py_out.strip(), "c_vm": c_out.strip()}
+    except Exception:
+        bundle["golden"] = {"ok": False}
+
+    if bundle["golden"]["ok"] == False:
+        bundle["trust"] = False
+
+    return bundle

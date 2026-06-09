@@ -66,6 +66,10 @@ def main(argv: list[str] | None = None) -> int:
     selfhost_artifact_cmd.add_argument("file", type=Path)
     selfhost_artifact_cmd.add_argument("--output", "-o", type=Path, help="write artifact to file")
 
+    native_artifact_cmd = sub.add_parser("native-artifact", help="produce Trust Artifact with C VM golden verification")
+    native_artifact_cmd.add_argument("file", type=Path)
+    native_artifact_cmd.add_argument("--output", "-o", type=Path, help="write artifact to file")
+
     compare_cmd = sub.add_parser("selfhost-compare")
     compare_cmd.add_argument("file", type=Path)
 
@@ -219,6 +223,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "selfhost-artifact":
             return run_selfhost_artifact(args.file, output=args.output)
+
+        if args.command == "native-artifact":
+            return run_native_artifact(args.file, output=args.output)
 
         if args.command == "doc":
             return run_doc(args.file, output=args.output)
@@ -2472,6 +2479,27 @@ def display_installation_path(path: Path, root: Path) -> Path:
         return path.relative_to(root)
     except ValueError:
         return path
+
+
+def run_native_artifact(path: Path, *, output: Path | None = None) -> int:
+    """Trust Artifact with C VM golden verification and Moss selfhost metrics."""
+    import json as _json
+    from .cvm import native_artifact
+    try:
+        bundle = native_artifact(path)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"native artifact error: {e}", file=sys.stderr)
+        return 1
+    trust_json = _json.dumps(bundle, indent=2)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(trust_json, encoding="utf-8")
+        print(f"native artifact written: {output}")
+    else:
+        print(trust_json)
+    return 0 if bundle.get("trust") else 1
 
 
 if __name__ == "__main__":
