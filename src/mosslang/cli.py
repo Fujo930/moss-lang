@@ -148,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     trust_cmd = sub.add_parser("trust", help="produce a trust bundle (alias: artifact)")
     trust_cmd.add_argument("file", type=Path)
     trust_cmd.add_argument("--output", "-o", type=Path, help="write trust bundle to file (default: stdout)")
+    trust_cmd.add_argument("--summary", action="store_true", help="minimal output for token efficiency")
 
     trust_proj_cmd = sub.add_parser("trust-project", help="project-wide trust bundle (alias: artifact-project)")
     trust_proj_cmd.add_argument("directory", type=Path)
