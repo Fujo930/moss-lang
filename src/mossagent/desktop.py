@@ -58,7 +58,8 @@ class CorvusBridge(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._cv = Corvus()
-        self._chat_session: ChatSession | None = None
+        self._chat_sessions: list[ChatSession] = [ChatSession()]
+        self._active_session: int = 0
         self._adapter = None
         self._agent: Agent | None = None
         self._generator: Generator | None = None
@@ -88,6 +89,15 @@ class CorvusBridge(QObject):
     def _get_stats(self) -> dict:
         return self._stats
 
+    def _get_session_names(self) -> list:
+        return [f"Session {i+1}" for i in range(len(self._chat_sessions))]
+
+    def _get_active_session(self) -> int:
+        return self._active_session
+
+    def _active_chat(self) -> ChatSession:
+        return self._chat_sessions[self._active_session]
+
     def _get_file_viewer_path(self) -> str:
         return self._file_viewer_path
 
@@ -100,6 +110,8 @@ class CorvusBridge(QObject):
     stats = Property("QVariantMap", fget=_get_stats, notify=progressChanged)
     fileViewerPath = Property(str, fget=_get_file_viewer_path, notify=progressChanged)
     fileViewerContent = Property(str, fget=_get_file_viewer_content, notify=progressChanged)
+    sessionNames = Property("QVariantList", fget=_get_session_names, notify=progressChanged)
+    activeSession = Property(int, fget=_get_active_session, notify=progressChanged)
 
     # ── Slots called from QML ─────────────────────────────────
 
@@ -111,7 +123,7 @@ class CorvusBridge(QObject):
         try:
             provider = os.environ.get("LLM_PROVIDER", "openai")
             self._adapter = create_adapter(provider)
-            self._chat_session = ChatSession().bind(self._adapter.generate)
+            self._chat_sessions[0].bind(self._adapter.generate)
             self._generator = Generator(self._cv, self._adapter.generate)
             self._agent = Agent(self._adapter.generate)
             self.progressChanged.emit("Ready — AI connected.")
@@ -130,16 +142,16 @@ class CorvusBridge(QObject):
 
         def _do():
             try:
-                if self._chat_session is None:
-                    # Lazy init adapter
+                chat = self._active_chat()
+                if chat._generate_fn is None:
                     provider = os.environ.get("LLM_PROVIDER", "openai")
                     self._adapter = create_adapter(provider)
-                    self._chat_session = ChatSession().bind(self._adapter.generate)
+                    chat.bind(self._adapter.generate)
 
-                result = self._chat_session.send(message)
+                result = chat.send(message)
                 self.messageAdded.emit("assistant", result.answer, None)
-                self._chat_session.save("corvus_chat.json")
-                self._update_stats(self._chat_session.stats())
+                chat.save(f"corvus_chat_{self._active_session}.json")
+                self._update_stats(chat.stats())
                 self.progressChanged.emit(
                     f"Done · cache hit {result.cache_hit_pct}% · {result.elapsed_s}s"
                 )
@@ -242,6 +254,34 @@ class CorvusBridge(QObject):
 
         threading.Thread(target=_do, daemon=True).start()
 
+    @Slot(str)
+    def createSession(self, name: str):
+        """Create a new chat session tab."""
+        session = ChatSession()
+        if self._adapter:
+            session.bind(self._adapter.generate)
+        self._chat_sessions.append(session)
+        self._active_session = len(self._chat_sessions) - 1
+        self.progressChanged.emit(f"Session '{name}' created.")
+
+    @Slot(int)
+    def switchSession(self, index: int):
+        """Switch to a different session tab."""
+        if 0 <= index < len(self._chat_sessions):
+            self._active_session = index
+            self.progressChanged.emit(f"Switched to Session {index+1}")
+
+    @Slot(int)
+    def closeSession(self, index: int):
+        """Close a session tab. At least one session must remain."""
+        if len(self._chat_sessions) <= 1:
+            return
+        if 0 <= index < len(self._chat_sessions):
+            self._chat_sessions.pop(index)
+            if self._active_session >= len(self._chat_sessions):
+                self._active_session = len(self._chat_sessions) - 1
+            self.progressChanged.emit(f"Session closed.")
+
     @Slot()
     def refreshWorkspace(self):
         """Refresh the workspace file tree."""
@@ -315,8 +355,8 @@ class CorvusBridge(QObject):
             {"key": "Moss version", "value": MOSS_VERSION},
             {"key": "Agent version", "value": AGENT_VERSION},
         ]
-        if self._chat_session:
-            stats = self._chat_session.stats()
+        if self._active_chat():
+            stats = self._active_chat().stats()
             mems.append({"key": "Chat turns", "value": str(stats["turns"])})
             mems.append({"key": "Cache hit", "value": str(stats.get("estimated_cache_hit_pct", "—")) + "%"})
         self._memories = mems
