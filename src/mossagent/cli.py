@@ -310,6 +310,36 @@ def cmd_chat_stats(*, json_mode: bool = False) -> int:
 
 
 def cmd_test(cv, *, json_mode: bool = False) -> int:
+    """Run the Python test suite and report results."""
+    import time as _time, re
+    from .tools import dispatch_tool
+
+    t0 = _time.perf_counter()
+    result = dispatch_tool("bash", {"command": "python -m pytest tests/ -q --tb=short 2>&1", "timeout": 60})
+    elapsed = round((_time.perf_counter() - t0) * 1000)
+    output = result.get("output", "")
+    passed = failed = xfailed = errors = 0
+    for line in output.splitlines():
+        m = re.search(r'(\d+) passed', line); passed = int(m.group(1)) if m else passed
+        m = re.search(r'(\d+) failed', line); failed = int(m.group(1)) if m else failed
+        m = re.search(r'(\d+) xfailed', line); xfailed = int(m.group(1)) if m else xfailed
+        m = re.search(r'(\d+) error', line); errors = int(m.group(1)) if m else errors
+    if json_mode:
+        _out({"passed": passed, "failed": failed, "xfailed": xfailed, "errors": errors, "elapsed_ms": elapsed}, json_mode=True)
+    else:
+        print(f"Tests: {passed} passed, {failed} failed, {xfailed} xfailed, {errors} errors · {elapsed}ms")
+    return 0 if failed == 0 and errors == 0 else 1
+
+
+def cmd_desktop() -> int:
+    """Launch the Corvus Desktop GUI application."""
+    try:
+        from .desktop import main as desktop_main
+    except ImportError as e:
+        print(f"Cannot launch desktop: {e}", file=sys.stderr)
+        print("Install PySide6: pip install PySide6", file=sys.stderr)
+        return 1
+    return desktop_main()
     """Run the Python test suite and report results.
     
     This is the test-feedback loop: run pytest, parse failures,
@@ -417,6 +447,9 @@ def main(argv: list[str] | None = None) -> int:
     if cmd == "test":
         from mossagent import Corvus
         return cmd_test(Corvus(), json_mode=json_mode)
+
+    if cmd == "desktop":
+        return cmd_desktop()
 
     # chat, chat-reset, chat-stats need no source/spec
     if cmd == "chat":

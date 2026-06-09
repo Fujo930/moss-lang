@@ -8,8 +8,10 @@ from __future__ import annotations
 from .core import Corvus, CorvusVersionError, ExecuteResult, VerifyResult
 from .agent import Agent, AgentResult
 from .generator import Generator, GenerationResult
+from .chat import ChatSession, ChatResult
 
 __all__ = [
     "Corvus", "VerifyResult", "ExecuteResult", "CorvusVersionError",
     "Agent", "AgentResult", "Generator", "GenerationResult",
+    "ChatSession", "ChatResult",
 ]
