@@ -46,6 +46,47 @@ class Diagnostic:
     level: str
     message: str
     location: SourceLocation | None = None
+    code: str = ""
+    hint: str = ""
+
+    def __post_init__(self):
+        if not self.code:
+            msg = self.message
+            if "duplicate effect" in msg:
+                object.__setattr__(self, "code", "E001"); object.__setattr__(self, "hint", "Remove the duplicate or rename.")
+            elif "duplicate type" in msg:
+                object.__setattr__(self, "code", "E002"); object.__setattr__(self, "hint", "Rename or remove the duplicate type.")
+            elif "duplicate callable" in msg:
+                object.__setattr__(self, "code", "E003"); object.__setattr__(self, "hint", "Rename or remove the duplicate.")
+            elif "uses undeclared effect" in msg:
+                object.__setattr__(self, "code", "E004"); object.__setattr__(self, "hint", "Add uses clause to function signature.")
+            elif "does not declare uses" in msg or "is missing effect" in msg:
+                object.__setattr__(self, "code", "E005"); object.__setattr__(self, "hint", "Add to uses clause or wrap in a function.")
+            elif "rules must be pure" in msg:
+                object.__setattr__(self, "code", "E006"); object.__setattr__(self, "hint", "Move effect call into a separate function with uses.")
+            elif "has undeclared type" in msg or ("return type" in msg and "not a declared type" in msg):
+                object.__setattr__(self, "code", "E007"); object.__setattr__(self, "hint", "Declare the type or check spelling.")
+            elif "type mismatch" in msg:
+                object.__setattr__(self, "code", "E008"); object.__setattr__(self, "hint", "Check expected type against provided.")
+            elif "non-exhaustive match" in msg:
+                object.__setattr__(self, "code", "E009"); object.__setattr__(self, "hint", "Add missing variant cases or wildcard.")
+            elif "has no field" in msg:
+                object.__setattr__(self, "code", "E010"); object.__setattr__(self, "hint", "Check field name in type declaration.")
+            elif "declared but never used" in msg:
+                object.__setattr__(self, "code", "W001"); object.__setattr__(self, "hint", "Remove from uses or add needed effect call.")
+            elif "match pattern" in msg and "will never match" in msg:
+                object.__setattr__(self, "code", "W002"); object.__setattr__(self, "hint", "Ok/Err patterns only match Result types.")
+            elif "possible import cycle" in msg:
+                object.__setattr__(self, "code", "W003"); object.__setattr__(self, "hint", "Restructure imports to break the cycle.")
+
+    def to_json(self) -> dict:
+        result = {"level": self.level, "message": self.message, "code": self.code}
+        if self.hint:
+            result["hint"] = self.hint
+        if self.location is not None:
+            result["line"] = self.location.line
+            result["column"] = self.location.column
+        return result
 
     def format(self) -> str:
         prefix = f"{self.location.format()}: " if self.location is not None else ""

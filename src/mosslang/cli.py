@@ -143,6 +143,11 @@ def main(argv: list[str] | None = None) -> int:
     playground_cmd.add_argument("--host", default="127.0.0.1")
     playground_cmd.add_argument("--port", type=int, default=8766)
 
+    # ── Trust Server ──
+    serve_cmd = sub.add_parser("serve", help="start Moss Trust Server (HTTP API for AI agents)")
+    serve_cmd.add_argument("--host", default="127.0.0.1")
+    serve_cmd.add_argument("--port", type=int, default=9876)
+
     compile_cmd = sub.add_parser("compile", help="compile moss source to bytecode")
     compile_cmd.add_argument("file", type=Path)
     compile_cmd.add_argument("--output", "-o", type=Path, help="output .mbc file path")
@@ -221,6 +226,11 @@ def main(argv: list[str] | None = None) -> int:
             from .playground import run_playground
 
             run_playground(args.host, args.port)
+            return 0
+
+        if args.command == "serve":
+            from .trust_server import run_trust_server
+            run_trust_server(args.host, args.port)
             return 0
 
         if args.command == "selfhost-bootstrap":
@@ -579,9 +589,17 @@ def summarize(program):
 
 
 def diagnostic_json(diagnostic) -> dict:
+    """Convert a Diagnostic to a JSON-serializable dict. Delegates to to_json() if available."""
+    if hasattr(diagnostic, 'to_json'):
+        return diagnostic.to_json()
     result = {"level": diagnostic.level, "message": diagnostic.message}
+    if isinstance(diagnostic, object) and hasattr(diagnostic, 'code') and diagnostic.code:
+        result["code"] = diagnostic.code
+    if isinstance(diagnostic, object) and hasattr(diagnostic, 'hint') and diagnostic.hint:
+        result["hint"] = diagnostic.hint
     if diagnostic.location is not None:
-        result.update({"line": diagnostic.location.line, "column": diagnostic.location.column})
+        result["line"] = diagnostic.location.line
+        result["column"] = diagnostic.location.column
     return result
 
 
