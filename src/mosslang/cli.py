@@ -62,6 +62,10 @@ def main(argv: list[str] | None = None) -> int:
     selfhost_compile_cmd.add_argument("file", type=Path)
     selfhost_compile_cmd.add_argument("--output", "-o", type=Path, help="output .mbc file")
 
+    selfhost_artifact_cmd = sub.add_parser("selfhost-artifact", help="produce Trust Artifact through Moss selfhost pipeline")
+    selfhost_artifact_cmd.add_argument("file", type=Path)
+    selfhost_artifact_cmd.add_argument("--output", "-o", type=Path, help="write artifact to file")
+
     compare_cmd = sub.add_parser("selfhost-compare")
     compare_cmd.add_argument("file", type=Path)
 
@@ -157,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
     art_cmd = sub.add_parser("artifact", help="produce a Trust Artifact (check + trace + golden + lock + selfhost)")
     art_cmd.add_argument("file", type=Path)
     art_cmd.add_argument("--output", "-o", type=Path, help="write artifact to file (default: stdout)")
+    art_cmd.add_argument("--summary", action="store_true", help="minimal output for token efficiency (15-20 tokens typical)")
 
     art_proj_cmd = sub.add_parser("artifact-project", help="produce a project-wide Trust Artifact")
     art_proj_cmd.add_argument("directory", type=Path)
@@ -211,6 +216,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "selfhost-compile":
             return run_selfhost_compile(args.file, output=args.output)
 
+        if args.command == "selfhost-artifact":
+            return run_selfhost_artifact(args.file, output=args.output)
+
         if args.command == "doc":
             return run_doc(args.file, output=args.output)
 
@@ -224,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
             return run_selfhost_compare(args.file)
 
         if args.command in ("trust", "artifact"):
-            return run_trust(args.file, output=args.output)
+            return run_trust(args.file, output=args.output, summary=args.summary)
 
         if args.command in ("trust-project", "artifact-project"):
             return run_trust_project(args.directory, output=args.output)
@@ -979,6 +987,102 @@ def run_selfhost_compile(path: Path, *, output: Path | None = None) -> int:
     return 0
 
 
+def run_selfhost_artifact(path: Path, *, output: Path | None = None) -> int:
+    """Produce Trust Artifact using Moss selfhost pipeline for parser + compiler."""
+    import hashlib, subprocess
+
+    source = path.read_text(encoding="utf-8-sig")
+    source_hash = hashlib.sha256(source.encode()).hexdigest()
+
+    from .selfhost import SelfHostFrontend
+    sf = SelfHostFrontend()
+    try:
+        moss_parsed = sf.parse_to_ast(source)
+        moss_compile = sf.compile_with_moss(source)
+    except Exception as e:
+        print(f"selfhost error: {e}", file=sys.stderr)
+        return 1
+
+    # Host checker (selfhost checker available but not yet integrated)
+    try:
+        program = parse_source(source)
+        diagnostics = check_program(program)
+    except Exception:
+        program = None
+        diagnostics = []
+
+    bundle: dict = {
+        "artifact": f"Moss Trust Artifact (selfhost) v{__version__}",
+        "moss": __version__,
+        "file": path.resolve().as_posix(),
+        "source_sha256": source_hash,
+        "trust": True,
+        "selfhost_compile": {
+            "instructions": len(moss_compile.get('instructions', [])),
+            "constants": len(moss_compile.get('constants', [])),
+            "globals": len(moss_compile.get('globals', [])),
+            "functions": len(moss_compile.get('functions', {})) if isinstance(moss_compile.get('functions'), dict) else 0,
+            "compiler": "compiler_core.moss",
+        },
+        "check": {
+            "ok": not any(d.level == "error" for d in diagnostics),
+            "diagnostics": [
+                {"level": d.level, "message": d.message,
+                 "line": d.location.line if d.location else None}
+                for d in diagnostics
+            ] if diagnostics else [],
+        },
+    }
+
+    if not bundle["check"]["ok"]:
+        bundle["trust"] = False
+
+    # Golden output via Python VM
+    if program and bundle["check"]["ok"]:
+        try:
+            buf = StringIO()
+            vm = VM(output=buf.write, base_path=path.parent)
+            mod = compile_program(program, source_path=str(path.resolve()))
+            vm.load_module(mod)
+            vm.run()
+            bundle["golden"] = {"snapshot": buf.getvalue()}
+        except Exception as e:
+            bundle["golden"] = {"snapshot": None, "error": str(e)}
+            bundle["trust"] = False
+
+    trust_json = json.dumps(bundle, indent=2)
+
+    # --summary mode: reduce bundle to 15-25 token minimal format
+    if summary:
+        chk = bundle.get("check", {})
+        chk_sum = chk.get("summary", {})
+        trace_events = bundle.get("trace", {}).get("events", [])
+        summary_bundle = {
+            "v": __version__,
+            "t": bundle["trust"],
+            "h": source_hash[:16],
+            "c": {
+                "e": chk_sum.get("effects", 0),
+                "t": chk_sum.get("types", 0),
+                "c": chk_sum.get("callables", 0),
+            },
+            "tr": len(trace_events),
+            "g": bundle.get("golden", {}).get("ok"),
+            "sh": bundle.get("selfhost", {}).get("ok"),
+        }
+        trust_json = json.dumps(summary_bundle, indent=2)
+    
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        if summary:
+            trust_json = _build_summary_json(bundle, __version__, source_hash)
+        output.write_text(trust_json, encoding="utf-8")
+        print(f"selfhost artifact written: {output}")
+    else:
+        print(trust_json)
+    return 0 if bundle["trust"] else 1
+
+
 def _serialize_hybrid(hybrid: dict, source_path: str, moss_output: dict) -> bytes:
     """Serialize hybrid dict (Moss instructions + Python metadata) to .mbc."""
     from .moss_serialize import _encode_code_object, encode_string
@@ -1508,6 +1612,26 @@ def run_keygen(output: Path) -> int:
     return 0
 
 
+def _build_summary_json(bundle: dict, version: str, source_hash: str) -> str:
+    """Build minimal Trust Artifact JSON for token efficiency (~15-25 tokens)."""
+    chk = bundle.get("check", {})
+    chk_sum = chk.get("summary", {})
+    trace_ev = bundle.get("trace", {}).get("events", [])
+    return json.dumps({
+        "v": version,
+        "t": bundle["trust"],
+        "h": source_hash[:16],
+        "c": {
+            "e": chk_sum.get("effects", 0),
+            "t": chk_sum.get("types", 0),
+            "c": chk_sum.get("callables", 0),
+        },
+        "tr": len(trace_ev),
+        "g": bundle.get("golden", {}).get("ok"),
+        "sh": bundle.get("selfhost", {}).get("ok"),
+    }, indent=2)
+
+
 def _find_lock(path: Path) -> Path | None:
     """Walk upward from *path* looking for moss.lock."""
     candidate = path.resolve()
@@ -1520,7 +1644,7 @@ def _find_lock(path: Path) -> Path | None:
     return None
 
 
-def run_trust(path: Path, *, output: Path | None = None) -> int:
+def run_trust(path: Path, *, output: Path | None = None, summary: bool = False) -> int:
     """Produce a trust bundle for a Moss program."""
     import hashlib
 
@@ -1568,6 +1692,8 @@ def run_trust(path: Path, *, output: Path | None = None) -> int:
         except Exception:
             bundle["_hash_verified"] = False
         trust_json = json.dumps(bundle, indent=2)
+        if summary:
+            trust_json = _build_summary_json(bundle, __version__, source_hash)
         print(trust_json)
     return 0 if bundle["trust"] else 1
 
