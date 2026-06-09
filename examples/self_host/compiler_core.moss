@@ -145,6 +145,9 @@ fn globalIdx(st: CompilerState, name: Text) -> Number {
 // ── Expression compilation ──
 
 fn compileExpr(st: CompilerState, expr: Any) -> CompilerState {
+  // Null guard: if expression is missing, skip it (return compiler state unchanged)
+  if expr == null { return st }
+
   kind = expr.kind
 
   if kind == "Identifier" {
@@ -298,6 +301,8 @@ fn compileExpr(st: CompilerState, expr: Any) -> CompilerState {
 // ── Statement compilation ──
 
 fn compileStmt(st: CompilerState, stmt: Any) -> CompilerState {
+  if stmt == null { return st }
+
   kind = stmt.kind
 
   if kind == "Expr" {

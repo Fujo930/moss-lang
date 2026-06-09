@@ -45,7 +45,7 @@ class Frame:
 class VM:
     """Stack-based bytecode virtual machine for Moss."""
     
-    MAX_FRAME_DEPTH = 100_000  # Python VM: selfhost recursive descent parser hits ~46k frames
+    MAX_FRAME_DEPTH = 500_000  # Python VM: selfhost compiler needs ~200k+ frames for recursive descent
     MAX_STACK_SIZE  = 4096   # matches C VM mossvm.c STACK_MAX
     
     def __init__(self, output=None, base_path=None, trace_rules=False, import_paths=None):

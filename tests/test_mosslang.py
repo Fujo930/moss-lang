@@ -1756,9 +1756,9 @@ print(shipped.status, dbGet("A-100").status)"""
         self.assertIn('case OP_ADD', source)
         self.assertIn('case OP_RETURN', source)
 
-    @pytest.mark.xfail(reason="selfhost compiler bug: null dereference in Moss-written compiler — GET_FIELD .kind on None. Fix in compiler_core.moss source, not Python runtime.")
+    @pytest.mark.xfail(reason="selfhost compiler Moss source bugs: compileExpr/compileStmt null guards fixed .kind crash, but len(None) remains — needs further Moss source hardening in compiler_core.moss")
     def test_moss_compiler_self_compile(self) -> None:
-        """Moss compiler can parse and compile its own source."""
+        """Moss compiler can parse and compile its own source (parsing works; compilation WIP)."""
         import os
         from mosslang.selfhost import SelfHostFrontend, moss_nodes_to_program, moss_compiler_to_module
         from pathlib import Path

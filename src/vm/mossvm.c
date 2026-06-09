@@ -18,8 +18,11 @@
 #include <stdbool.h>
 #ifdef _WIN32
 #include <windows.h>
+#define NULL_DEVICE "nul"
 #else
 #include <unistd.h>
+#include <dirent.h>
+#define NULL_DEVICE "/dev/null"
 #endif
 
 /* strndup polyfill for C99 (POSIX function) */
@@ -155,6 +158,122 @@ static void val_print(FILE *fp, Value *v) {
     }
     default: fprintf(fp, "<%d>", v->kind); break;
     }
+}
+
+/* ── Minimal JSON parser ───────────────────────────────────────────── */
+
+static void json_skip_ws(const char **p) {
+    while (**p == ' ' || **p == '\t' || **p == '\n' || **p == '\r') (*p)++;
+}
+
+static Value *json_parse_value(const char **p);
+
+static Value *json_parse_string(const char **p) {
+    if (**p != '"') return val_null();
+    (*p)++;
+    char buf[8192]; int i = 0;
+    while (**p && **p != '"' && i < 8191) {
+        if (**p == '\\') {
+            (*p)++;
+            switch (**p) {
+                case '"': buf[i++] = '"'; break;
+                case '\\': buf[i++] = '\\'; break;
+                case '/': buf[i++] = '/'; break;
+                case 'n': buf[i++] = '\n'; break;
+                case 'r': buf[i++] = '\r'; break;
+                case 't': buf[i++] = '\t'; break;
+                case 'u': {
+                    unsigned cp = 0;
+                    for (int j = 0; j < 4; j++) {
+                        (*p)++; char c = **p;
+                        cp = cp * 16 + (c >= '0' && c <= '9' ? c - '0' :
+                                       c >= 'a' && c <= 'f' ? c - 'a' + 10 :
+                                       c >= 'A' && c <= 'F' ? c - 'A' + 10 : 0);
+                    }
+                    if (cp < 128) buf[i++] = (char)cp;
+                    else { buf[i++] = '?'; } /* non-ASCII → ? */
+                    break;
+                }
+                default: buf[i++] = **p; break;
+            }
+        } else {
+            buf[i++] = **p;
+        }
+        (*p)++;
+    }
+    if (**p == '"') (*p)++;
+    buf[i] = 0;
+    return val_string(buf);
+}
+
+static Value *json_parse_number(const char **p) {
+    char buf[64]; int i = 0;
+    while ((**p >= '0' && **p <= '9') || **p == '-' || **p == '+' || **p == '.' || **p == 'e' || **p == 'E') {
+        if (i < 63) buf[i++] = **p;
+        (*p)++;
+    }
+    buf[i] = 0;
+    return val_number(atof(buf));
+}
+
+static Value *json_parse_array(const char **p) {
+    (*p)++; /* skip '[' */
+    json_skip_ws(p);
+    Value *lst = val_null(); lst->kind = V_LIST;
+    lst->as.list.items = NULL; lst->as.list.count = 0;
+    while (**p && **p != ']') {
+        json_skip_ws(p);
+        Value *item = json_parse_value(p);
+        lst->as.list.count++;
+        lst->as.list.items = realloc(lst->as.list.items, lst->as.list.count * sizeof(Value*));
+        lst->as.list.items[lst->as.list.count - 1] = item;
+        json_skip_ws(p);
+        if (**p == ',') (*p)++;
+    }
+    if (**p == ']') (*p)++;
+    return lst;
+}
+
+static Value *json_parse_object(const char **p) {
+    (*p)++; /* skip '{' */
+    json_skip_ws(p);
+    Value *rec = val_null(); rec->kind = V_RECORD;
+    rec->as.record.keys = NULL; rec->as.record.vals = NULL;
+    rec->as.record.count = 0;
+    while (**p && **p != '}') {
+        json_skip_ws(p);
+        Value *key = json_parse_string(p);
+        json_skip_ws(p);
+        if (**p == ':') (*p)++;
+        json_skip_ws(p);
+        Value *val = json_parse_value(p);
+        rec->as.record.count++;
+        rec->as.record.keys = realloc(rec->as.record.keys, rec->as.record.count * sizeof(char*));
+        rec->as.record.vals = realloc(rec->as.record.vals, rec->as.record.count * sizeof(Value*));
+        rec->as.record.keys[rec->as.record.count - 1] = strdup(key->as.string);
+        rec->as.record.vals[rec->as.record.count - 1] = val;
+        json_skip_ws(p);
+        if (**p == ',') (*p)++;
+    }
+    if (**p == '}') (*p)++;
+    return rec;
+}
+
+static Value *json_parse_value(const char **p) {
+    json_skip_ws(p);
+    if (!**p) return val_null();
+    if (**p == '"') return json_parse_string(p);
+    if (**p == '{') return json_parse_object(p);
+    if (**p == '[') return json_parse_array(p);
+    if (**p == 't' && strncmp(*p, "true", 4) == 0) { *p += 4; return val_bool(true); }
+    if (**p == 'f' && strncmp(*p, "false", 5) == 0) { *p += 5; return val_bool(false); }
+    if (**p == 'n' && strncmp(*p, "null", 4) == 0) { *p += 4; return val_null(); }
+    if ((**p >= '0' && **p <= '9') || **p == '-') return json_parse_number(p);
+    (*p)++; return val_null();
+}
+
+static Value *json_parse(const char **p) {
+    return json_parse_value(p);
 }
 
 /* ── Stack ─────────────────────────────────────────────────────────── */
@@ -664,10 +783,11 @@ static void vm_run(VM *vm) {
                         }
                         stack_push(&vm->stack, val_string(buf));
                     } else if (strcmp(name, "jsonParse") == 0) {
-                        /* Simple JSON parse: just return the string as-is for now */
-                        if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_STRING)
-                            stack_push(&vm->stack, val_string(fn_args[0]->as.string));
-                        else stack_push(&vm->stack, val_null());
+                        /* Recursive-descent JSON parser */
+                        if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            const char *js = fn_args[0]->as.string;
+                            stack_push(&vm->stack, json_parse(&js));
+                        } else stack_push(&vm->stack, val_null());
                     } else if (strcmp(name, "writeText") == 0) {
                         if (arg >= 2 && fn_args[0] && fn_args[0]->kind == V_STRING && fn_args[1] && fn_args[1]->kind == V_STRING) {
                             FILE *wf = fopen(fn_args[0]->as.string, "w");
@@ -675,15 +795,39 @@ static void vm_run(VM *vm) {
                             else stack_push(&vm->stack, val_null());
                         } else stack_push(&vm->stack, val_null());
                     } else if (strcmp(name, "listFiles") == 0) {
-                        /* Return empty list on Windows — directory listing needs platform code */
                         Value *lst = val_null(); lst->kind = V_LIST;
                         lst->as.list.items = NULL; lst->as.list.count = 0;
-#ifdef __unix__
                         if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_STRING) {
-                            FILE *pp = popen("ls", "r"); /* simplified */
-                            if (pp) { /* TODO: real directory listing */ pclose(pp); }
-                        }
+                            const char *dir_path = fn_args[0]->as.string;
+#ifdef _WIN32
+                            WIN32_FIND_DATA fd;
+                            char pattern[512]; snprintf(pattern, sizeof(pattern), "%s\\*", dir_path);
+                            HANDLE h = FindFirstFile(pattern, &fd);
+                            if (h != INVALID_HANDLE_VALUE) {
+                                do {
+                                    if (strcmp(fd.cFileName, ".") != 0 && strcmp(fd.cFileName, "..") != 0) {
+                                        lst->as.list.count++;
+                                        lst->as.list.items = realloc(lst->as.list.items, lst->as.list.count * sizeof(Value*));
+                                        lst->as.list.items[lst->as.list.count - 1] = val_string(fd.cFileName);
+                                    }
+                                } while (FindNextFile(h, &fd));
+                                FindClose(h);
+                            }
+#else
+                            DIR *d = opendir(dir_path);
+                            if (d) {
+                                struct dirent *entry;
+                                while ((entry = readdir(d)) != NULL) {
+                                    if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+                                        lst->as.list.count++;
+                                        lst->as.list.items = realloc(lst->as.list.items, lst->as.list.count * sizeof(Value*));
+                                        lst->as.list.items[lst->as.list.count - 1] = val_string(entry->d_name);
+                                    }
+                                }
+                                closedir(d);
+                            }
 #endif
+                        }
                         stack_push(&vm->stack, lst);
                     } else if (strcmp(name, "listSet") == 0) {
                         if (arg >= 3 && fn_args[0] && fn_args[0]->kind == V_LIST) {
@@ -746,9 +890,33 @@ static void vm_run(VM *vm) {
                             stack_push(&vm->stack, lst);
                         } else stack_push(&vm->stack, val_null());
                     } else if (strcmp(name, "httpGet") == 0 || strcmp(name, "httpPostJson") == 0) {
-                        stack_push(&vm->stack, val_string("{}"));
+                        /* Use curl for HTTP — zero-dependency but needs curl in PATH */
+                        if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            char cmd[2048];
+                            if (name[4] == 'G') {
+                                snprintf(cmd, sizeof(cmd), "curl -s \"%s\" 2>" NULL_DEVICE, fn_args[0]->as.string);
+                            } else {
+                                /* httpPostJson: url, body */
+                                const char *body = (arg >= 2 && fn_args[1]) ? fn_args[1]->as.string : "{}";
+                                snprintf(cmd, sizeof(cmd), "curl -s -X POST -H \"Content-Type: application/json\" -d \"%s\" \"%s\" 2>" NULL_DEVICE, body, fn_args[0]->as.string);
+                            }
+                            FILE *pp = popen(cmd, "r");
+                            if (pp) {
+                                char buf[4096]; int len = (int)fread(buf, 1, 4095, pp); pclose(pp);
+                                if (len > 0) { buf[len] = 0; stack_push(&vm->stack, val_string(buf)); }
+                                else stack_push(&vm->stack, val_string("{}"));
+                            } else stack_push(&vm->stack, val_string("{}"));
+                        } else stack_push(&vm->stack, val_string("{}"));
                     } else if (strcmp(name, "processRun") == 0 || strcmp(name, "processRunJson") == 0) {
-                        stack_push(&vm->stack, val_string("{}"));
+                        /* Run a shell command via popen; returns stdout as string */
+                        if (arg >= 1 && fn_args[0] && fn_args[0]->kind == V_STRING) {
+                            FILE *pp = popen(fn_args[0]->as.string, "r");
+                            if (pp) {
+                                char buf[4096]; int len = (int)fread(buf, 1, 4095, pp); pclose(pp);
+                                if (len > 0) { buf[len] = 0; stack_push(&vm->stack, val_string(buf)); }
+                                else stack_push(&vm->stack, val_string(""));
+                            } else stack_push(&vm->stack, val_string(""));
+                        } else stack_push(&vm->stack, val_string(""));
                     } else if (name[0] >= 'A' && name[0] <= 'Z') {
                         /* Ok(value) → Result, Err(value) → Result, others → Variant */
                         Value *r = val_null();
@@ -1235,10 +1403,10 @@ int main(int argc, char *argv[]) {
             }
             snprintf(temp_mbc, sizeof(temp_mbc), "%s.mbc_tmp", input);
             char cmd[1024];
-            snprintf(cmd, sizeof(cmd), "python -m mosslang.cli compile \"%s\" -o \"%s\" 2>nul", input, temp_mbc);
+            snprintf(cmd, sizeof(cmd), "python -m mosslang.cli compile \"%s\" -o \"%s\" 2>" NULL_DEVICE, input, temp_mbc);
             int ret = system(cmd);
             if (ret != 0) {
-                snprintf(cmd, sizeof(cmd), "moss compile \"%s\" -o \"%s\" 2>nul", input, temp_mbc);
+                snprintf(cmd, sizeof(cmd), "moss compile \"%s\" -o \"%s\" 2>" NULL_DEVICE, input, temp_mbc);
                 ret = system(cmd);
             }
             if (ret == 0) {

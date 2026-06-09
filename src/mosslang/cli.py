@@ -1970,8 +1970,10 @@ def run_token_sign(path: Path, *, key_path: Path, output: Path | None = None) ->
         print(f"error: key file too short ({len(key)} bytes, need at least 16)", file=sys.stderr)
         return 1
 
-    # Build signed payload: hash the token content
-    token_hash = hashlib.sha256(token_json.encode()).hexdigest()
+    # Build signed payload: hash the token content (use sort_keys for deterministic hash)
+    token_hash = hashlib.sha256(
+        json.dumps(token, sort_keys=True).encode()
+    ).hexdigest()
     payload = {
         "f": token.get("f"),
         "h": token.get("h"),
