@@ -150,6 +150,17 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
         bundle["selfhost"] = {"ok": False, "note": "selfhost comparison failed"}
         bundle["trust"] = False
 
+    # Gate passing count (for trust header alignment: @trust 5/5)
+    gates = [
+        bundle.get("check", {}).get("ok"),
+        bundle.get("trace", {}).get("ok"),
+        bundle.get("golden", {}).get("ok") is not False,
+        True,  # lock gate: not applicable in API mode
+        bundle.get("selfhost", {}).get("ok"),
+    ]
+    bundle["gates"] = sum(1 for g in gates if g)
+    bundle["gates_total"] = 5
+
     bundle["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
 
     # Cache the result
@@ -248,6 +259,7 @@ def make_trust_handler() -> type[BaseHTTPRequestHandler]:
             self.send_json({
                 "trust": True,
                 "h": result["source_sha256"][:12],
+                "g": result.get("gates", 0),
                 "c": result.get("token", {"e": 0, "t": 0, "l": 0}),
                 "r": [{"n": e.get("rule"), "o": str(e.get("result", "?"))[:16]} for e in trace_ev[:2]] if trace_ev else None,
                 "ms": result.get("elapsed_ms", 0),
@@ -258,6 +270,7 @@ def make_trust_handler() -> type[BaseHTTPRequestHandler]:
             """Auto-level: normal + fix_hints on trust=false."""
             payload = {
                 "trust": result["trust"],
+                "g": result.get("gates", 0),
                 "check": result.get("check", {}).get("ok"),
                 "fix_hints": result.get("fix_hints", []),
                 "token": result.get("token", {}),
