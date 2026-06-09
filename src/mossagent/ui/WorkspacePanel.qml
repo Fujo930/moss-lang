@@ -48,7 +48,6 @@ Rectangle {
                             Text { text: modelData.isDir ? "📂" : "📄"; font.pixelSize: 11 }
                             Text {
                                 text: modelData.name; color: window.cFg1; font.pixelSize: 12
-                                font.family: modelData.isDir ? "" : "Consolas"
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
                         }

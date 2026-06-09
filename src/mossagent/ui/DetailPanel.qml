@@ -68,7 +68,7 @@ Rectangle {
                                     Behavior on width { NumberAnimation { duration: 300 } }
                                 }
                             }
-                            Text { text: modelData; color: window.cFg1; font.pixelSize: 12; font.family: "Consolas"; Layout.preferredWidth: 50 }
+                            Text { text: modelData; color: window.cFg1; font.pixelSize: 12; Layout.preferredWidth: 50 }
                             Text { text: root.gateStates[modelData].status; color: root.gateStates[modelData].color; font.pixelSize: 12; font.weight: Font.DemiBold }
                         }
                     }
@@ -122,11 +122,11 @@ Rectangle {
                     Layout.leftMargin: 12; Layout.rightMargin: 12; spacing: 3
                     RowLayout { spacing: 4
                         Text { text: "Cache hit:"; color: window.cFg2; font.pixelSize: 11 }
-                        Text { text: bridge.stats && bridge.stats.estimated_cache_hit_pct ? bridge.stats.estimated_cache_hit_pct + "%" : "—"; color: window.cGreen; font.family: "Consolas"; font.pixelSize: 11 }
+                        Text { text: bridge.stats && bridge.stats.estimated_cache_hit_pct ? bridge.stats.estimated_cache_hit_pct + "%" : "—"; color: window.cGreen; font.pixelSize: 11 }
                     }
                     RowLayout { spacing: 4
                         Text { text: "Turns:"; color: window.cFg2; font.pixelSize: 11 }
-                        Text { text: bridge.stats && bridge.stats.turns ? bridge.stats.turns : "—"; color: window.cFg1; font.family: "Consolas"; font.pixelSize: 11 }
+                        Text { text: bridge.stats && bridge.stats.turns ? bridge.stats.turns : "—"; color: window.cFg1; font.pixelSize: 11 }
                     }
                 }
             }

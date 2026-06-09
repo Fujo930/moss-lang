@@ -10,6 +10,9 @@ ApplicationWindow {
     visible: true
     title: "Corvus — Moss Agent"
 
+    // ── Global font ────────────────────────────────────────
+    font.family: "Segoe UI"
+
     // ── Theme ──────────────────────────────────────────────
     property bool darkMode: false
 
@@ -73,7 +76,7 @@ ApplicationWindow {
         height: 28; color: cBg1; border.color: cBg3; border.width: 1
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 16
-            Text { text: bridge.version.moss; color: cFg3; font.pixelSize: 11; font.family: "Consolas" }
+            Text { text: bridge.version.moss; color: cFg3; font.pixelSize: 11 }
             Text { text: "·"; color: cFg3 }
             Text { text: window.statusText; color: cFg2; font.pixelSize: 11 }
             Item { Layout.fillWidth: true }

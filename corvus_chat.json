@@ -4,12 +4,12 @@
     {
       "role": "user",
       "content": "hi",
-      "timestamp": 1781043141.495201
+      "timestamp": 1781044016.1955488
     },
     {
       "role": "assistant",
-      "content": "Hello! I'm Corvus, the Moss Agent core engine. How can I help you today?\n\nAre you looking to:\n- **Write or verify** some Moss code?\n- **Learn** about Moss architecture (Trust, Token, Server, Decompile)?\n- **Explore** the Corvus agent platform?\n- **Discuss** AI-built programming languages?\n\nLet me know what you're working on!",
-      "timestamp": 1781043141.495201
+      "content": "Hello! I'm Corvus, the Moss Agent core engine. How can I help you today?\n\nI can assist with:\n- **Moss language** questions (syntax, patterns, best practices)\n- **Corvus Agent** commands (verify, execute, token, generate)\n- **Architecture** explanations (Trust Artifact, Token Artifact, four-brand system)\n- **Code** writing, review, and debugging\n\nWhat would you like to explore?",
+      "timestamp": 1781044016.1955488
     }
   ],
   "turn": 1
