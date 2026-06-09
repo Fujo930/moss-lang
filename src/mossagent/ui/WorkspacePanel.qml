@@ -1,117 +1,139 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "theme.js" as Theme
+
+// Workspace — card-style file browser + memory. Reads all colors from window.
 
 Rectangle {
     id: root
-    color: Theme.bg1
-
-    property color cBg1: Theme.bg1
-    property color cBg2: Theme.bg2
-    property color cBg3: Theme.bg3
-    property color cFg1: Theme.fg1
-    property color cFg2: Theme.fg2
-    property color cFg3: Theme.fg3
-    property color cAccent: Theme.accent
-    property color cGreen: Theme.green
-    property color cBlue: Theme.blue
+    color: window.cBg1
 
     ColumnLayout {
-        anchors.fill: parent
-        spacing: 0
+        anchors.fill: parent; anchors.margins: 10; spacing: 8
 
-        // Section: Files
+        // ── Files card ──────────────────────────────────────
         Rectangle {
-            Layout.fillWidth: true; implicitHeight: 32
-            color: root.cBg2; border.color: root.cBg3; border.width: 1
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: Theme.space_md; spacing: Theme.space_sm
-                Text { text: "\uD83D\uDCC1"; font.pixelSize: Theme.font_size_sm }
-                Text { text: "Workspace"; color: root.cFg1; font.pixelSize: Theme.font_size_sm; font.family: Theme.font_sans; font.weight: Font.DemiBold }
-                Item { Layout.fillWidth: true }
-                Text {
-                    text: "\u27F3"; color: root.cFg2; font.pixelSize: Theme.font_size_sm
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bridge.refreshWorkspace() }
+            Layout.fillWidth: true; Layout.fillHeight: true
+            radius: 12; color: window.cBg0; border.color: window.cBg3; border.width: 1
+
+            ColumnLayout {
+                anchors.fill: parent; spacing: 0
+
+                // Header
+                Rectangle {
+                    Layout.fillWidth: true; implicitHeight: 36; radius: 12
+                    color: "transparent"
+
+                    RowLayout {
+                        anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 6
+                        Text { text: "📁"; font.pixelSize: 12 }
+                        Text { text: "Files"; color: window.cFg1; font.pixelSize: 13; font.weight: Font.DemiBold }
+                        Item { Layout.fillWidth: true }
+                        Text {
+                            text: "⟳"; color: window.cFg2; font.pixelSize: 14
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bridge.refreshWorkspace() }
+                        }
+                    }
+                }
+
+                ListView {
+                    id: fileList
+                    Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                    model: bridge.fileTree; spacing: 2
+                    anchors.leftMargin: 6; anchors.rightMargin: 6
+
+                    delegate: Rectangle {
+                        width: fileList.width - 12; implicitHeight: 30; radius: 8
+                        color: mouseArea.containsMouse ? window.cBg2 : "transparent"
+
+                        RowLayout {
+                            anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 8; spacing: 6
+                            Text {
+                                text: modelData.isDir ? "📂" : "📄"; font.pixelSize: 11
+                            }
+                            Text {
+                                text: modelData.name; color: window.cFg1; font.pixelSize: 12
+                                font.family: modelData.isDir ? "" : "Consolas"
+                                elide: Text.ElideRight; Layout.fillWidth: true
+                            }
+                        }
+
+                        MouseArea {
+                            id: mouseArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (modelData.isDir) bridge.toggleDirectory(modelData.path)
+                                else bridge.openFile(modelData.path)
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        ListView {
-            id: fileList
-            Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 100
-            clip: true; model: bridge.fileTree; spacing: 0
-            delegate: Rectangle {
-                width: fileList.width; implicitHeight: 28
-                color: mouseArea.containsMouse ? Qt.alpha(root.cBg3, 0.5) : "transparent"
-                RowLayout {
-                    anchors.fill: parent; anchors.leftMargin: Theme.space_md; anchors.rightMargin: Theme.space_sm; spacing: Theme.space_sm
-                    Text { text: modelData.isDir ? "\uD83D\uDCC2" : "\uD83D\uDCC4"; font.pixelSize: Theme.font_size_sm }
-                    Text { text: modelData.name; color: root.cFg1; font.family: modelData.isDir ? Theme.font_sans : Theme.font_mono; font.pixelSize: Theme.font_size_sm; elide: Text.ElideRight; Layout.fillWidth: true }
-                }
-                MouseArea {
-                    id: mouseArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onClicked: { if (modelData.isDir) bridge.toggleDirectory(modelData.path); else bridge.openFile(modelData.path) }
-                }
-            }
-        }
-
-        // Section: Memory
+        // ── Memory card ─────────────────────────────────────
         Rectangle {
-            Layout.fillWidth: true; implicitHeight: 32
-            color: root.cBg2; border.color: root.cBg3; border.width: 1
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: Theme.space_md; spacing: Theme.space_sm
-                Text { text: "\uD83E\uDDE0"; font.pixelSize: Theme.font_size_sm }
-                Text { text: "Memory"; color: root.cFg1; font.pixelSize: Theme.font_size_sm; font.family: Theme.font_sans; font.weight: Font.DemiBold }
-            }
-        }
+            Layout.fillWidth: true; implicitHeight: 120; radius: 12
+            color: window.cBg0; border.color: window.cBg3; border.width: 1
 
-        ListView {
-            id: memoryList
-            Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 80
-            clip: true; model: bridge.memories; spacing: Theme.space_xs
-            delegate: Rectangle {
-                width: memoryList.width; implicitHeight: memText.implicitHeight + Theme.space_xs * 2
-                color: "transparent"; border.color: root.cBg3; border.width: 1; radius: Theme.radius_sm
-                Text {
-                    id: memText; anchors.fill: parent; anchors.margins: Theme.space_xs
-                    text: modelData.key + ": " + modelData.value
-                    color: root.cFg2; font.pixelSize: Theme.font_size_xs; font.family: Theme.font_sans
-                    wrapMode: Text.WordWrap; maximumLineCount: 3; elide: Text.ElideRight
+            ColumnLayout {
+                anchors.fill: parent; spacing: 0
+
+                Rectangle {
+                    Layout.fillWidth: true; implicitHeight: 36; radius: 12
+                    color: "transparent"
+                    RowLayout {
+                        anchors.fill: parent; anchors.leftMargin: 12; spacing: 6
+                        Text { text: "🧠"; font.pixelSize: 12 }
+                        Text { text: "Memory"; color: window.cFg1; font.pixelSize: 13; font.weight: Font.DemiBold }
+                    }
+                }
+
+                ListView {
+                    id: memoryList
+                    Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                    model: bridge.memories; spacing: 4
+                    anchors.leftMargin: 12; anchors.rightMargin: 12
+
+                    delegate: Rectangle {
+                        width: memoryList.width - 24; implicitHeight: memText.implicitHeight + 12; radius: 8
+                        color: window.cBg2
+
+                        Text {
+                            id: memText
+                            anchors.fill: parent; anchors.margins: 6
+                            text: modelData.key + ": " + modelData.value
+                            color: window.cFg2; font.pixelSize: 11; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight
+                        }
+                    }
                 }
             }
         }
-    }
 
-    // Action buttons
-    RowLayout {
-        anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
-        anchors.margins: Theme.space_sm; spacing: Theme.space_sm
+        // ── Action buttons row ──────────────────────────────
+        RowLayout {
+            Layout.fillWidth: true; spacing: 6
 
-        Rectangle {
-            implicitWidth: btnText1.implicitWidth + Theme.space_md * 2; implicitHeight: 28; radius: Theme.radius_sm
-            color: Qt.darker(root.cGreen, 10.0); border.color: Qt.alpha(root.cGreen, 0.4); border.width: 1
-            Text { id: btnText1; anchors.centerIn: parent; text: "\uD83D\uDD0D Verify"; color: root.cGreen; font.pixelSize: Theme.font_size_xs; font.family: Theme.font_sans; font.weight: Font.DemiBold }
-            MouseArea {
-                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                onClicked: { var s = bridge.getActiveSource(); if (s) bridge.runVerify(s) }
+            Rectangle {
+                Layout.fillWidth: true; implicitHeight: 30; radius: 10
+                color: window.cGreen; opacity: 0.12
+                border.color: Qt.rgba(26/255, 127/255, 55/255, 0.2); border.width: 1
+                Text { anchors.centerIn: parent; text: "🔍 Verify"; color: window.cGreen; font.pixelSize: 11; font.weight: Font.DemiBold }
+                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { var s = bridge.getActiveSource(); if (s) bridge.runVerify(s) } }
             }
-        }
-        Rectangle {
-            implicitWidth: btnText2.implicitWidth + Theme.space_md * 2; implicitHeight: 28; radius: Theme.radius_sm
-            color: Qt.darker(root.cBlue, 10.0); border.color: Qt.alpha(root.cBlue, 0.4); border.width: 1
-            Text { id: btnText2; anchors.centerIn: parent; text: "\u25B6 Run"; color: root.cBlue; font.pixelSize: Theme.font_size_xs; font.family: Theme.font_sans; font.weight: Font.DemiBold }
-            MouseArea {
-                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                onClicked: { var s = bridge.getActiveSource(); if (s) bridge.runExecute(s) }
+            Rectangle {
+                Layout.fillWidth: true; implicitHeight: 30; radius: 10
+                color: window.cBlue; opacity: 0.12
+                border.color: Qt.rgba(9/255, 105/255, 218/255, 0.2); border.width: 1
+                Text { anchors.centerIn: parent; text: "▶ Run"; color: window.cBlue; font.pixelSize: 11; font.weight: Font.DemiBold }
+                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { var s = bridge.getActiveSource(); if (s) bridge.runExecute(s) } }
             }
-        }
-        Rectangle {
-            implicitWidth: btnText3.implicitWidth + Theme.space_md * 2; implicitHeight: 28; radius: Theme.radius_sm
-            color: Qt.darker(root.cAccent, 10.0); border.color: Qt.alpha(root.cAccent, 0.4); border.width: 1
-            Text { id: btnText3; anchors.centerIn: parent; text: "\u2728 Gen"; color: root.cAccent; font.pixelSize: Theme.font_size_xs; font.family: Theme.font_sans; font.weight: Font.DemiBold }
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bridge.promptGenerate() }
+            Rectangle {
+                Layout.fillWidth: true; implicitHeight: 30; radius: 10
+                color: window.cAccent; opacity: 0.12
+                border.color: Qt.rgba(124/255, 58/255, 237/255, 0.2); border.width: 1
+                Text { anchors.centerIn: parent; text: "✨ Gen"; color: window.cAccent; font.pixelSize: 11; font.weight: Font.DemiBold }
+                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bridge.promptGenerate() }
+            }
         }
     }
 }

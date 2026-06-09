@@ -1,138 +1,137 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "theme.js" as Theme
+
+// Detail panel — Trust gates, task result, cache stats. Cards, reads from window.
 
 Rectangle {
     id: root
-    color: Theme.bg1
-
-    property color cBg1: Theme.bg1
-    property color cBg2: Theme.bg2
-    property color cBg3: Theme.bg3
-    property color cFg1: Theme.fg1
-    property color cFg2: Theme.fg2
-    property color cFg3: Theme.fg3
-    property color cGreen: Theme.green
-    property color cRed: Theme.red
-    property color cAmber: Theme.amber
+    color: window.cBg1
 
     property var gateStates: ({
-        check:    { status: "\u2014", color: root.cFg3 },
-        trace:    { status: "\u2014", color: root.cFg3 },
-        golden:   { status: "\u2014", color: root.cFg3 },
-        lock:     { status: "\u2014", color: root.cFg3 },
-        selfhost: { status: "\u2014", color: root.cFg3 }
+        check:    { status: "—", color: window.cFg3 },
+        trace:    { status: "—", color: window.cFg3 },
+        golden:   { status: "—", color: window.cFg3 },
+        lock:     { status: "—", color: window.cFg3 },
+        selfhost: { status: "—", color: window.cFg3 }
     })
 
     function updateGate(name, status) {
         if (!gateStates[name]) return
         gateStates[name].status = status
-        if (status === "PASS") gateStates[name].color = root.cGreen
-        else if (status === "FAIL") gateStates[name].color = root.cRed
-        else if (status === "SKIP") gateStates[name].color = root.cAmber
-        else gateStates[name].color = root.cFg3
+        if (status === "PASS") gateStates[name].color = window.cGreen
+        else if (status === "FAIL") gateStates[name].color = window.cRed
+        else if (status === "SKIP") gateStates[name].color = window.cAmber
+        else gateStates[name].color = window.cFg3
         gateStates = gateStates
     }
 
     function showResult(result) {
-        summaryText.text = result.summary || ""
-        summaryOk.text = result.ok ? "\u2705" : "\u274C"
+        taskSummary.text = result.summary || ""
+        taskIcon.text = result.ok ? "✅" : "❌"
     }
 
     ColumnLayout {
-        anchors.fill: parent
-        spacing: 0
+        anchors.fill: parent; anchors.margins: 10; spacing: 8
 
-        // Gates header
+        // ── Trust Gates card ────────────────────────────────
         Rectangle {
-            Layout.fillWidth: true; implicitHeight: 32
-            color: root.cBg2; border.color: root.cBg3; border.width: 1
-            Text {
-                anchors.verticalCenter: parent.verticalCenter; anchors.left: parent.left; anchors.leftMargin: Theme.space_md
-                text: "\uD83D\uDEE1 Trust Gates"; color: root.cFg1; font.pixelSize: Theme.font_size_sm; font.family: Theme.font_sans; font.weight: Font.DemiBold
-            }
-        }
+            Layout.fillWidth: true; implicitHeight: 180; radius: 12
+            color: window.cBg0; border.color: window.cBg3; border.width: 1
 
-        Column {
-            Layout.fillWidth: true; Layout.topMargin: Theme.space_sm
-            Layout.leftMargin: Theme.space_md; Layout.rightMargin: Theme.space_md
-            spacing: Theme.space_xs
+            ColumnLayout {
+                anchors.fill: parent; spacing: 0
 
-            Repeater {
-                model: ["check", "trace", "golden", "lock", "selfhost"]
-                delegate: RowLayout {
-                    width: parent ? parent.width : 200
-                    spacing: Theme.space_sm
+                Rectangle {
+                    Layout.fillWidth: true; implicitHeight: 36; radius: 12; color: "transparent"
+                    RowLayout {
+                        anchors.fill: parent; anchors.leftMargin: 12; spacing: 6
+                        Text { text: "🛡"; font.pixelSize: 12 }
+                        Text { text: "Trust Gates"; color: window.cFg1; font.pixelSize: 13; font.weight: Font.DemiBold }
+                    }
+                }
 
-                    Rectangle {
-                        width: 100; height: 12; radius: 6
-                        color: root.cBg2; border.color: root.cBg3
-                        Rectangle {
-                            width: root.gateStates[modelData].status === "PASS" || root.gateStates[modelData].status === "FAIL" ? 100 : 0
-                            height: parent.height; radius: 6
-                            color: root.gateStates[modelData].color
-                            Behavior on width { NumberAnimation { duration: 300 } }
+                Column {
+                    Layout.fillWidth: true; Layout.leftMargin: 12; Layout.rightMargin: 12; spacing: 4
+                    Repeater {
+                        model: ["check", "trace", "golden", "lock", "selfhost"]
+                        delegate: RowLayout {
+                            width: parent ? parent.width - 24 : 200; spacing: 8
+
+                            Rectangle {
+                                width: 80; height: 8; radius: 4
+                                color: window.cBg2; border.color: window.cBg3
+                                Rectangle {
+                                    width: root.gateStates[modelData].status === "PASS" || root.gateStates[modelData].status === "FAIL" ? 80 : 0
+                                    height: 8; radius: 4
+                                    color: root.gateStates[modelData].color
+                                    Behavior on width { NumberAnimation { duration: 300 } }
+                                }
+                            }
+                            Text { text: modelData; color: window.cFg1; font.pixelSize: 12; font.family: "Consolas"; Layout.preferredWidth: 50 }
+                            Text { text: root.gateStates[modelData].status; color: root.gateStates[modelData].color; font.pixelSize: 12; font.weight: Font.DemiBold }
                         }
                     }
-                    Text { text: modelData; color: root.cFg1; font.pixelSize: Theme.font_size_sm; font.family: Theme.font_mono; Layout.preferredWidth: 55 }
-                    Text { text: root.gateStates[modelData].status; color: root.gateStates[modelData].color; font.pixelSize: Theme.font_size_sm; font.family: Theme.font_sans; font.weight: Font.DemiBold }
                 }
             }
         }
 
-        Item { Layout.preferredHeight: Theme.space_lg }
-
-        // Task header
+        // ── Task card ───────────────────────────────────────
         Rectangle {
-            Layout.fillWidth: true; implicitHeight: 32
-            color: root.cBg2; border.color: root.cBg3; border.width: 1
-            Text {
-                anchors.verticalCenter: parent.verticalCenter; anchors.left: parent.left; anchors.leftMargin: Theme.space_md
-                text: "\uD83D\uDCCB Task"; color: root.cFg1; font.pixelSize: Theme.font_size_sm; font.family: Theme.font_sans; font.weight: Font.DemiBold
+            Layout.fillWidth: true; implicitHeight: 72; radius: 12
+            color: window.cBg0; border.color: window.cBg3; border.width: 1
+
+            ColumnLayout {
+                anchors.fill: parent; spacing: 0
+
+                Rectangle {
+                    Layout.fillWidth: true; implicitHeight: 36; radius: 12; color: "transparent"
+                    RowLayout {
+                        anchors.fill: parent; anchors.leftMargin: 12; spacing: 6
+                        Text { text: "📋"; font.pixelSize: 12 }
+                        Text { text: "Task"; color: window.cFg1; font.pixelSize: 13; font.weight: Font.DemiBold }
+                    }
+                }
+
+                RowLayout {
+                    Layout.leftMargin: 12; Layout.rightMargin: 12; spacing: 6
+                    Text { id: taskIcon; text: ""; font.pixelSize: 16 }
+                    Text { id: taskSummary; text: "No active task"; color: window.cFg2; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                }
             }
         }
 
-        ColumnLayout {
-            Layout.fillWidth: true; Layout.margins: Theme.space_md; spacing: Theme.space_sm
-            RowLayout {
-                spacing: Theme.space_sm
-                Text { id: summaryOk; text: ""; font.pixelSize: Theme.font_size_lg }
-                Text { id: summaryText; text: "No active task"; color: root.cFg2; font.pixelSize: Theme.font_size_sm; font.family: Theme.font_sans; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+        // ── Performance card ────────────────────────────────
+        Rectangle {
+            Layout.fillWidth: true; implicitHeight: 100; radius: 12
+            color: window.cBg0; border.color: window.cBg3; border.width: 1
+
+            ColumnLayout {
+                anchors.fill: parent; spacing: 0
+
+                Rectangle {
+                    Layout.fillWidth: true; implicitHeight: 36; radius: 12; color: "transparent"
+                    RowLayout {
+                        anchors.fill: parent; anchors.leftMargin: 12; spacing: 6
+                        Text { text: "⚡"; font.pixelSize: 12 }
+                        Text { text: "Performance"; color: window.cFg1; font.pixelSize: 13; font.weight: Font.DemiBold }
+                    }
+                }
+
+                Column {
+                    Layout.leftMargin: 12; Layout.rightMargin: 12; spacing: 3
+                    RowLayout { spacing: 4
+                        Text { text: "Cache hit:"; color: window.cFg2; font.pixelSize: 11 }
+                        Text { text: bridge.stats && bridge.stats.estimated_cache_hit_pct ? bridge.stats.estimated_cache_hit_pct + "%" : "—"; color: window.cGreen; font.family: "Consolas"; font.pixelSize: 11 }
+                    }
+                    RowLayout { spacing: 4
+                        Text { text: "Turns:"; color: window.cFg2; font.pixelSize: 11 }
+                        Text { text: bridge.stats && bridge.stats.turns ? bridge.stats.turns : "—"; color: window.cFg1; font.family: "Consolas"; font.pixelSize: 11 }
+                    }
+                }
             }
         }
 
         Item { Layout.fillHeight: true }
-
-        // Performance header
-        Rectangle {
-            Layout.fillWidth: true; implicitHeight: 32
-            color: root.cBg2; border.color: root.cBg3; border.width: 1
-            Text {
-                anchors.verticalCenter: parent.verticalCenter; anchors.left: parent.left; anchors.leftMargin: Theme.space_md
-                text: "\u26A1 Performance"; color: root.cFg1; font.pixelSize: Theme.font_size_sm; font.family: Theme.font_sans; font.weight: Font.DemiBold
-            }
-        }
-
-        ColumnLayout {
-            Layout.fillWidth: true; Layout.margins: Theme.space_md; spacing: Theme.space_xs
-            RowLayout {
-                spacing: Theme.space_sm
-                Text { text: "Cache hit:"; color: root.cFg2; font.family: Theme.font_sans; font.pixelSize: Theme.font_size_xs }
-                Text { text: bridge.stats && bridge.stats.cache_hit_pct ? bridge.stats.cache_hit_pct + "%" : "—"; color: root.cGreen; font.family: Theme.font_mono; font.pixelSize: Theme.font_size_xs }
-            }
-            RowLayout {
-                spacing: Theme.space_sm
-                Text { text: "Turns:"; color: root.cFg2; font.family: Theme.font_sans; font.pixelSize: Theme.font_size_xs }
-                Text { text: bridge.stats && bridge.stats.turns ? bridge.stats.turns : "—"; color: root.cFg1; font.family: Theme.font_mono; font.pixelSize: Theme.font_size_xs }
-            }
-            RowLayout {
-                spacing: Theme.space_sm
-                Text { text: "Messages:"; color: root.cFg2; font.family: Theme.font_sans; font.pixelSize: Theme.font_size_xs }
-                Text { text: bridge.stats && bridge.stats.messages ? bridge.stats.messages : "—"; color: root.cFg1; font.family: Theme.font_mono; font.pixelSize: Theme.font_size_xs }
-            }
-        }
-
-        Item { Layout.preferredHeight: Theme.space_sm }
     }
 }

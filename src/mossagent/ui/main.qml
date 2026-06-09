@@ -2,186 +2,90 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
-import "theme.js" as Theme
 
 ApplicationWindow {
     id: window
-    width: 1200
-    height: 760
-    minimumWidth: 800
-    minimumHeight: 500
+    width: 1200; height: 760
+    minimumWidth: 800; minimumHeight: 500
     visible: true
     title: "Corvus — Moss Agent"
 
-    // ── Color scheme ────────────────────────────────────────
-    property bool darkMode: true
-    property color cBg0:     darkMode ? Theme.bg0     : Theme.light_bg0
-    property color cBg1:     darkMode ? Theme.bg1     : Theme.light_bg1
-    property color cBg2:     darkMode ? Theme.bg2     : Theme.light_bg2
-    property color cBg3:     darkMode ? Theme.bg3     : Theme.light_bg3
-    property color cFg1:     darkMode ? Theme.fg1     : Theme.light_fg1
-    property color cFg2:     darkMode ? Theme.fg2     : Theme.light_fg2
-    property color cFg3:     darkMode ? Theme.fg3     : Theme.light_fg3
-    property color cAccent:  Theme.accent
-    property color cGreen:   Theme.green
-    property color cRed:     Theme.red
-    property color cAmber:   Theme.amber
-    property color cBlue:    Theme.blue
+    // ── Theme ──────────────────────────────────────────────
+    property bool darkMode: false
+
+    property color cBg0:     darkMode ? "#0d1117" : "#ffffff"
+    property color cBg1:     darkMode ? "#161b22" : "#f6f8fa"
+    property color cBg2:     darkMode ? "#21262d" : "#eaeef2"
+    property color cBg3:     darkMode ? "#30363d" : "#d0d7de"
+    property color cFg1:     darkMode ? "#e6edf3" : "#1f2328"
+    property color cFg2:     darkMode ? "#8b949e" : "#656d76"
+    property color cFg3:     darkMode ? "#484f58" : "#8c959f"
+    property color cAccent:  "#7c3aed"
+    property color cGreen:   darkMode ? "#3fb950" : "#1a7f37"
+    property color cRed:     darkMode ? "#f85149" : "#cf222e"
+    property color cAmber:   darkMode ? "#d29922" : "#9a6700"
+    property color cBlue:    darkMode ? "#58a6ff" : "#0969da"
 
     color: cBg0
 
-    // ── Header bar (Claude-style minimal top bar) ──────────
+    // ── Header ─────────────────────────────────────────────
     header: Rectangle {
-        height: 44
-        color: cBg1
-        border.color: cBg3
-        border.width: 1
-
+        height: 44; color: cBg1; border.color: cBg3; border.width: 1
         RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: Theme.space_md
-            anchors.rightMargin: Theme.space_md
-
-            // Logo area
-            Rectangle {
-                width: 28; height: 28; radius: 8
-                color: cAccent
-                Text {
-                    anchors.centerIn: parent
-                    text: "⟡"
-                    color: "white"
-                    font.pixelSize: 16
-                    font.family: Theme.font_sans
-                }
-            }
-
-            Text {
-                text: "Corvus"
-                color: cFg1
-                font.pixelSize: Theme.font_size_lg
-                font.family: Theme.font_sans
-                font.weight: Font.DemiBold
-            }
-
-            Text {
-                text: "Moss Agent · " + bridge.version.moss
-                color: cFg2
-                font.pixelSize: Theme.font_size_sm
-                font.family: Theme.font_sans
-            }
-
+            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
+            Rectangle { width: 28; height: 28; radius: 8; color: cAccent
+                Text { anchors.centerIn: parent; text: "⟡"; color: "white"; font.pixelSize: 16 } }
+            Text { text: "Corvus"; color: cFg1; font.pixelSize: 16; font.weight: Font.DemiBold }
+            Text { text: "Moss Agent"; color: cFg2; font.pixelSize: 12 }
             Item { Layout.fillWidth: true }
-
-            // Quick actions
-            RowLayout {
-                spacing: Theme.space_sm
-                
-                // Dark/light toggle
-                Rectangle {
-                    width: 32; height: 32; radius: 8
-                    color: darkMode ? cBg2 : cBg2
-                    border.color: cBg3
-                    Text {
-                        anchors.centerIn: parent
-                        text: darkMode ? "☀" : "🌙"
-                        font.pixelSize: 14
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: darkMode = !darkMode
-                    }
-                }
+            // Theme toggle
+            Rectangle { width: 32; height: 32; radius: 8; color: cBg2; border.color: cBg3
+                Text { anchors.centerIn: parent; text: darkMode ? "☀" : "🌙"; font.pixelSize: 14 }
+                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: darkMode = !darkMode }
             }
         }
     }
 
-    // ── Two-panel body: Chat (center) + Tools (right) ──────
-    RowLayout {
-        anchors.fill: parent
-        spacing: 0
+    // ── Title bar text (read by bridge) ────────────────────
+    property string statusText: "Ready"
 
-        // CENTER: Chat panel — main interaction area
+    // ── Two-panel body ─────────────────────────────────────
+    RowLayout {
+        anchors.fill: parent; spacing: 0
+
         ChatPanel {
             id: chatPanel
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.minimumWidth: 300
+            Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumWidth: 300
         }
 
-        // Divider
         Rectangle {
-            width: 1
-            Layout.fillHeight: true
-            color: cBg3
+            width: 1; Layout.fillHeight: true; color: cBg3
         }
 
-        // RIGHT: Workspace + Detail stacked vertically
         ColumnLayout {
-            Layout.preferredWidth: Theme.detail_w
-            Layout.minimumWidth: Theme.min_panel
-            Layout.fillHeight: true
-            spacing: 0
+            Layout.preferredWidth: 300; Layout.minimumWidth: 200; Layout.fillHeight: true; spacing: 0
 
             WorkspacePanel {
                 id: workspacePanel
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredHeight: parent ? parent.height * 0.55 : 300
+                Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredHeight: parent ? parent.height * 0.55 : 300
             }
-
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: cBg3
-            }
-
+            Rectangle { Layout.fillWidth: true; height: 1; color: cBg3 }
             DetailPanel {
                 id: detailPanel
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredHeight: parent ? parent.height * 0.45 : 200
+                Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredHeight: parent ? parent.height * 0.45 : 200
             }
         }
     }
 
-    // ── Status bar (bottom) ─────────────────────────────────
+    // ── Status bar ─────────────────────────────────────────
     footer: Rectangle {
-        height: 28
-        color: cBg1
-        border.color: cBg3
-        border.width: 1
-
+        height: 28; color: cBg1; border.color: cBg3; border.width: 1
         RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: Theme.space_md
-            anchors.rightMargin: Theme.space_md
-            spacing: Theme.space_lg
-
-            Text {
-                text: bridge.version.moss
-                color: cFg3
-                font.pixelSize: Theme.font_size_xs
-                font.family: Theme.font_mono
-            }
-            Text {
-                text: "·"
-                color: cFg3
-            }
-            Text {
-                id: statusText
-                text: "Ready"
-                color: cFg2
-                font.pixelSize: Theme.font_size_xs
-                font.family: Theme.font_sans
-            }
+            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 16
+            Text { text: bridge.version.moss; color: cFg3; font.pixelSize: 11; font.family: "Consolas" }
+            Text { text: "·"; color: cFg3 }
+            Text { text: window.statusText; color: cFg2; font.pixelSize: 11 }
             Item { Layout.fillWidth: true }
-            Text {
-                text: bridge.stats && bridge.stats.cache_hit ? bridge.stats.cache_hit : ""
-                color: cFg3
-                font.pixelSize: Theme.font_size_xs
-                font.family: Theme.font_mono
-            }
         }
     }
 
@@ -196,16 +100,11 @@ ApplicationWindow {
             detailPanel.updateGate(name, status)
         }
         function onProgressChanged(msg) {
-            statusText.text = msg
-            // Check if this is a task result JSON
+            window.statusText = msg
             try {
                 var result = JSON.parse(msg)
-                if (result.summary) {
-                    detailPanel.showResult(result)
-                }
-            } catch(e) {
-                // not JSON, just a status message
-            }
+                if (result.summary) detailPanel.showResult(result)
+            } catch(e) {}
         }
     }
 
