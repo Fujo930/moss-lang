@@ -31,24 +31,6 @@ ApplicationWindow {
 
     color: cBg0
 
-    // ── Header ─────────────────────────────────────────────
-    header: Rectangle {
-        height: 44; color: cBg1; border.color: cBg3; border.width: 1
-        RowLayout {
-            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
-            Rectangle { width: 28; height: 28; radius: 8; color: cAccent
-                Text { anchors.centerIn: parent; text: "⟡"; color: "white"; font.pixelSize: 16 } }
-            Text { text: "Corvus"; color: cFg1; font.pixelSize: 16; font.weight: Font.DemiBold }
-            Text { text: "Moss Agent"; color: cFg2; font.pixelSize: 12 }
-            Item { Layout.fillWidth: true }
-            // Theme toggle
-            Rectangle { width: 32; height: 32; radius: 8; color: cBg2; border.color: cBg3
-                Text { anchors.centerIn: parent; text: darkMode ? "☀" : "🌙"; font.pixelSize: 14 }
-                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: darkMode = !darkMode }
-            }
-        }
-    }
-
     // ── Title bar text (read by bridge) ────────────────────
     property string statusText: "Ready"
 
@@ -68,18 +50,6 @@ ApplicationWindow {
         WorkspacePanel {
             id: workspacePanel
             Layout.preferredWidth: 280; Layout.minimumWidth: 200; Layout.fillHeight: true
-        }
-    }
-
-    // ── Status bar ─────────────────────────────────────────
-    footer: Rectangle {
-        height: 28; color: cBg1; border.color: cBg3; border.width: 1
-        RowLayout {
-            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 16
-            Text { text: bridge.version.moss; color: cFg3; font.pixelSize: 11 }
-            Text { text: "·"; color: cFg3 }
-            Text { text: window.statusText; color: cFg2; font.pixelSize: 11 }
-            Item { Layout.fillWidth: true }
         }
     }
 

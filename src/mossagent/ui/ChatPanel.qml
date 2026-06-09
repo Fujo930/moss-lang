@@ -26,30 +26,71 @@ Rectangle {
             model: chatModel; boundsBehavior: Flickable.StopAtBounds
             bottomMargin: 64  // space for floating input bar
 
-            // Empty state: welcome message, centered
-            Rectangle {
+            // Empty state: multilingual welcome — Canvas ellipse
+            Canvas {
                 anchors.fill: parent
-                color: "transparent"
                 visible: chatModel.count === 0
 
-                Column {
-                    anchors.centerIn: parent
-                    spacing: 6
+                property var languages: [
+                    "Bonjour, l'ère de l'IA",
+                    "Hallo, KI-Zeitalter",
+                    "こんにちは、AI時代",
+                    "안녕, AI 시대",
+                    "Hola, era de la IA",
+                    "Olá, era da IA",
+                    "Ciao, era dell'IA",
+                    "Привет, эпоха ИИ",
+                    "مرحباً، عصر الذكاء",
+                    "Hallå, AI-eran",
+                    "Hej, AI-tidsalder",
+                    "नमस्ते, AI युग",
+                    "שלום, עידן ה-AI",
+                    "Salut, ère de l'IA",
+                    "สวัสดี, ยุค AI",
+                    "Ahoj, éro AI",
+                    "Γεια, εποχή AI",
+                    "Merhaba, YZ çağı",
+                    "Xin chào, kỷ nguyên AI",
+                    "Hei, AI-aikakausi"
+                ]
 
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "你好，AI时代"
-                        color: window.cFg1
-                        font.pixelSize: 28
-                        font.weight: Font.Light
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+
+                    var cx = width / 2
+                    var cy = height / 2
+
+                    // Main titles
+                    ctx.fillStyle = window.darkMode ? "#e6edf3" : "#1f2328"
+                    ctx.font = "300 28px 'Segoe UI'"
+                    ctx.textAlign = "center"
+                    ctx.fillText("你好，AI时代", cx, cy - 6)
+
+                    ctx.fillStyle = window.darkMode ? "#8b949e" : "#656d76"
+                    ctx.font = "300 20px 'Segoe UI'"
+                    ctx.fillText("Hi, AI Time", cx, cy + 24)
+
+                    // Surrounding languages — elliptical ring
+                    var radX = Math.min(width * 0.38, 340)
+                    var radY = Math.min(height * 0.36, 155)
+                    var count = languages.length
+
+                    for (var i = 0; i < count; i++) {
+                        var angle = (i / count) * Math.PI * 2 - Math.PI / 2
+                        var x = cx + Math.cos(angle) * radX
+                        var y = cy + Math.sin(angle) * radY
+
+                        var sinVal = Math.sin(angle)
+                        var opac = 0.22 + Math.abs(sinVal) * 0.18
+
+                        ctx.globalAlpha = opac
+                        ctx.fillStyle = window.darkMode ? "#8b949e" : "#656d76"
+                        ctx.font = "300 " + Math.round(10 + Math.abs(sinVal) * 3) + "px 'Segoe UI'"
+                        ctx.textAlign = "center"
+                        ctx.fillText(languages[i], x, y)
                     }
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "Hi, AI Time"
-                        color: window.cFg2
-                        font.pixelSize: 20
-                        font.weight: Font.Light
-                    }
+                    ctx.globalAlpha = 1.0
                 }
             }
 
