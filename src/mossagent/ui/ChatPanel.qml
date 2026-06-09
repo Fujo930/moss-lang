@@ -7,14 +7,28 @@ import "theme.js" as Theme
 
 Rectangle {
     id: root
-    color: parent ? parent.cBg0 : Theme.bg0
+    color: Theme.bg0
+
+    // Self-contained color properties
+    property color cBg0: Theme.bg0
+    property color cBg1: Theme.bg1
+    property color cBg2: Theme.bg2
+    property color cBg3: Theme.bg3
+    property color cFg1: Theme.fg1
+    property color cFg2: Theme.fg2
+    property color cFg3: Theme.fg3
+    property color cAccent: Theme.accent
+    property color cGreen: Theme.green
+    property color cRed: Theme.red
+    property color cAmber: Theme.amber
+    property color cBlue: Theme.blue
 
     property var messages: []
     property bool typing: false
 
     function addMessage(role, content, toolCall) {
         messages.push({role: role, content: content, toolCall: toolCall || null, time: new Date()})
-        messages = messages  // trigger binding refresh
+        messages = messages
         messageList.positionViewAtEnd()
     }
 
@@ -22,7 +36,6 @@ Rectangle {
         anchors.fill: parent
         spacing: 0
 
-        // ── Message list ────────────────────────────────────
         ListView {
             id: messageList
             Layout.fillWidth: true
@@ -42,7 +55,6 @@ Rectangle {
                     x: Theme.space_lg
                     spacing: Theme.space_xs
 
-                    // Role label
                     Text {
                         text: modelData.role === "user" ? "You" : 
                               modelData.role === "system" ? "System" : "Corvus"
@@ -53,7 +65,6 @@ Rectangle {
                         font.weight: Font.DemiBold
                     }
 
-                    // Message bubble
                     Rectangle {
                         Layout.fillWidth: true
                         implicitHeight: messageText.implicitHeight + Theme.space_md * 2
@@ -75,13 +86,12 @@ Rectangle {
                             text: modelData.content
                             color: root.cFg1
                             font.pixelSize: Theme.font_size_md
-                            font.family: modelData.role === "system" ? Theme.font_mono : Theme.font_sans
+                            font.family: Theme.font_sans
                             wrapMode: Text.WordWrap
-                            textFormat: modelData.role === "system" ? Text.PlainText : Text.RichText
                         }
                     }
 
-                    // Tool call card (Reasonix-style expandable)
+                    // Tool call card
                     Rectangle {
                         visible: modelData.toolCall !== null && modelData.toolCall !== undefined
                         Layout.fillWidth: true
@@ -100,10 +110,7 @@ Rectangle {
 
                             RowLayout {
                                 spacing: Theme.space_sm
-                                Text {
-                                    text: "🔧"
-                                    font.pixelSize: Theme.font_size_sm
-                                }
+                                Text { text: "\uD83D\uDD27"; font.pixelSize: Theme.font_size_sm }
                                 Text {
                                     text: modelData.toolCall ? modelData.toolCall.tool || "tool" : ""
                                     color: root.cBlue
@@ -113,7 +120,7 @@ Rectangle {
                                 }
                                 Text {
                                     text: modelData.toolCall && modelData.toolCall.ok !== undefined ? 
-                                          (modelData.toolCall.ok ? "✅" : "❌") : ""
+                                          (modelData.toolCall.ok ? "\u2705" : "\u274C") : ""
                                     font.pixelSize: Theme.font_size_sm
                                 }
                             }
@@ -133,7 +140,6 @@ Rectangle {
                 }
             }
 
-            // ── Typing indicator (Claude-style bouncing dots) ─
             footer: Item {
                 width: messageList.width
                 height: root.typing ? 40 : 0
@@ -153,21 +159,6 @@ Rectangle {
                             Rectangle {
                                 width: 6; height: 6; radius: 3
                                 color: root.cFg2
-                                y: bounceAnimation.running ? bounceAnimation.value * 6 : 0
-
-                                NumberAnimation on y {
-                                    id: bounceAnimation
-                                    running: root.typing
-                                    from: 0; to: -6
-                                    duration: 400
-                                    loops: Animation.Infinite
-                                    easing.type: Easing.OutBounce
-                                }
-                                SequentialAnimation {
-                                    running: root.typing
-                                    PauseAnimation { duration: index * 150 }
-                                    ScriptAction { script: bounceAnimation.restart() }
-                                }
                             }
                         }
                     }
@@ -175,7 +166,7 @@ Rectangle {
             }
         }
 
-        // ── Input area (Claude-style bottom input) ──────────
+        // Input area
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: 56
@@ -197,16 +188,11 @@ Rectangle {
                     color: root.cFg1
                     font.pixelSize: Theme.font_size_md
                     font.family: Theme.font_sans
-                    background: Rectangle {
-                        color: "transparent"
-                    }
+                    background: Rectangle { color: "transparent" }
                     wrapMode: TextArea.Wrap
 
                     Keys.onReturnPressed: {
-                        if (event.modifiers & Qt.ShiftModifier) {
-                            // Shift+Enter = newline
-                            return
-                        }
+                        if (event.modifiers & Qt.ShiftModifier) return
                         var text = chatInput.text.trim()
                         if (text.length > 0) {
                             root.addMessage("user", text, null)
@@ -216,19 +202,11 @@ Rectangle {
                     }
                 }
 
-                // Send button
                 Rectangle {
                     width: 36; height: 36; radius: 18
                     color: root.cAccent
                     opacity: chatInput.text.trim().length > 0 ? 1.0 : 0.4
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "→"
-                        color: "white"
-                        font.pixelSize: 18
-                    }
-
+                    Text { anchors.centerIn: parent; text: "\u2192"; color: "white"; font.pixelSize: 18 }
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
