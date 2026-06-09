@@ -189,6 +189,17 @@ def main(argv: list[str] | None = None) -> int:
     keygen_cmd = sub.add_parser("keygen", help="generate a signing key for Trust Artifacts")
     keygen_cmd.add_argument("--output", "-o", type=Path, default=Path("moss.key"), help="output key file")
 
+    # ── Token Artifact ──
+    token_cmd = sub.add_parser("token", help="produce a Token Artifact (alias: token-artifact)")
+    token_cmd.add_argument("file", type=Path)
+    token_cmd.add_argument("--output", "-o", type=Path, help="write token artifact to file")
+    token_cmd.add_argument("--level", choices=("brief", "normal", "full"), default="normal",
+                           help="detail level (brief: ~10 tokens, normal: ~20, full: ~50)")
+
+    token_diff_cmd = sub.add_parser("token-diff", help="diff two Moss files or Token Artifacts")
+    token_diff_cmd.add_argument("file_a", type=Path, help="first file (.moss or .json)")
+    token_diff_cmd.add_argument("file_b", type=Path, help="second file (.moss or .json)")
+
     run_vm_cmd = sub.add_parser("run-vm", help="execute compiled bytecode module")
     run_vm_cmd.add_argument("file", type=Path)
     run_vm_cmd.add_argument("--source-root", type=Path, help="source root for resolving imports")
@@ -256,6 +267,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "keygen":
             return run_keygen(args.output)
+
+        if args.command in ("token", "token-artifact"):
+            return run_token_artifact(args.file, output=args.output, level=args.level)
+
+        if args.command == "token-diff":
+            return run_token_diff(args.file_a, args.file_b)
 
         if args.command == "trace-graph":
             return run_trace_graph(args.file)
@@ -1612,6 +1629,177 @@ def _build_summary_json(bundle: dict, version: str, source_hash: str) -> str:
         "g": bundle.get("golden", {}).get("ok"),
         "sh": bundle.get("selfhost", {}).get("ok"),
     }, indent=2)
+
+
+# ── Token Artifact ────────────────────────────────────────────────
+
+TA_TOKEN_FORMAT = "ta.v1"
+
+
+def _token_artifact_brief(bundle: dict, source_path: Path, source_hash: str) -> dict:
+    """Level brief: ~10-15 tokens. Structure signature only."""
+    chk = bundle.get("check", {})
+    chk_sum = chk.get("summary", {})
+    trace_ev = bundle.get("trace", {}).get("events", [])
+    rules_out = [
+        {"n": e.get("rule", "?"), "io": f"{list(e.get('arguments',{}).values())[:1]}→{e.get('result','?')}"}
+        for e in trace_ev[:3]
+    ] if trace_ev else None
+    return {
+        "ta": TA_TOKEN_FORMAT,
+        "v": __version__,
+        "f": source_path.stem,
+        "h": source_hash[:12],
+        "c": {"e": chk_sum.get("effects", 0), "t": chk_sum.get("types", 0), "l": chk_sum.get("callables", 0)},
+        "r": rules_out,
+        "t": bundle["trust"],
+    }
+
+
+def _token_artifact_normal(bundle: dict, source_path: Path, source_hash: str) -> dict:
+    """Level normal: ~20-30 tokens. All gates, rule details, externs."""
+    chk = bundle.get("check", {})
+    chk_sum = chk.get("summary", {})
+    trace_ev = bundle.get("trace", {}).get("events", [])
+    rule_details = [{
+        "n": e.get("rule", "?"),
+        "in": {k: str(v)[:32] for k, v in (e.get("arguments", {}) or {}).items()},
+        "o": str(e.get("result", "?"))[:32],
+        "at": f"{e.get('file','')}:{e.get('line',0)}",
+    } for e in trace_ev] if trace_ev else None
+    return {
+        "ta": TA_TOKEN_FORMAT,
+        "v": __version__,
+        "f": source_path.name,
+        "h": source_hash[:16],
+        "c": {"e": chk_sum.get("effects", 0), "t": chk_sum.get("types", 0), "l": chk_sum.get("callables", 0)},
+        "r": rule_details,
+        "g": bundle.get("golden", {}).get("ok"),
+        "s": bundle.get("selfhost", {}).get("ok"),
+        "t": bundle["trust"],
+    }
+
+
+def _token_artifact_full(bundle: dict, source_path: Path, source_hash: str) -> dict:
+    """Level full: structured like a summary but with rule signatures."""
+    return _build_summary_json(bundle, __version__, source_hash)
+
+
+def _build_token_artifact(bundle: dict, source_path: Path, source_hash: str, level: str) -> str:
+    if level == "brief":
+        payload = _token_artifact_brief(bundle, source_path, source_hash)
+    elif level == "full":
+        return _token_artifact_full(bundle, source_path, source_hash)
+    else:
+        payload = _token_artifact_normal(bundle, source_path, source_hash)
+    return json.dumps(payload, indent=2 if level == "brief" else 2)
+
+
+def run_token_artifact(path: Path, *, output: Path | None = None, level: str = "normal") -> int:
+    """Produce a Token Artifact: AI-optimized structural summary of a Moss file."""
+    import hashlib
+    source = path.read_text(encoding="utf-8-sig")
+    source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    try:
+        program = parse_source(source)
+        diagnostics = check_program(program)
+        chk_errors = [d for d in diagnostics if d.level == "error"]
+        rule_count = sum(1 for item in program.items if type(item).__name__ == "RuleDecl")
+        bundle: dict = {
+            "artifact": f"Moss Token Artifact v{__version__}",
+            "trust": len(chk_errors) == 0,
+            "check": {
+                "ok": len(chk_errors) == 0,
+                "diagnostics": [
+                    {"level": d.level, "message": d.message,
+                     "line": d.location.line if d.location else None}
+                    for d in diagnostics
+                ],
+                "summary": {
+                    "effects": sum(1 for item in program.items if type(item).__name__ == "EffectDecl"),
+                    "types": sum(1 for item in program.items if type(item).__name__ == "TypeDecl"),
+                    "callables": sum(1 for item in program.items if type(item).__name__ in ("RuleDecl", "FunctionDecl", "PythonExternDecl")),
+                },
+            },
+        }
+        if not chk_errors and rule_count > 0:
+            vm = VM(output=lambda _: None, base_path=path.parent, trace_rules=True)
+            mod = compile_program(program, source_path=str(path.resolve()))
+            vm.load_module(mod)
+            vm.run()
+            bundle["trace"] = {"ok": True, "events": [portable_trace_event(e) for e in vm.trace_events]}
+        if not chk_errors:
+            buf = StringIO()
+            vm_out = VM(output=buf.write, base_path=path.parent)
+            mod_out = compile_program(program, source_path=str(path.resolve()))
+            vm_out.load_module(mod_out)
+            vm_out.run()
+            golden_path = path.with_suffix(path.suffix + ".golden")
+            if golden_path.is_file():
+                expected = golden_path.read_text(encoding="utf-8")
+                bundle["golden"] = {"ok": buf.getvalue() == expected}
+            else:
+                bundle["golden"] = {"ok": None}
+        details = compare_selfhost_details(path)
+        bundle["selfhost"] = {"ok": details["ok"]}
+    except Exception as exc:
+        bundle = {"trust": False, "check": {"ok": False, "diagnostics": [], "summary": {"effects": 0, "types": 0, "callables": 0}},
+                  "trace": {}, "golden": {}, "selfhost": {}, "_error": str(exc)}
+    result = _build_token_artifact(bundle, path, source_hash, level)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(result, encoding="utf-8")
+        print(f"token artifact written: {output}")
+    else:
+        print(result)
+    return 0 if bundle.get("trust") else 1
+
+
+def run_token_diff(path_a: Path, path_b: Path) -> int:
+    """Diff two Moss files (or Token Artifacts) showing only what changed."""
+    import hashlib
+
+    def _token_summary(p: Path) -> dict:
+        if p.suffix == ".json":
+            bundle = json.loads(p.read_text(encoding="utf-8"))
+            return {
+                "check": bundle.get("check", {}).get("ok"),
+                "trust": bundle.get("trust"),
+                "golden": bundle.get("golden", {}).get("ok"),
+                "selfhost": bundle.get("selfhost", {}).get("ok"),
+                "hash": bundle.get("source_sha256", "")[:16],
+            }
+        source = p.read_text(encoding="utf-8-sig")
+        src_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        program = parse_source(source)
+        diagnostics = check_program(program)
+        return {
+            "check": not any(d.level == "error" for d in diagnostics),
+            "trust": not any(d.level == "error" for d in diagnostics),
+            "effects": sum(1 for item in program.items if type(item).__name__ == "EffectDecl"),
+            "types": sum(1 for item in program.items if type(item).__name__ == "TypeDecl"),
+            "callables": sum(1 for item in program.items if type(item).__name__ in ("RuleDecl", "FunctionDecl", "PythonExternDecl")),
+            "hash": src_hash[:16],
+            "lines": len(source.splitlines()),
+        }
+
+    a_info = _token_summary(path_a)
+    b_info = _token_summary(path_b)
+
+    diffs = {}
+    for key in set(list(a_info.keys()) + list(b_info.keys())):
+        av = a_info.get(key)
+        bv = b_info.get(key)
+        if av != bv:
+            diffs[key] = {"from": av, "to": bv}
+
+    result = {
+        "files": [path_a.name, path_b.name],
+        "changed": list(diffs.keys()),
+        "details": diffs,
+    }
+    print(json.dumps(result, indent=2))
+    return 0
 
 
 def _find_lock(path: Path) -> Path | None:
