@@ -73,8 +73,9 @@ def token_from_source(source: str, *, level: str = "normal") -> dict:
     source_sha256 = hashlib.sha256(source.encode("utf-8")).hexdigest()
 
     cache_key = f"token.{level}.{source_sha256[:32]}"
-    if cache_key in _token_cache:
-        return dict(_token_cache[cache_key])
+    cached = _cache_get(_token_cache, _token_cache_lru, cache_key)
+    if cached:
+        return dict(cached)
     from mosslang.checker import check_program
 
     try:
@@ -117,8 +118,7 @@ def token_from_source(source: str, *, level: str = "normal") -> dict:
                 for d in diagnostics if d.level == "error" and d.hint
             ]
 
-    if len(_token_cache) < _TRUST_CACHE_LIMIT:
-        _token_cache[cache_key] = result
+    _cache_put(_token_cache, _token_cache_lru, cache_key, result, limit=_TRUST_CACHE_LIMIT)
     return result
 
 
@@ -131,8 +131,9 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
 
     # Check cache
     cache_key = source_sha256[:32]
-    if cache_key in _trust_cache:
-        result = dict(_trust_cache[cache_key])
+    cached = _cache_get(_trust_cache, _trust_cache_lru, cache_key)
+    if cached:
+        result = dict(cached)
         result["cached"] = True
         return result
 
@@ -186,7 +187,7 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
         bundle["gates_total"] = 5
         bundle["failed_gates"] = ["check"]
         bundle["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
-        _trust_cache[cache_key] = bundle
+        _cache_put(_trust_cache, _trust_cache_lru, cache_key, bundle, limit=_TRUST_CACHE_LIMIT)
         return bundle
 
     # 2. Trace gate
@@ -256,8 +257,7 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
     bundle["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
 
     # Cache the result
-    if len(_trust_cache) < _TRUST_CACHE_LIMIT:
-        _trust_cache[cache_key] = bundle
+    _cache_put(_trust_cache, _trust_cache_lru, cache_key, bundle, limit=_TRUST_CACHE_LIMIT)
     return bundle
 
 
@@ -271,7 +271,7 @@ def make_trust_handler() -> type[BaseHTTPRequestHandler]:
                     "status": "ok",
                     "moss": __import__("mosslang").__version__,
                     "cached_entries": len(_trust_cache),
-                    "server": "MossTrustServer/alpha(t)2",
+                    "server": "MossTrustServer/alpha(t)3",
                 })
             else:
                 self.send_error(HTTPStatus.NOT_FOUND)
@@ -397,7 +397,7 @@ def run_trust_server(host: str = "127.0.0.1", port: int = 9876) -> None:
     server = ThreadingHTTPServer((host, port), make_trust_handler())
     address = f"http://{host}:{server.server_port}"
     print(f"Moss Trust Server running at {address}")
-    print(f"Endpoints: POST /api/trust  POST /api/token?level=  GET /api/health")
+    print(f"Endpoints: POST /api/trust  POST /api/token?level=  POST /api/trust-batch  GET /api/health")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
