@@ -16,6 +16,11 @@
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 /* strndup polyfill for C99 (POSIX function) */
 static char *strndup(const char *s, size_t n) {
@@ -1128,8 +1133,54 @@ static Value *vm_resolve_global(VM *vm, int idx) {
 
 /* ── Main ──────────────────────────────────────────────────────────── */
 
+static void vm_load_module_file(VM *vm, const char *path) {
+    vm_load(vm, path);
+}
+
+/* Find directory containing mossvm.exe */
+static void find_exe_dir(char *buf, size_t len) {
+    buf[0] = 0;
+#ifdef _WIN32
+    GetModuleFileNameA(NULL, buf, (DWORD)len);
+    char *slash = strrchr(buf, '\\');
+    if (slash) *slash = 0;
+#else
+    /* Linux: read /proc/self/exe */
+    ssize_t n = readlink("/proc/self/exe", buf, len - 1);
+    if (n > 0) { buf[n] = 0; char *slash = strrchr(buf, '/'); if (slash) *slash = 0; }
+#endif
+}
+
 int main(int argc, char *argv[]) {
-    if (argc < 2) { fprintf(stderr, "usage: mossvm program.mbc [--source file.moss]\n"); return 1; }
+    if (argc < 2) {
+        fprintf(stderr, "Moss VM v0.99 — C VM with embedded selfhost modules\n");
+        fprintf(stderr, "usage:\n");
+        fprintf(stderr, "  mossvm program.mbc           run bytecode\n");
+        fprintf(stderr, "  mossvm --source file.moss     compile via Python + run\n");
+        fprintf(stderr, "  mossvm --modules              load embedded .mbc modules + show stats\n");
+        return 1;
+    }
+
+    /* --modules: load embedded modules from ./moss_modules/ */
+    if (strcmp(argv[1], "--modules") == 0) {
+        char exe_dir[512];
+        find_exe_dir(exe_dir, sizeof(exe_dir));
+        fprintf(stderr, "mossvm: loading embedded modules from %s/moss_modules/\n", exe_dir);
+        const char *modules[] = {"lexer_core.mbc", "parser_core.mbc", "compiler_core.mbc"};
+        for (int i = 0; i < 3; i++) {
+            char path[512];
+            snprintf(path, sizeof(path), "%s/moss_modules/%s", exe_dir, modules[i]);
+            VM mod_vm = {0};
+            if (vm_load(&mod_vm, path)) {
+                fprintf(stderr, "  loaded %s (%d instructions, %d functions)\n",
+                        modules[i], mod_vm.insts.length, func_registry_count);
+            } else {
+                fprintf(stderr, "  NOT FOUND: %s\n", modules[i]);
+            }
+        }
+        fprintf(stderr, "mossvm: selfhost modules ready (%d functions registered)\n", func_registry_count);
+        return 0;
+    }
 
     const char *input = argv[1];
     char temp_mbc[256] = "";
@@ -1138,16 +1189,13 @@ int main(int argc, char *argv[]) {
     /* --source mode: compile .moss via Python CLI, then run */
     if (argc >= 3 && strcmp(argv[1], "--source") == 0) {
         input = argv[2];
-        /* Check if it's a .moss file (not .mbc) */
         const char *dot = strrchr(input, '.');
         if (dot && strcmp(dot, ".moss") == 0) {
-            /* Auto-compile via moss CLI */
             snprintf(temp_mbc, sizeof(temp_mbc), "%s.mbc_tmp", input);
             char cmd[1024];
             snprintf(cmd, sizeof(cmd), "python -m mosslang.cli compile \"%s\" -o \"%s\" 2>nul", input, temp_mbc);
             int ret = system(cmd);
             if (ret != 0) {
-                /* Try pip-installed moss */
                 snprintf(cmd, sizeof(cmd), "moss compile \"%s\" -o \"%s\" 2>nul", input, temp_mbc);
                 ret = system(cmd);
             }

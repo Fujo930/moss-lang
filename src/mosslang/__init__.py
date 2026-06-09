@@ -1,3 +1,3 @@
 """Moss language prototype package — ds-Mosslang experimental branch."""
 
-__version__ = "0.95.0"
+__version__ = "0.99.0"

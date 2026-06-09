@@ -133,7 +133,7 @@ def trust_artifact_cvm(source_path: str | Path) -> dict:
         try:
             c_out, code = compile_and_run(source_path)
             bundle["golden"] = {
-                "ok": py_out.rstrip() == c_out.rstrip(),
+                "ok": py_out.strip().replace('\r','') == c_out.strip().replace('\r',''),
                 "python": py_out,
                 "c_vm": c_out,
             }
@@ -204,11 +204,11 @@ def native_artifact(source_path: str | Path) -> dict:
         vm_py.load_module(mod2)
         vm_py.run()
         py_out = py_buf.getvalue()
-        bundle["golden"] = {"ok": py_out.rstrip() == c_out.rstrip(), "python": py_out.strip(), "c_vm": c_out.strip()}
+        bundle["golden"] = {"ok": py_out.strip().replace('\r','') == c_out.strip().replace('\r',''), "python": py_out.strip(), "c_vm": c_out.strip()}
     except Exception:
         bundle["golden"] = {"ok": False}
 
-    if bundle["golden"]["ok"] == False:
+    if not bundle["golden"]["ok"]:
         bundle["trust"] = False
 
     return bundle
