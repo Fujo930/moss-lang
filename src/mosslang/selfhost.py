@@ -479,7 +479,13 @@ def moss_compiler_to_module(moss_output: dict, source_path: str) -> "BytecodeMod
     moss_functions = moss_output.get("functions", {})
     if isinstance(moss_functions, dict):
         for fn_name, fn_body in moss_functions.items():
-            # Build a simple CodeObject for each function
+            if isinstance(fn_body, dict) and "instructions" in fn_body:
+                # v0.85+: Moss compiler produces compiled function body
+                # NOTE: Moss functions don't handle full param registration yet.
+                # For now, compile functions through Python compiler for correctness.
+                pass
+            # Fallback for all functions: create stub CodeObject
+            # (real function compilation uses Python compiler in hybrid mode)
             fn_co = CodeObject(
                 name=str(fn_name),
                 arg_count=0,
@@ -488,6 +494,7 @@ def moss_compiler_to_module(moss_output: dict, source_path: str) -> "BytecodeMod
                 locals=["__self"],
             )
             module.functions[str(fn_name)] = fn_co
-            module.globals.append(str(fn_name))
+            if str(fn_name) not in module.globals:
+                module.globals.append(str(fn_name))
 
     return module

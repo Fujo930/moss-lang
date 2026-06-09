@@ -396,12 +396,9 @@ fn compileStmt(st: CompilerState, stmt: Any) -> CompilerState {
 
 // ── Function/rule compilation ──
 
-fn compileFunction(st: CompilerState, node: Any) -> CompilerState {
+fn compileFunction(node: Any) -> Any {
+  st = newState()
   name = node.name
-  // Register params as locals
-  value = node.value
-  // Simple param extraction from value text: "(name: Type, ...) -> ... {"
-  // Skip: register placeholder local for each param
   body = node.data
   st = registerLocal(st, "__self")
   i = 0
@@ -410,7 +407,18 @@ fn compileFunction(st: CompilerState, node: Any) -> CompilerState {
     i = i + 1
   }
   st = emit(st, OP_LOAD_NULL, 0)
-  return emit(st, OP_RETURN, 0)
+  st = emit(st, OP_RETURN, 0)
+  return {
+    instructions: st.instructions,
+    constants: st.constants,
+    locals: st.locals,
+    globals: st.globals,
+    arg_count: 0,
+    functions: st.functions,
+    tests: st.tests,
+    effects: st.effects,
+    imports: st.imports
+  }
 }
 
 // ── Main compile function ──
@@ -444,12 +452,11 @@ fn compileProgram(nodes: List<Any>) -> Any {
     kind = node.kind
 
     if kind == "Function" {
-      // Compile function body into a separate code object stored in functions map
-      st = st with functions = mapPut(st.functions, node.name, node.data)
+      compiled = compileFunction(node)
+      st = st with functions = mapPut(st.functions, node.name, compiled)
     }
 
     if kind == "Rule" {
-      // Rule body is a single expression — compile inline
       if node.data != null {
         st = compileExpr(st, node.data)
         st = emit(st, OP_RETURN, 0)
@@ -457,8 +464,8 @@ fn compileProgram(nodes: List<Any>) -> Any {
     }
 
     if kind == "Test" {
-      body = node.data
-      st = st with functions = mapPut(st.functions, node.name, node.data)
+      compiled = compileFunction(node)
+      st = st with functions = mapPut(st.functions, node.name, compiled)
       st = st with tests = listPush(st.tests, node.name)
     }
 

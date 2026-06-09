@@ -911,70 +911,44 @@ def run_selfhost_run(path: Path) -> int:
 
 
 def run_selfhost_compile(path: Path, *, output: Path | None = None) -> int:
-    """Compile Moss source through Moss compiler → report instruction metrics.
-    
-    Full selfhost compile (Moss instructions replacing Python's) is WIP.
-    v0.80 delivers: Moss compiler → dict → serializable bytes, with metrics."""
-    import subprocess, struct, io, json as _json
+    """Compile through Moss compiler → metrics + Python-compiled .mbc for execution."""
+    import subprocess
 
     source = path.read_text(encoding="utf-8-sig")
-    try:
-        program = parse_source(source)
+    try: program = parse_source(source)
     except MossError as exc:
-        print(f"parse error: {exc}", file=sys.stderr)
-        return 1
+        print(f"parse error: {exc}", file=sys.stderr); return 1
 
     from .selfhost import SelfHostFrontend
     sf = SelfHostFrontend()
-    try:
-        moss_output = sf.compile_with_moss(source)
+    try: moss_out = sf.compile_with_moss(source)
     except Exception as e:
-        print(f"moss compiler error: {e}", file=sys.stderr)
-        return 1
+        print(f"moss compiler error: {e}", file=sys.stderr); return 1
 
-    moss_insts = moss_output.get('instructions', [])
-    moss_consts = moss_output.get('constants', [])
-    moss_globals = moss_output.get('globals', [])
-    moss_funcs = moss_output.get('functions', {})
+    moss_insts = moss_out.get('instructions', [])
+    moss_funcs = moss_out.get('functions', {})
+    func_metrics = {}
+    if isinstance(moss_funcs, dict):
+        for k, v in moss_funcs.items():
+            if isinstance(v, dict) and 'instructions' in v:
+                func_metrics[k] = len(v['instructions'])
+    total_func_insts = sum(func_metrics.values())
+    total_all = len(moss_insts) + total_func_insts
 
-    print(f"selfhost compile metrics:")
-    print(f"  instructions: {len(moss_insts)} (from compiler_core.moss)")
-    print(f"  constants:    {len(moss_consts)}")
-    print(f"  globals:      {len(moss_globals)}")
-    print(f"  functions:    {len(moss_funcs) if isinstance(moss_funcs, dict) else 0}")
+    print(f"  Moss compiler (compiler_core.moss):")
+    print(f"    module:    {len(moss_insts)} instructions")
+    for fn, cnt in func_metrics.items():
+        print(f"    fn {fn}: {cnt} instructions")
+    print(f"    total:     {total_all} instructions (module + {len(func_metrics)} functions)")
 
-    # Verify Moss instructions are valid (have proper opcodes)
-    valid_count = 0
-    for inst in moss_insts[:3]:
-        op = inst.get('opcode', '?')
-        arg = inst.get('arg', '?')
-        valid_count += 1
-        print(f"  inst[{valid_count-1}]: {op} arg={arg}")
-
-    # Serialize to .mbc for size comparison
-    from .moss_serialize import serialize_compiler_output
-    try:
-        moss_mbc = serialize_compiler_output(moss_output, source_path=str(path.resolve()))
-        print(f"  moss .mbc size: {len(moss_mbc)} bytes (instructions only, stub functions)")
-    except Exception as e:
-        print(f"  serialization test: {e}")
-
-    # Compare with Python compiler
-    try:
-        py_module = compile_program(program, source_path=str(path.resolve()))
-        py_mbc = py_module.serialize()
-        print(f"  python .mbc size: {len(py_mbc)} bytes (full compilation)")
-        print(f"  selfhost ratio: {len(moss_mbc) / len(py_mbc) * 100:.0f}% (functions missing from Moss compiler)")
-    except Exception as e:
-        print(f"  python compile comparison: {e}")
-
-    # Write full Python .mbc (currently the only working .mbc for execution)
+    # Python compile for execution
+    py_mod = compile_program(program, source_path=str(path.resolve()))
+    mbc = py_mod.serialize()
     out_path = output or path.with_suffix(".mbc")
-    py_module = compile_program(program, source_path=str(path.resolve()))
-    out_path.write_bytes(py_module.serialize())
-    print(f"  output: {out_path}")
+    out_path.write_bytes(mbc)
+    print(f"    output:    {out_path} ({len(mbc)} bytes, Python-compiled)")
 
-    # C VM verification using Python-compiled .mbc (for now)
+    # C VM verification
     cvm = Path(__file__).resolve().parents[2] / "bin" / "mossvm.exe"
     if not cvm.is_file():
         import sys as _s
@@ -983,7 +957,7 @@ def run_selfhost_compile(path: Path, *, output: Path | None = None) -> int:
     if cvm.is_file():
         result = subprocess.run([str(cvm), str(out_path)], capture_output=True, text=True, timeout=30)
         lines = [l for l in (result.stdout or "").splitlines() if "LOAD OK" not in l]
-        print(f"  C VM output: {repr(lines)}")
+        print(f"    C VM:      {repr(lines)}")
     return 0
 
 

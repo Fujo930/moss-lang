@@ -795,6 +795,7 @@ static void vm_run(VM *vm) {
         case OP_SUB: { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_number(to_number(l) - to_number(r))); break; }
         case OP_MUL: { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_number(to_number(l) * to_number(r))); break; }
         case OP_DIV: { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_number(to_number(l) / to_number(r))); break; }
+        case OP_MOD: { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_number(fmod(to_number(l), to_number(r)))); break; }
         case OP_EQ:  { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack);
             bool eq = (l->kind == r->kind);
             if (eq && l->kind == V_NUMBER) eq = (l->as.number == r->as.number);
@@ -811,6 +812,8 @@ static void vm_run(VM *vm) {
         case OP_LTE: { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_bool(to_number(l) <= to_number(r))); break; }
         case OP_GTE: { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_bool(to_number(l) >= to_number(r))); break; }
         case OP_NOT: { Value *v = stack_pop(&vm->stack); stack_push(&vm->stack, val_bool(!is_truthy(v))); break; }
+        case OP_AND: { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_bool(is_truthy(l) && is_truthy(r))); break; }
+        case OP_OR:  { Value *r = stack_pop(&vm->stack), *l = stack_pop(&vm->stack); stack_push(&vm->stack, val_bool(is_truthy(l) || is_truthy(r))); break; }
         case OP_NEG: { Value *v = stack_pop(&vm->stack); stack_push(&vm->stack, val_number(-to_number(v))); break; }
         case OP_BUILD_RECORD: {
             Value *rec = val_null(); rec->kind = V_RECORD;
