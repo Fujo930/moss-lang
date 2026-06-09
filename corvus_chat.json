@@ -4,12 +4,12 @@
     {
       "role": "user",
       "content": "hi",
-      "timestamp": 1781042995.0828338
+      "timestamp": 1781043141.495201
     },
     {
       "role": "assistant",
-      "content": "(Error calling LLM: LLM API error 401: {\n    \"error\": {\n        \"message\": \"You didn't provide an API key. You need to provide your API key in an Authorization header using Bearer auth (i.e. Authorization: Bearer YOUR_KEY), or as the password field (with blank username) if you're accessing the API from your browser and are prompted for a username and password. You can obtain an API key from https://platform.openai.com/account/api-keys.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": null\n    }\n}\n)",
-      "timestamp": 1781042995.0828338
+      "content": "Hello! I'm Corvus, the Moss Agent core engine. How can I help you today?\n\nAre you looking to:\n- **Write or verify** some Moss code?\n- **Learn** about Moss architecture (Trust, Token, Server, Decompile)?\n- **Explore** the Corvus agent platform?\n- **Discuss** AI-built programming languages?\n\nLet me know what you're working on!",
+      "timestamp": 1781043141.495201
     }
   ],
   "turn": 1

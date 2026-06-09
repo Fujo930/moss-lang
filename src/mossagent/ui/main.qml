@@ -49,7 +49,7 @@ ApplicationWindow {
     // ── Title bar text (read by bridge) ────────────────────
     property string statusText: "Ready"
 
-    // ── Two-panel body ─────────────────────────────────────
+    // ── Two-panel body: Chat (left) + Files (right) ─────────
     RowLayout {
         anchors.fill: parent; spacing: 0
 
@@ -62,18 +62,9 @@ ApplicationWindow {
             width: 1; Layout.fillHeight: true; color: cBg3
         }
 
-        ColumnLayout {
-            Layout.preferredWidth: 300; Layout.minimumWidth: 200; Layout.fillHeight: true; spacing: 0
-
-            WorkspacePanel {
-                id: workspacePanel
-                Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredHeight: parent ? parent.height * 0.55 : 300
-            }
-            Rectangle { Layout.fillWidth: true; height: 1; color: cBg3 }
-            DetailPanel {
-                id: detailPanel
-                Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredHeight: parent ? parent.height * 0.45 : 200
-            }
+        WorkspacePanel {
+            id: workspacePanel
+            Layout.preferredWidth: 280; Layout.minimumWidth: 200; Layout.fillHeight: true
         }
     }
 
