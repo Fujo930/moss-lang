@@ -207,6 +207,15 @@ def main(argv: list[str] | None = None) -> int:
     token_diff_cmd.add_argument("file_a", type=Path, help="first file (.moss or .json)")
     token_diff_cmd.add_argument("file_b", type=Path, help="second file (.moss or .json)")
 
+    token_sign_cmd = sub.add_parser("token-sign", help="sign a Token Artifact with HMAC-SHA256")
+    token_sign_cmd.add_argument("file", type=Path, help=".moss source file")
+    token_sign_cmd.add_argument("--key", "-k", type=Path, required=True, help="signing key file")
+    token_sign_cmd.add_argument("--output", "-o", type=Path, help="output signed token artifact")
+
+    token_verify_sig_cmd = sub.add_parser("token-verify-sig", help="verify a signed Token Artifact")
+    token_verify_sig_cmd.add_argument("bundle", type=Path, help="Token Artifact JSON file")
+    token_verify_sig_cmd.add_argument("--key", "-k", type=Path, required=True, help="signing key file")
+
     decompile_cmd = sub.add_parser("decompile", help="decompile .mbc bytecode (brand 4)")
     decompile_cmd.add_argument("file", type=Path)
     decompile_cmd.add_argument("--output", "-o", type=Path, help="output decomposition")
@@ -289,6 +298,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "token-diff":
             return run_token_diff(args.file_a, args.file_b)
+
+        if args.command == "token-sign":
+            return run_token_sign(args.file, key_path=args.key, output=args.output)
+
+        if args.command == "token-verify-sig":
+            return run_token_verify_sig(args.bundle, key_path=args.key)
 
         if args.command == "decompile":
             from .decompile import decompile_mbc
@@ -1469,10 +1484,13 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None, 
         print(f"error: source file not found: {source_path}", file=sys.stderr)
         return 1
 
-    # Detect file redirection: bundle claims file X, but we resolved to Y.
-    # Only flag when no explicit --source override (user trusted the bundle's file field).
+    # Detect file redirection: bundle claims file X, but source resolved to Y.
+    # When --source is given, compare bundle_file_claim against the override too.
     source_resolved = source_path.resolve()
-    file_redirected = (not source_override and source_resolved != bundle_file_claim)
+    if source_override:
+        file_redirected = (source_resolved != bundle_file_claim)
+    else:
+        file_redirected = (source_resolved != bundle_file_claim)
 
     source = source_path.read_text(encoding="utf-8-sig")
     actual_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
@@ -1497,6 +1515,23 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None, 
         new_bundle.setdefault("selfhost", {"ok": False})
         new_bundle["_error"] = {"type": type(exc).__name__, "message": str(exc)}
 
+    # Compare old bundle gate results against fresh re-run to detect evidence tampering
+    evidence_mismatches = []
+    for gate in ("check", "trace", "golden", "lock", "selfhost"):
+        old_ok = bundle.get(gate, {}).get("ok") if isinstance(bundle.get(gate), dict) else None
+        new_ok = new_bundle.get(gate, {}).get("ok") if isinstance(new_bundle.get(gate), dict) else None
+        if old_ok is not None and new_ok is not None and old_ok != new_ok:
+            evidence_mismatches.append(f"{gate}: old={old_ok} new={new_ok}")
+    # Also compare overall trust flag
+    old_trust = bundle.get("trust")
+    if old_trust is not None and old_trust != new_bundle.get("trust"):
+        evidence_mismatches.append(f"trust: old={old_trust} new={new_bundle.get('trust')}")
+    # Compare diagnostic counts
+    old_diag_count = len(bundle.get("check", {}).get("diagnostics", []))
+    new_diag_count = len(new_bundle.get("check", {}).get("diagnostics", []))
+    if old_diag_count != new_diag_count:
+        evidence_mismatches.append(f"diagnostics: old={old_diag_count} new={new_diag_count}")
+
     # Strict mode: also check for warnings in check diagnostics
     check_has_warnings = False
     if strict:
@@ -1516,9 +1551,11 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None, 
         "golden_ok": new_bundle.get("golden", {}).get("ok"),
         "lock_ok": new_bundle.get("lock", {}).get("ok"),
         "selfhost_ok": new_bundle.get("selfhost", {}).get("ok"),
+        "evidence_mismatches": evidence_mismatches if evidence_mismatches else None,
         "verified": (new_bundle.get("trust", False)
                      and stored_hash == actual_hash
                      and not file_redirected
+                     and not evidence_mismatches
                      and not (strict and check_has_warnings)),
     }
 
@@ -1537,6 +1574,8 @@ def run_trust_verify(bundle_path: Path, *, source_override: Path | None = None, 
         if not result["gates_trust"]:
             failed = [g for g in ["check", "trace", "golden", "lock", "selfhost"] if not result.get(f"{g}_ok")]
             reasons.append(f"failed gates: {', '.join(failed)}")
+        if result["evidence_mismatches"]:
+            reasons.append(f"evidence tampered: {'; '.join(result['evidence_mismatches'])}")
         print(json.dumps(result, indent=2))
         print(f"FAIL: {'; '.join(reasons)}", file=sys.stderr)
         return 1
@@ -1572,6 +1611,10 @@ def run_artifact_sign(bundle_path: Path, *, key_path: Path, output: Path | None 
             return None
         return hashlib.sha256(json.dumps(v, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
+    # Hash top-level key set to detect extra field injection
+    _top_keys = sorted(k for k in bundle.keys() if k not in ("signature",))
+    _top_keys_hash = hashlib.sha256(json.dumps(_top_keys).encode()).hexdigest()[:12]
+
     payload = {
         "file": bundle.get("file"),
         "source_sha256": bundle.get("source_sha256"),
@@ -1584,6 +1627,7 @@ def run_artifact_sign(bundle_path: Path, *, key_path: Path, output: Path | None 
         "evidence_trace": _hash_evidence(bundle, "trace"),
         "evidence_golden": _hash_evidence(bundle, "golden"),
         "evidence_selfhost": _hash_evidence(bundle, "selfhost"),
+        "_top_keys": _top_keys_hash,
     }
     payload_json = json.dumps(payload, sort_keys=True).encode("utf-8")
     sig = hmac.new(key, payload_json, hashlib.sha256).hexdigest()
@@ -1640,8 +1684,16 @@ def run_artifact_verify_sig(bundle_path: Path, *, key_path: Path) -> int:
         "evidence_trace": _hash_evidence(bundle, "trace"),
         "evidence_golden": _hash_evidence(bundle, "golden"),
         "evidence_selfhost": _hash_evidence(bundle, "selfhost"),
+        "_top_keys": hashlib.sha256(
+            json.dumps(sorted(k for k in bundle.keys() if k != "signature")).encode()
+        ).hexdigest()[:12],
     }
     payload_match = (stored_payload == current_payload)
+    # Detect extra/injected top-level keys vs signed _top_keys hash
+    current_top_keys = sorted(k for k in bundle.keys() if k != "signature")
+    current_top_hash = hashlib.sha256(json.dumps(current_top_keys).encode()).hexdigest()[:12]
+    stored_top_hash = stored_payload.get("_top_keys", "")
+    top_keys_tampered = (current_top_hash != stored_top_hash)
     payload_json = json.dumps(stored_payload, sort_keys=True).encode("utf-8")
     expected = hmac.new(key, payload_json, hashlib.sha256).hexdigest()
     stored = sig_data.get("hmac", "")
@@ -1651,9 +1703,10 @@ def run_artifact_verify_sig(bundle_path: Path, *, key_path: Path) -> int:
         "algorithm": sig_data.get("algorithm"),
         "hmac_match": hmac.compare_digest(expected, stored),
         "payload_match": payload_match,
+        "top_keys_tampered": top_keys_tampered if top_keys_tampered else None,
     }
 
-    if result["hmac_match"] and result["payload_match"]:
+    if result["hmac_match"] and result["payload_match"] and not top_keys_tampered:
         print(json.dumps(result, indent=2))
         print("PASS: signature valid, payload intact")
         return 0
@@ -1661,6 +1714,7 @@ def run_artifact_verify_sig(bundle_path: Path, *, key_path: Path) -> int:
         reasons = []
         if not result["payload_match"]: reasons.append("payload tampered (fields don't match signed payload)")
         if not result["hmac_match"]: reasons.append("HMAC mismatch (signature forged)")
+        if top_keys_tampered: reasons.append("top-level keys tampered (added/removed fields)")
         print(json.dumps(result, indent=2), file=sys.stderr)
         print(f"FAIL: {'; '.join(reasons)}", file=sys.stderr)
         return 1
@@ -1898,6 +1952,130 @@ def _find_lock(path: Path) -> Path | None:
     return None
 
 
+def run_token_sign(path: Path, *, key_path: Path, output: Path | None = None) -> int:
+    """Sign a Token Artifact with HMAC-SHA256."""
+    import hashlib
+    import hmac
+
+    # Generate the token artifact first
+    token_json = _build_token_artifact_from_source(
+        path.read_text(encoding="utf-8-sig"), path, level="normal"
+    )
+    token = json.loads(token_json)
+
+    key = key_path.read_bytes()
+    if len(key) < 16:
+        print(f"error: key file too short ({len(key)} bytes, need at least 16)", file=sys.stderr)
+        return 1
+
+    # Build signed payload: hash the token content
+    token_hash = hashlib.sha256(token_json.encode()).hexdigest()
+    payload = {
+        "f": token.get("f"),
+        "h": token.get("h"),
+        "c": token.get("c"),
+        "th": token_hash,
+    }
+    payload_json = json.dumps(payload, sort_keys=True).encode("utf-8")
+    sig = hmac.new(key, payload_json, hashlib.sha256).hexdigest()
+
+    signed = dict(token)
+    signed["sig"] = {"algorithm": "HMAC-SHA256", "hmac": sig, "payload": payload}
+
+    result = json.dumps(signed, indent=2)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(result, encoding="utf-8")
+        print(f"signed token artifact written: {output}")
+    else:
+        print(result)
+    return 0
+
+
+def run_token_verify_sig(bundle_path: Path, *, key_path: Path) -> int:
+    """Verify a signed Token Artifact."""
+    import hashlib
+    import hmac
+
+    try:
+        token = json.loads(bundle_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"error reading token: {e}", file=sys.stderr)
+        return 1
+
+    sig_data = token.pop("sig", None)
+    if not sig_data:
+        print("error: token has no 'sig' field", file=sys.stderr)
+        return 1
+
+    key = key_path.read_bytes()
+    stored_payload = sig_data.get("payload", {})
+
+    # Recompute token hash from current content (without sig field)
+    current_json = json.dumps(token, sort_keys=True).encode()
+    current_hash = hashlib.sha256(current_json).hexdigest()
+
+    current_payload = {
+        "f": token.get("f"),
+        "h": token.get("h"),
+        "c": token.get("c"),
+        "th": current_hash,
+    }
+
+    payload_match = (stored_payload == current_payload)
+    payload_json = json.dumps(stored_payload, sort_keys=True).encode("utf-8")
+    expected = hmac.new(key, payload_json, hashlib.sha256).hexdigest()
+    stored = sig_data.get("hmac", "")
+
+    result = {
+        "bundle": bundle_path.as_posix(),
+        "hmac_match": hmac.compare_digest(expected, stored),
+        "payload_match": payload_match,
+    }
+
+    if result["hmac_match"] and result["payload_match"]:
+        print(json.dumps(result, indent=2))
+        print("PASS: token signature valid")
+        return 0
+    else:
+        reasons = []
+        if not result["payload_match"]: reasons.append("payload tampered")
+        if not result["hmac_match"]: reasons.append("HMAC mismatch")
+        print(json.dumps(result, indent=2), file=sys.stderr)
+        print(f"FAIL: {'; '.join(reasons)}", file=sys.stderr)
+        return 1
+
+
+def _build_token_artifact_from_source(source: str, path: Path, level: str = "normal") -> str:
+    """Build a token artifact JSON string from source. (Lightweight version for signing.)"""
+    import hashlib
+    source_sha256 = hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+    from mosslang.parser import parse_source
+    from mosslang.checker import check_program
+
+    program = parse_source(source)
+    diags = check_program(program)
+    errors = [d for d in diags if d.level == "error"]
+
+    token_data = {
+        "effects": sum(1 for item in program.items if type(item).__name__ == "EffectDecl"),
+        "types": sum(1 for item in program.items if type(item).__name__ == "TypeDecl"),
+        "callables": sum(1 for item in program.items
+                         if type(item).__name__ in ("RuleDecl", "FunctionDecl", "PythonExternDecl")),
+    }
+
+    result = {
+        "ta": "ta.v1",
+        "v": __version__,
+        "f": path.name,
+        "h": source_sha256[:16],
+        "c": token_data,
+        "g": len(errors) == 0,
+    }
+    return json.dumps(result)
+
+
 def run_trust(path: Path, *, output: Path | None = None, summary: bool = False) -> int:
     """Produce a trust bundle for a Moss program."""
     import hashlib
@@ -1954,6 +2132,18 @@ def run_trust(path: Path, *, output: Path | None = None, summary: bool = False) 
 
 def _build_trust_bundle(source: str, source_hash: str, path: Path, bundle: dict) -> None:
     """Fill the trust bundle with check/trace/golden/lock/selfhost gates."""
+
+    # Reject empty source — parse would fail silently
+    if not source.strip():
+        bundle["trust"] = False
+        bundle["check"] = {"ok": False, "diagnostics": [
+            {"level": "error", "message": "empty source — nothing to verify", "code": "F000"}
+        ]}
+        bundle["trace"] = {"ok": False, "events": []}
+        bundle["golden"] = {"ok": False}
+        bundle["lock"] = {"ok": None}
+        bundle["selfhost"] = {"ok": False}
+        return
 
     # 1. Static check
     program = parse_source(source)

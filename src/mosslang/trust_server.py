@@ -154,6 +154,21 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
         "elapsed_ms": 0,
     }
 
+    # Reject empty source — no code means nothing to trust
+    if not source.strip():
+        bundle["trust"] = False
+        bundle["check"] = {"ok": False, "diagnostics": [
+            {"level": "error", "message": "empty source — nothing to verify", "code": "F000",
+             "hint": "Provide Moss source code to evaluate trust."}
+        ]}
+        bundle["token"] = {"effects": 0, "types": 0, "callables": 0}
+        bundle["fix_hints"] = [{"line": 0, "hint": "Provide non-empty Moss source code."}]
+        bundle["gates"] = 0
+        bundle["gates_total"] = 5
+        bundle["failed_gates"] = ["check", "trace", "golden", "lock", "selfhost"]
+        bundle["elapsed_ms"] = 0
+        return bundle
+
     # 1. Check gate
     t_check = time.perf_counter()
     try:
