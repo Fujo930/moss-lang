@@ -6,7 +6,7 @@ import QtQuick.Window
 ApplicationWindow {
     id: window
     width: 1200; height: 760
-    minimumWidth: 800; minimumHeight: 500
+    minimumWidth: 900; minimumHeight: 500
     visible: true
     title: "Corvus — Moss Agent"
     font.family: "Segoe UI"
@@ -30,178 +30,155 @@ ApplicationWindow {
     property int activeSession: bridge.activeSession || 0
     property var sessionNames: bridge.sessionNames || ["Default"]
 
-    // ── Tab bar ────────────────────────────────────────────
+    // ── Three-panel body ────────────────────────────────────
     Item {
-        id: tabBar
-        anchors.top: parent.top; anchors.left: parent.left
-        anchors.right: parent.right
-        height: 44
+        anchors.fill: parent; anchors.margins: 10
 
-        RowLayout {
-            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 6
+        // LEFT: Session sidebar
+        Rectangle {
+            id: sidebar
+            anchors.top: parent.top; anchors.bottom: parent.bottom
+            anchors.left: parent.left; width: 200; radius: 14; color: cBg0
+            border.color: cBg3; border.width: 1; clip: true
 
-            // Session tabs
-            ListView {
-                id: tabList
-                Layout.fillWidth: true; Layout.fillHeight: true
-                orientation: ListView.Horizontal; clip: true
-                model: window.sessionNames
-                spacing: 4
-                interactive: false
+            ColumnLayout {
+                anchors.fill: parent; spacing: 0
 
-                delegate: Rectangle {
-                    width: tabLabel.implicitWidth + 32; height: 32; radius: 10
-                    color: index === window.activeSession ? Qt.alpha(window.cAccent, 0.12) : "transparent"
-                    border.color: index === window.activeSession ? window.cAccent : "transparent"
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.centerIn: parent; spacing: 6
-                        Text {
-                            id: tabLabel
-                            text: modelData; color: window.cFg1; font.pixelSize: 12
-                            font.weight: index === window.activeSession ? Font.DemiBold : Font.Normal
+                // Sidebar header
+                Rectangle { Layout.fillWidth: true; implicitHeight: 46
+                    color: cBg0
+                    Rectangle { anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: cBg3 }
+                    RowLayout { anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 10; spacing: 8
+                        Rectangle { width: 24; height: 24; radius: 6; color: cAccent
+                            Text { anchors.centerIn: parent; text: "⟡"; color: "white"; font.pixelSize: 13 } }
+                        Text { text: "Corvus"; color: cFg1; font.pixelSize: 14; font.weight: Font.DemiBold }
+                        Item { Layout.fillWidth: true }
+                        Rectangle { width: 26; height: 26; radius: 6; color: cBg2; border.color: cBg3
+                            Text { anchors.centerIn: parent; text: "+"; color: cFg2; font.pixelSize: 15 }
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bridge.createSession("New") }
                         }
-                        Rectangle {
-                            visible: tabList.count > 1
-                            width: 16; height: 16; radius: 4
-                            color: "transparent"
-                            Text { anchors.centerIn: parent; text: "✕"; color: window.cFg3; font.pixelSize: 10 }
-                            MouseArea {
-                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                onClicked: bridge.closeSession(index)
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                        onClicked: bridge.switchSession(index)
                     }
                 }
-            }
 
-            // New session button
-            Rectangle {
-                width: 28; height: 28; radius: 8; color: "transparent"; border.color: window.cBg3
-                Text { anchors.centerIn: parent; text: "+"; color: window.cFg2; font.pixelSize: 16 }
-                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bridge.createSession("Session " + (tabList.count + 1)) }
-            }
+                // Session list
+                ListView {
+                    id: sessionList
+                    Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                    model: window.sessionNames; spacing: 2
+                    anchors.topMargin: 6; anchors.bottomMargin: 6
 
-            Item { Layout.preferredWidth: 16 }
+                    delegate: Rectangle {
+                        width: sessionList.width - 16; x: 8; implicitHeight: 38; radius: 10
+                        color: index === window.activeSession ? Qt.alpha(window.cAccent, 0.10) : "transparent"
+                        border.color: index === window.activeSession ? Qt.alpha(window.cAccent, 0.25) : "transparent"
+                        border.width: 1
 
-            // Theme toggle
-            Rectangle {
-                width: 28; height: 28; radius: 8; color: window.cBg2; border.color: window.cBg3
-                Text { anchors.centerIn: parent; text: darkMode ? "☀" : "🌙"; font.pixelSize: 14 }
-                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: darkMode = !darkMode }
+                        RowLayout {
+                            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 8
+                            Text { text: "💬"; font.pixelSize: 11 }
+                            Text { text: modelData; color: window.cFg1; font.pixelSize: 12
+                                font.weight: index === window.activeSession ? Font.DemiBold : Font.Normal
+                                elide: Text.ElideRight; Layout.fillWidth: true }
+                            Rectangle { visible: sessionList.count > 1; width: 18; height: 18; radius: 4; color: "transparent"
+                                Text { anchors.centerIn: parent; text: "✕"; color: window.cFg3; font.pixelSize: 9 }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bridge.closeSession(index) }
+                            }
+                        }
+
+                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bridge.switchSession(index) }
+                    }
+                }
+
+                // Bottom tools
+                ColumnLayout {
+                    Layout.fillWidth: true; anchors.bottomMargin: 8
+                    // Settings button
+                    Rectangle { id: sbtn; property bool h: false
+                        Layout.fillWidth: true; implicitHeight: 36; radius: 10
+                        color: sbtn.h ? window.cBg2 : "transparent"
+                        RowLayout { anchors.fill: parent; anchors.leftMargin: 14; spacing: 8
+                            Text { text: "⚙️"; font.pixelSize: 12 }
+                            Text { text: "Settings"; color: window.cFg2; font.pixelSize: 12 }
+                            Item { Layout.fillWidth: true } }
+                        MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onEntered: sbtn.h = true; onExited: sbtn.h = false } }
+                    // History button
+                    Rectangle { id: hbtn; property bool h: false
+                        Layout.fillWidth: true; implicitHeight: 36; radius: 10
+                        color: hbtn.h ? window.cBg2 : "transparent"
+                        RowLayout { anchors.fill: parent; anchors.leftMargin: 14; spacing: 8
+                            Text { text: "🕐"; font.pixelSize: 12 }
+                            Text { text: "History"; color: window.cFg2; font.pixelSize: 12 }
+                            Item { Layout.fillWidth: true } }
+                        MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onEntered: hbtn.h = true; onExited: hbtn.h = false } }
+                    // Trash button
+                    Rectangle { id: tbtn; property bool h: false
+                        Layout.fillWidth: true; implicitHeight: 36; radius: 10
+                        color: tbtn.h ? window.cBg2 : "transparent"
+                        RowLayout { anchors.fill: parent; anchors.leftMargin: 14; spacing: 8
+                            Text { text: "🗑️"; font.pixelSize: 12 }
+                            Text { text: "Trash"; color: window.cFg2; font.pixelSize: 12 }
+                            Item { Layout.fillWidth: true } }
+                        MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onEntered: tbtn.h = true; onExited: tbtn.h = false } }
+                }
+
+                // Theme toggle
+                Rectangle { Layout.fillWidth: true; implicitHeight: 38; radius: 10; color: "transparent"; width: sidebar.width - 16; anchors.leftMargin: 8
+                    RowLayout { anchors.fill: parent; anchors.leftMargin: 12; spacing: 8
+                        Text { text: darkMode ? "☀" : "🌙"; font.pixelSize: 13 }
+                        Text { text: darkMode ? "Light mode" : "Dark mode"; color: window.cFg2; font.pixelSize: 11 } }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: darkMode = !darkMode }
+                }
             }
         }
-    }
 
-    // ── Main body ──────────────────────────────────────────
-    Item {
-        anchors.top: tabBar.bottom; anchors.bottom: parent.bottom
-        anchors.left: parent.left; anchors.right: parent.right
-        anchors.margins: 12
+        Item { width: 10; anchors.top: parent.top; anchors.bottom: parent.bottom }
 
+        // CENTER: Chat
         ChatPanel {
             id: chatPanel
             anchors.top: parent.top; anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            anchors.right: filePanel.left; anchors.rightMargin: 12
+            anchors.left: sidebar.right; anchors.leftMargin: 10
+            anchors.right: filePanel.left; anchors.rightMargin: 10
         }
 
+        // RIGHT: File panel
         Rectangle {
             id: filePanel
             anchors.top: parent.top; anchors.bottom: parent.bottom
-            anchors.right: parent.right
-            anchors.rightMargin: viewerSlot.viewerVisible ? 432 : 0
-            width: 280; radius: 14; color: window.cBg0
-            border.color: window.cBg3; border.width: 1
-            clip: true
-
+            anchors.right: parent.right; width: 280; radius: 14; color: cBg0
+            border.color: cBg3; border.width: 1; clip: true
+            anchors.rightMargin: viewerSlot.viewerVisible ? 430 : 0
             Behavior on anchors.rightMargin { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
 
-            Rectangle {
-                anchors.fill: parent; anchors.margins: -2; radius: 16; z: -1
-                color: window.darkMode ? Qt.rgba(0,0,0,0.2) : Qt.rgba(0,0,0,0.06)
-            }
+            ListView {
+                id: fileList
+                anchors.fill: parent; anchors.margins: 10; clip: true
+                model: bridge.fileTree; spacing: 2
 
-            ColumnLayout {
-                anchors.fill: parent; spacing: 0; anchors.margins: 10
+                delegate: Rectangle {
+                    width: fileList.width; implicitHeight: 30; radius: 8
+                    x: modelData.depth ? modelData.depth * 14 : 0
+                    color: modelData.path === window.selectedPath ? Qt.alpha(window.cAccent, 0.12) : "transparent"
 
-                // File tree — fills vertical space
-                ListView {
-                    id: fileList
-                    Layout.fillWidth: true; Layout.fillHeight: true
-                    clip: true; model: bridge.fileTree; spacing: 1
+                    RowLayout { anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 8; spacing: 6
+                        Text { text: modelData.isDir ? "📂" : "📄"; font.pixelSize: 11 }
+                        Text { text: modelData.name; color: window.cFg1; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true } }
 
-                    delegate: Rectangle {
-                        width: fileList.width; implicitHeight: 30; radius: 8
-                        x: modelData.depth ? modelData.depth * 14 : 0
-                        color: modelData.path === window.selectedPath ? Qt.alpha(window.cAccent, 0.12) : "transparent"
-
-                        RowLayout {
-                            anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 8; spacing: 6
-                            Text { text: modelData.isDir ? "📂" : "📄"; font.pixelSize: 11 }
-                            Text { text: modelData.name; color: window.cFg1; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                window.selectedPath = modelData.path
-                                if (modelData.isDir) bridge.toggleDirectory(modelData.path)
-                                else bridge.openFile(modelData.path)
-                            }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            window.selectedPath = modelData.path
+                            if (modelData.isDir) bridge.toggleDirectory(modelData.path)
+                            else bridge.openFile(modelData.path)
                         }
                     }
                 }
-
-                // Settings card
-                Rectangle { id: mc1; property bool ch: false
-                    Layout.fillWidth: true; implicitHeight: 44; radius: 12
-                    color: window.cBg0; border.color: window.cBg3; border.width: 1
-                    Rectangle { anchors.fill: parent; anchors.margins: -2; radius: 14; z: -1
-                        color: window.darkMode ? Qt.rgba(0,0,0,0.2) : Qt.rgba(0,0,0,0.06)
-                        opacity: mc1.ch ? 1.0 : 0.0; Behavior on opacity { NumberAnimation { duration: 200 } } }
-                    RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
-                        Text { text: "⚙️"; font.pixelSize: 12 }
-                        Text { text: "Settings"; color: window.cFg1; font.pixelSize: 13 }
-                        Item { Layout.fillWidth: true } }
-                    MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onEntered: mc1.ch = true; onExited: mc1.ch = false } }
-                // History card
-                Rectangle { id: mc2; property bool ch: false
-                    Layout.fillWidth: true; implicitHeight: 44; radius: 12
-                    color: window.cBg0; border.color: window.cBg3; border.width: 1
-                    Rectangle { anchors.fill: parent; anchors.margins: -2; radius: 14; z: -1
-                        color: window.darkMode ? Qt.rgba(0,0,0,0.2) : Qt.rgba(0,0,0,0.06)
-                        opacity: mc2.ch ? 1.0 : 0.0; Behavior on opacity { NumberAnimation { duration: 200 } } }
-                    RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
-                        Text { text: "🕐"; font.pixelSize: 12 }
-                        Text { text: "History"; color: window.cFg1; font.pixelSize: 13 }
-                        Item { Layout.fillWidth: true } }
-                    MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onEntered: mc2.ch = true; onExited: mc2.ch = false } }
-                // Trash card
-                Rectangle { id: mc3; property bool ch: false
-                    Layout.fillWidth: true; implicitHeight: 44; radius: 12
-                    color: window.cBg0; border.color: window.cBg3; border.width: 1
-                    Rectangle { anchors.fill: parent; anchors.margins: -2; radius: 14; z: -1
-                        color: window.darkMode ? Qt.rgba(0,0,0,0.2) : Qt.rgba(0,0,0,0.06)
-                        opacity: mc3.ch ? 1.0 : 0.0; Behavior on opacity { NumberAnimation { duration: 200 } } }
-                    RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
-                        Text { text: "🗑️"; font.pixelSize: 12 }
-                        Text { text: "Trash"; color: window.cFg1; font.pixelSize: 13 }
-                        Item { Layout.fillWidth: true } }
-                    MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onEntered: mc3.ch = true; onExited: mc3.ch = false } }
             }
         }
 
-        // Viewer
+        // Viewer — slides from right
         Rectangle {
             id: viewerSlot
             anchors.top: parent.top; anchors.bottom: parent.bottom
@@ -212,41 +189,23 @@ ApplicationWindow {
             visible: viewerVisible || x < width
             Behavior on x { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
 
-            Rectangle {
-                anchors.fill: parent; radius: 16; color: window.cBg0
-                border.color: window.cBg3; border.width: 1; clip: true
+            Rectangle { anchors.fill: parent; radius: 16; color: cBg0; border.color: cBg3; border.width: 1; clip: true
+                Rectangle { anchors.fill: parent; anchors.margins: -2; radius: 18; z: -1
+                    color: darkMode ? Qt.rgba(0,0,0,0.35) : Qt.rgba(0,0,0,0.08) }
 
-                Rectangle {
-                    anchors.fill: parent; anchors.margins: -2; radius: 18; z: -1
-                    color: window.darkMode ? Qt.rgba(0,0,0,0.35) : Qt.rgba(0,0,0,0.08)
-                }
-
-                Rectangle {
-                    id: viewerTitleBar; width: parent.width; height: 44; color: window.cBg0
-                    RowLayout {
-                        anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 8; spacing: 10
+                Rectangle { id: viewerTitleBar; width: parent.width; height: 44; color: cBg0
+                    RowLayout { anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 8; spacing: 10
                         Text { text: "📄"; font.pixelSize: 14 }
-                        Text { text: bridge.fileViewerPath || ""; color: window.cFg1; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
-                        Rectangle { width: 30; height: 30; radius: 8; color: window.cBg2; border.color: window.cBg3
-                            Text { anchors.centerIn: parent; text: "✕"; color: window.cFg2; font.pixelSize: 13 }
-                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bridge.closeFileViewer() }
-                        }
-                    }
-                    Rectangle { anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: window.cBg3 }
-                }
+                        Text { text: bridge.fileViewerPath || ""; color: cFg1; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
+                        Rectangle { width: 30; height: 30; radius: 8; color: cBg2; border.color: cBg3
+                            Text { anchors.centerIn: parent; text: "✕"; color: cFg2; font.pixelSize: 13 }
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bridge.closeFileViewer() } } }
+                    Rectangle { anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: cBg3 } }
 
-                Flickable {
-                    id: viewerFlick
-                    anchors.top: viewerTitleBar.bottom; anchors.left: parent.left
-                    anchors.right: parent.right; anchors.bottom: parent.bottom
-                    contentWidth: viewerText.implicitWidth; contentHeight: viewerText.implicitHeight
-                    clip: true; boundsBehavior: Flickable.StopAtBounds; flickableDirection: Flickable.VerticalFlick
-
-                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn; parent: viewerFlick.parent
-                        anchors.right: viewerFlick.right; anchors.top: viewerFlick.top; anchors.bottom: viewerFlick.bottom; anchors.margins: 4 }
-
-                    Text { id: viewerText; width: viewerFlick.width - 28; x: 16; y: 8
-                        text: bridge.fileViewerContent || ""; color: window.cFg1; font.pixelSize: 12; font.family: "Consolas"; wrapMode: Text.Wrap }
+                Flickable { id: viewerFlick; anchors.top: viewerTitleBar.bottom; anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                    contentWidth: viewerText.implicitWidth; contentHeight: viewerText.implicitHeight; clip: true; boundsBehavior: Flickable.StopAtBounds; flickableDirection: Flickable.VerticalFlick
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn; parent: viewerFlick.parent; anchors.right: viewerFlick.right; anchors.top: viewerFlick.top; anchors.bottom: viewerFlick.bottom; anchors.margins: 4 }
+                    Text { id: viewerText; width: viewerFlick.width - 28; x: 16; y: 8; text: bridge.fileViewerContent || ""; color: cFg1; font.pixelSize: 12; font.family: "Consolas"; wrapMode: Text.Wrap }
                 }
             }
         }
