@@ -55,6 +55,20 @@ class Diagnostic:
             object.__setattr__(self, "code", c)
             object.__setattr__(self, "hint", h or self.hint)
 
+    def to_json(self) -> dict:
+        result = {"level": self.level, "message": self.message, "code": self.code}
+        if self.hint:
+            result["hint"] = self.hint
+        if self.location is not None:
+            result["line"] = self.location.line
+            result["column"] = self.location.column
+        return result
+
+    def format(self) -> str:
+        prefix = f"{self.location.format()}: " if self.location is not None else ""
+        code_part = f" [{self.code}]" if self.code else ""
+        return f"{self.level}: {prefix}{self.message}{code_part}"
+
 
 # ── Pure classification function — testable independently ──
 
@@ -81,20 +95,6 @@ def _classify_diagnostic(message: str) -> tuple[str, str]:
         if pattern in message:
             return code, hint
     return "", ""
-
-    def to_json(self) -> dict:
-        result = {"level": self.level, "message": self.message, "code": self.code}
-        if self.hint:
-            result["hint"] = self.hint
-        if self.location is not None:
-            result["line"] = self.location.line
-            result["column"] = self.location.column
-        return result
-
-    def format(self) -> str:
-        prefix = f"{self.location.format()}: " if self.location is not None else ""
-        code_part = f" [{self.code}]" if self.code else ""
-        return f"{self.level}: {prefix}{self.message}{code_part}"
 
 
 BUILTIN_EFFECTS = {

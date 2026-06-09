@@ -37,6 +37,69 @@ from pathlib import Path
 
 _TRUST_CACHE_LIMIT = 100
 _trust_cache: dict[str, dict] = {}
+_token_cache: dict[str, dict] = {}
+
+
+def token_from_source(source: str, *, level: str = "normal") -> dict:
+    """Lightweight token extraction: parse + structure only. No VM execution.
+    
+    Returns Token Artifact in ~5ms vs ~80ms for full trust pipeline.
+    Suitable for POST /api/token and AI code-scanning use cases.
+    """
+    import hashlib
+    t0 = time.perf_counter()
+    source_sha256 = hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+    cache_key = f"token.{level}.{source_sha256[:32]}"
+    if cache_key in _token_cache:
+        return dict(_token_cache[cache_key])
+
+    from mosslang.parser import parse_source
+    from mosslang.checker import check_program
+
+    try:
+        program = parse_source(source)
+        diagnostics = check_program(program)
+    except Exception as e:
+        return {"ta": "ta.v1", "t": False, "error": str(e), "ms": round((time.perf_counter() - t0) * 1000)}
+
+    chk_errors = [d for d in diagnostics if d.level == "error"]
+    token_data = {
+        "effects": sum(1 for item in program.items if type(item).__name__ == "EffectDecl"),
+        "types": sum(1 for item in program.items if type(item).__name__ == "TypeDecl"),
+        "callables": sum(1 for item in program.items if type(item).__name__ in ("RuleDecl", "FunctionDecl", "PythonExternDecl")),
+    }
+    rule_items = [item for item in program.items if type(item).__name__ == "RuleDecl"]
+    rules = [{"n": r.name, "v": getattr(r, 'return_type', '?') or "?"} for r in rule_items] if rule_items else None
+
+    if level == "brief":
+        result = {
+            "ta": "ta.v1",
+            "t": len(chk_errors) == 0,
+            "h": source_sha256[:12],
+            "c": {"e": token_data["effects"], "t": token_data["types"], "l": token_data["callables"]},
+            "r": rules,
+            "ms": round((time.perf_counter() - t0) * 1000),
+        }
+    else:
+        result = {
+            "ta": "ta.v1",
+            "t": len(chk_errors) == 0,
+            "h": source_sha256[:16],
+            "c": {"e": token_data["effects"], "t": token_data["types"], "l": token_data["callables"]},
+            "r": rules,
+            "g": len(chk_errors) == 0,
+            "ms": round((time.perf_counter() - t0) * 1000),
+        }
+        if chk_errors:
+            result["fix_hints"] = [
+                {"line": d.location.line if d.location else None, "hint": d.hint}
+                for d in diagnostics if d.level == "error" and d.hint
+            ]
+
+    if len(_token_cache) < _TRUST_CACHE_LIMIT:
+        _token_cache[cache_key] = result
+    return result
 
 
 def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
@@ -99,6 +162,9 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
              "hint": d.hint}
             for d in diagnostics if d.level == "error" and d.hint
         ]
+        bundle["gates"] = 0
+        bundle["gates_total"] = 5
+        bundle["failed_gates"] = ["check"]
         bundle["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
         _trust_cache[cache_key] = bundle
         return bundle
@@ -158,8 +224,10 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
         True,  # lock gate: not applicable in API mode
         bundle.get("selfhost", {}).get("ok"),
     ]
+    gate_names = ["check", "trace", "golden", "lock", "selfhost"]
     bundle["gates"] = sum(1 for g in gates if g)
     bundle["gates_total"] = 5
+    bundle["failed_gates"] = [gate_names[i] for i, ok in enumerate(gates) if not ok]
 
     bundle["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
 
@@ -171,7 +239,7 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
 
 def make_trust_handler() -> type[BaseHTTPRequestHandler]:
     class TrustHandler(BaseHTTPRequestHandler):
-        server_version = "MossTrustServer/alpha(t)2"
+        server_version = "MossTrustServer/alpha(t)2.3"
 
         def do_GET(self) -> None:
             if self.path == "/api/health":
@@ -214,31 +282,8 @@ def make_trust_handler() -> type[BaseHTTPRequestHandler]:
                 from urllib.parse import urlparse, parse_qs
                 qs = parse_qs(urlparse(self.path).query)
                 level = qs.get("level", ["normal"])[0]
-                result = trust_from_source(source)
-                # Build token artifact from trust result
-                chk = result.get("check", {})
-                trace_ev = result.get("trace", {}).get("events", [])
-                if level == "brief":
-                    token = {
-                        "ta": "ta.v1",
-                        "f": "<api>",
-                        "h": result["source_sha256"][:12],
-                        "c": result.get("token", {"e": 0, "t": 0, "l": 0}),
-                        "r": [{"n": e.get("rule"), "io": f"{str(e.get('arguments',{}))[:20]}→{str(e.get('result','?'))[:8]}"} for e in trace_ev[:3]] if trace_ev else None,
-                        "t": result["trust"],
-                    }
-                else:
-                    token = {
-                        "ta": "ta.v1",
-                        "f": "<api>",
-                        "h": result["source_sha256"][:16],
-                        "c": result.get("token", {"e": 0, "t": 0, "l": 0}),
-                        "r": trace_ev[:5] if trace_ev else None,
-                        "g": result.get("golden", {}).get("ok"),
-                        "s": result.get("selfhost", {}).get("ok"),
-                        "t": result["trust"],
-                    }
-                self.send_json(token)
+                result = token_from_source(source, level=level)
+                self.send_json(result)
             else:
                 self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -254,23 +299,24 @@ def make_trust_handler() -> type[BaseHTTPRequestHandler]:
             return  # suppress logs for fast API operation
 
         def _send_trust_brief(self, result: dict) -> None:
-            """Auto-level: brief on trust=true — 6 fields, ~15 tokens."""
+            """Auto-level: brief on trust=true — 7 fields, ~15 tokens."""
             trace_ev = result.get("trace", {}).get("events", [])
             self.send_json({
                 "trust": True,
                 "h": result["source_sha256"][:12],
                 "g": result.get("gates", 0),
                 "c": result.get("token", {"e": 0, "t": 0, "l": 0}),
-                "r": [{"n": e.get("rule"), "o": str(e.get("result", "?"))[:16]} for e in trace_ev[:2]] if trace_ev else None,
+                "r": [{"n": e.get("rule"), "v": str(e.get("result", "?"))[:16]} for e in trace_ev[:2]] if trace_ev else None,
                 "ms": result.get("elapsed_ms", 0),
                 "ta": "ta.v1",
             })
 
         def _send_trust_normal(self, result: dict) -> None:
-            """Auto-level: normal + fix_hints on trust=false."""
+            """Auto-level: normal + fix_hints + failed_gates on trust=false."""
             payload = {
                 "trust": result["trust"],
                 "g": result.get("gates", 0),
+                "failed_gates": result.get("failed_gates", []),
                 "check": result.get("check", {}).get("ok"),
                 "fix_hints": result.get("fix_hints", []),
                 "token": result.get("token", {}),
