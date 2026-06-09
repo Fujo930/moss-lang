@@ -242,3 +242,11 @@ class LiteralPattern:
 class VariantPattern:
     name: str
     payload: list[Any]
+
+@dataclass
+class LambdaExpr:
+    """Anonymous function: \\params -> expr"""
+    params: list[Param]
+    expr: object
+    location: SourceLocation | None = None
+
