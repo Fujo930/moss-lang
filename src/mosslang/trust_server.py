@@ -181,9 +181,24 @@ def make_trust_handler() -> type[BaseHTTPRequestHandler]:
 
             source = self.rfile.read(length).decode("utf-8")
 
-            if self.path == "/api/trust":
+            if self.path.startswith("/api/trust"):
+                from urllib.parse import urlparse, parse_qs
+                qs = parse_qs(urlparse(self.path).query)
+                level = qs.get("level", ["auto"])[0]
                 result = trust_from_source(source)
-                self.send_json(result)
+
+                if level == "auto":
+                    # auto: brief on success, normal + fix_hints on failure
+                    if result["trust"]:
+                        self._send_trust_brief(result)
+                    else:
+                        self._send_trust_normal(result)
+                elif level == "brief":
+                    self._send_trust_brief(result)
+                elif level == "full":
+                    self.send_json(result)
+                else:
+                    self._send_trust_normal(result)
             elif self.path == "/api/token":
                 from urllib.parse import urlparse, parse_qs
                 qs = parse_qs(urlparse(self.path).query)
@@ -226,6 +241,32 @@ def make_trust_handler() -> type[BaseHTTPRequestHandler]:
 
         def log_message(self, format: str, *args: object) -> None:
             return  # suppress logs for fast API operation
+
+        def _send_trust_brief(self, result: dict) -> None:
+            """Auto-level: brief on trust=true — 6 fields, ~15 tokens."""
+            trace_ev = result.get("trace", {}).get("events", [])
+            self.send_json({
+                "trust": True,
+                "h": result["source_sha256"][:12],
+                "c": result.get("token", {"e": 0, "t": 0, "l": 0}),
+                "r": [{"n": e.get("rule"), "o": str(e.get("result", "?"))[:16]} for e in trace_ev[:2]] if trace_ev else None,
+                "ms": result.get("elapsed_ms", 0),
+                "ta": "ta.v1",
+            })
+
+        def _send_trust_normal(self, result: dict) -> None:
+            """Auto-level: normal + fix_hints on trust=false."""
+            payload = {
+                "trust": result["trust"],
+                "check": result.get("check", {}).get("ok"),
+                "fix_hints": result.get("fix_hints", []),
+                "token": result.get("token", {}),
+                "h": result["source_sha256"][:16],
+                "ms": result.get("elapsed_ms", 0),
+            }
+            if result.get("golden"):
+                payload["golden"] = result["golden"].get("ok")
+            self.send_json(payload)
 
     return TrustHandler
 
