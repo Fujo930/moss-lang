@@ -65,8 +65,11 @@ class CorvusBridge(QObject):
         self._busy = False
         self._active_source = ""
         self._file_tree: list[dict] = []
+        self._expanded_dirs: set[str] = set()
         self._memories: list[dict] = []
         self._stats: dict = {}
+        self._file_viewer_path = ""
+        self._file_viewer_content = ""
 
         # Initialize workspace
         self._refresh_workspace()
@@ -85,10 +88,18 @@ class CorvusBridge(QObject):
     def _get_stats(self) -> dict:
         return self._stats
 
+    def _get_file_viewer_path(self) -> str:
+        return self._file_viewer_path
+
+    def _get_file_viewer_content(self) -> str:
+        return self._file_viewer_content
+
     version = Property("QVariantMap", fget=_get_version, constant=True)
     fileTree = Property("QVariantList", fget=_get_file_tree, notify=progressChanged)
     memories = Property("QVariantList", fget=_get_memories, notify=progressChanged)
     stats = Property("QVariantMap", fget=_get_stats, notify=progressChanged)
+    fileViewerPath = Property(str, fget=_get_file_viewer_path, notify=progressChanged)
+    fileViewerContent = Property(str, fget=_get_file_viewer_content, notify=progressChanged)
 
     # ── Slots called from QML ─────────────────────────────────
 
@@ -239,17 +250,34 @@ class CorvusBridge(QObject):
 
     @Slot(str)
     def toggleDirectory(self, path: str):
-        """Toggle directory expansion."""
-        pass  # Future: expand/collapse directory nodes
+        """Expand or collapse a directory in the file tree."""
+        if path in self._expanded_dirs:
+            self._expanded_dirs.discard(path)
+        else:
+            self._expanded_dirs.add(path)
+        self._refresh_workspace()
+        self.progressChanged.emit("")  # trigger QML refresh
 
     @Slot(str)
     def openFile(self, path: str):
-        """Load a file into the active source (silent — no chat message)."""
+        """Load a file into the viewer."""
         try:
-            self._active_source = Path(path).read_text(encoding="utf-8", errors="replace")
-            self.progressChanged.emit(f"Loaded {path} ({len(self._active_source)} chars)")
+            content = Path(path).read_text(encoding="utf-8", errors="replace")
+            self._active_source = content
+            self._file_viewer_path = path
+            self._file_viewer_content = content
+            self.progressChanged.emit(f"Viewing {path} ({len(content)} chars)")
         except Exception as e:
+            self._file_viewer_content = f"Error opening {path}: {e}"
+            self._file_viewer_path = ""
             self.progressChanged.emit(f"Error opening {path}: {e}")
+
+    @Slot()
+    def closeFileViewer(self):
+        """Close the file viewer overlay."""
+        self._file_viewer_path = ""
+        self._file_viewer_content = ""
+        self.progressChanged.emit("")
 
     @Slot(result=str)
     def getActiveSource(self) -> str:
@@ -258,41 +286,28 @@ class CorvusBridge(QObject):
     # ── Internal ──────────────────────────────────────────────
 
     def _refresh_workspace(self):
-        """Scan project directory for .moss, .py, .md, .toml files."""
-        entries = []
-        try:
-            root = Path(".")
-            for f in sorted(root.iterdir()):
-                if f.name.startswith(".") or f.name.startswith("__"):
-                    continue
-                if f.name == "node_modules":
+        """Build a flat tree list with depth for expanded directories."""
+        entries: list[dict] = []
+
+        def _scan(dir_path: Path, depth: int):
+            try:
+                items = sorted(dir_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
+            except OSError:
+                return
+            for f in items:
+                if f.name.startswith(".") or f.name.startswith("__") or f.name == "node_modules":
                     continue
                 if f.is_dir():
-                    if f.name in ("src", "tests", "examples", "docs", "build"):
-                        entries.append({"name": f.name + "/", "path": str(f), "isDir": True})
-                    elif f.name in ("dist", ".git", "__pycache__", ".pytest_cache"):
+                    if f.name in ("dist", ".git", "__pycache__", ".pytest_cache", "build", "embedded"):
                         continue
-                    else:
-                        entries.append({"name": f.name + "/", "path": str(f), "isDir": True})
-                elif f.suffix in (".moss", ".py", ".md", ".toml", ".json", ".c", ".h", ".txt"):
-                    entries.append({"name": f.name, "path": str(f), "isDir": False})
+                    rel = str(f)
+                    entries.append({"name": f.name, "path": rel, "isDir": True, "depth": depth})
+                    if rel in self._expanded_dirs:
+                        _scan(f, depth + 1)
+                elif f.suffix in (".moss", ".py", ".md", ".toml", ".json", ".c", ".h", ".txt", ".qml", ".js", ".ps1", ".cmd", ".ini", ".cfg", ".yml", ".yaml"):
+                    entries.append({"name": f.name, "path": str(f), "isDir": False, "depth": depth})
 
-            # Expand src/
-            for d in ("src", "tests", "examples"):
-                p = Path(d)
-                if p.is_dir():
-                    for f in sorted(p.rglob("*")):
-                        if f.name.startswith(".") or f.name.startswith("__"):
-                            continue
-                        if f.suffix in (".moss", ".py", ".md", ".toml", ".json", ".c", ".h", ".qml", ".js"):
-                            entries.append({
-                                "name": str(f),
-                                "path": str(f),
-                                "isDir": False,
-                            })
-        except Exception:
-            pass
-
+        _scan(Path("."), 0)
         self._file_tree = entries
 
         # Memories: project context

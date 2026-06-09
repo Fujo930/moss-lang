@@ -11,6 +11,16 @@ Rectangle {
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 10; spacing: 8; z: 1
 
+        // ── Clear selection when viewer closes ──────────────
+        Connections {
+            target: bridge
+            function onProgressChanged(msg) {
+                if (bridge.fileViewerPath === "") {
+                    root.selectedPath = ""
+                }
+            }
+        }
+
         // ── Files card ──────────────────────────────────────
         Rectangle {
             id: filesCard
@@ -45,13 +55,13 @@ Rectangle {
                 ListView {
                     id: fileList
                     width: parent.width; height: parent.height - 36; clip: true
-                    model: bridge.fileTree; spacing: 2
+                    model: bridge.fileTree; spacing: 1
 
                     delegate: Rectangle {
-                        width: fileList.width - 12; x: 6; implicitHeight: 30; radius: 8
-                        color: modelData.path === root.selectedPath ? Qt.alpha(window.cAccent, 0.12) :
-                               isHovered ? window.cBg2 : "transparent"
-                        property bool isHovered: false
+                        width: fileList.width - (modelData.depth ? modelData.depth * 16 : 0)
+                        x: modelData.depth ? modelData.depth * 16 : 0
+                        implicitHeight: 30; radius: 8
+                        color: modelData.path === root.selectedPath ? Qt.alpha(window.cAccent, 0.12) : "transparent"
 
                         RowLayout {
                             anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 8; spacing: 6
@@ -63,16 +73,11 @@ Rectangle {
                         }
 
                         MouseArea {
-                            id: mouseArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                            onEntered: parent.isHovered = true
-                            onExited: parent.isHovered = false
+                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                if (modelData.isDir) {
-                                    bridge.toggleDirectory(modelData.path)
-                                } else {
-                                    root.selectedPath = modelData.path
-                                    bridge.openFile(modelData.path)
-                                }
+                                root.selectedPath = modelData.path
+                                if (modelData.isDir) bridge.toggleDirectory(modelData.path)
+                                else bridge.openFile(modelData.path)
                             }
                         }
                     }
@@ -86,88 +91,52 @@ Rectangle {
             }
         }
 
-        // ── Settings card ──────────────────────────────────
+        // ── Settings ────────────────────────────────────────
         Rectangle {
-            id: settingsCard
-            property bool cardHovered: false
+            id: settingsCard; property bool cardHovered: false
             Layout.fillWidth: true; implicitHeight: 44; radius: 12
             color: window.cBg0; border.color: window.cBg3; border.width: 1
-
-            Rectangle {
-                anchors.fill: parent; anchors.margins: -2; radius: 14; z: -1
+            Rectangle { anchors.fill: parent; anchors.margins: -2; radius: 14; z: -1
                 color: window.darkMode ? Qt.rgba(0,0,0,0.2) : Qt.rgba(0,0,0,0.06)
-                opacity: settingsCard.cardHovered ? 1.0 : 0.0
-                Behavior on opacity { NumberAnimation { duration: 200 } }
-            }
-
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                opacity: settingsCard.cardHovered ? 1.0 : 0.0; Behavior on opacity { NumberAnimation { duration: 200 } } }
+            RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
                 Text { text: "⚙️"; font.pixelSize: 12 }
                 Text { text: "Settings"; color: window.cFg1; font.pixelSize: 13 }
-                Item { Layout.fillWidth: true }
-            }
-
-            MouseArea {
-                anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                onEntered: settingsCard.cardHovered = true
-                onExited: settingsCard.cardHovered = false
-            }
+                Item { Layout.fillWidth: true } }
+            MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                onEntered: settingsCard.cardHovered = true; onExited: settingsCard.cardHovered = false }
         }
 
-        // ── History card ───────────────────────────────────
+        // ── History ─────────────────────────────────────────
         Rectangle {
-            id: historyCard
-            property bool cardHovered: false
+            id: historyCard; property bool cardHovered: false
             Layout.fillWidth: true; implicitHeight: 44; radius: 12
             color: window.cBg0; border.color: window.cBg3; border.width: 1
-
-            Rectangle {
-                anchors.fill: parent; anchors.margins: -2; radius: 14; z: -1
+            Rectangle { anchors.fill: parent; anchors.margins: -2; radius: 14; z: -1
                 color: window.darkMode ? Qt.rgba(0,0,0,0.2) : Qt.rgba(0,0,0,0.06)
-                opacity: historyCard.cardHovered ? 1.0 : 0.0
-                Behavior on opacity { NumberAnimation { duration: 200 } }
-            }
-
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                opacity: historyCard.cardHovered ? 1.0 : 0.0; Behavior on opacity { NumberAnimation { duration: 200 } } }
+            RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
                 Text { text: "🕐"; font.pixelSize: 12 }
                 Text { text: "History"; color: window.cFg1; font.pixelSize: 13 }
-                Item { Layout.fillWidth: true }
-            }
-
-            MouseArea {
-                anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                onEntered: historyCard.cardHovered = true
-                onExited: historyCard.cardHovered = false
-            }
+                Item { Layout.fillWidth: true } }
+            MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                onEntered: historyCard.cardHovered = true; onExited: historyCard.cardHovered = false }
         }
 
-        // ── Trash card ─────────────────────────────────────
+        // ── Trash ───────────────────────────────────────────
         Rectangle {
-            id: trashCard
-            property bool cardHovered: false
+            id: trashCard; property bool cardHovered: false
             Layout.fillWidth: true; implicitHeight: 44; radius: 12
             color: window.cBg0; border.color: window.cBg3; border.width: 1
-
-            Rectangle {
-                anchors.fill: parent; anchors.margins: -2; radius: 14; z: -1
+            Rectangle { anchors.fill: parent; anchors.margins: -2; radius: 14; z: -1
                 color: window.darkMode ? Qt.rgba(0,0,0,0.2) : Qt.rgba(0,0,0,0.06)
-                opacity: trashCard.cardHovered ? 1.0 : 0.0
-                Behavior on opacity { NumberAnimation { duration: 200 } }
-            }
-
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                opacity: trashCard.cardHovered ? 1.0 : 0.0; Behavior on opacity { NumberAnimation { duration: 200 } } }
+            RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
                 Text { text: "🗑️"; font.pixelSize: 12 }
                 Text { text: "Trash"; color: window.cFg1; font.pixelSize: 13 }
-                Item { Layout.fillWidth: true }
-            }
-
-            MouseArea {
-                anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                onEntered: trashCard.cardHovered = true
-                onExited: trashCard.cardHovered = false
-            }
+                Item { Layout.fillWidth: true } }
+            MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                onEntered: trashCard.cardHovered = true; onExited: trashCard.cardHovered = false }
         }
     }
 }
