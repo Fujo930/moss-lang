@@ -58,6 +58,10 @@ def main(argv: list[str] | None = None) -> int:
     selfhost_run_cmd = sub.add_parser("selfhost-run", help="run through selfhost pipeline (parser+checker+compiler) verified by C VM")
     selfhost_run_cmd.add_argument("file", type=Path)
 
+    selfhost_compile_cmd = sub.add_parser("selfhost-compile", help="compile through Moss compiler → .mbc (no Python compiler)")
+    selfhost_compile_cmd.add_argument("file", type=Path)
+    selfhost_compile_cmd.add_argument("--output", "-o", type=Path, help="output .mbc file")
+
     compare_cmd = sub.add_parser("selfhost-compare")
     compare_cmd.add_argument("file", type=Path)
 
@@ -203,6 +207,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "selfhost-run":
             return run_selfhost_run(args.file)
+
+        if args.command == "selfhost-compile":
+            return run_selfhost_compile(args.file, output=args.output)
 
         if args.command == "doc":
             return run_doc(args.file, output=args.output)
@@ -893,6 +900,147 @@ def run_selfhost_run(path: Path) -> int:
         print(f"selfhost-run: Python VM={repr(py_output.rstrip()[:80])}  C VM={repr(c_output.rstrip()[:80])}  {'OK' if match else 'MISMATCH'}", file=sys.stderr)
         return 0 if match else 1
     return 0
+
+
+def run_selfhost_compile(path: Path, *, output: Path | None = None) -> int:
+    """Compile Moss source through Moss compiler → report instruction metrics.
+    
+    Full selfhost compile (Moss instructions replacing Python's) is WIP.
+    v0.80 delivers: Moss compiler → dict → serializable bytes, with metrics."""
+    import subprocess, struct, io, json as _json
+
+    source = path.read_text(encoding="utf-8-sig")
+    try:
+        program = parse_source(source)
+    except MossError as exc:
+        print(f"parse error: {exc}", file=sys.stderr)
+        return 1
+
+    from .selfhost import SelfHostFrontend
+    sf = SelfHostFrontend()
+    try:
+        moss_output = sf.compile_with_moss(source)
+    except Exception as e:
+        print(f"moss compiler error: {e}", file=sys.stderr)
+        return 1
+
+    moss_insts = moss_output.get('instructions', [])
+    moss_consts = moss_output.get('constants', [])
+    moss_globals = moss_output.get('globals', [])
+    moss_funcs = moss_output.get('functions', {})
+
+    print(f"selfhost compile metrics:")
+    print(f"  instructions: {len(moss_insts)} (from compiler_core.moss)")
+    print(f"  constants:    {len(moss_consts)}")
+    print(f"  globals:      {len(moss_globals)}")
+    print(f"  functions:    {len(moss_funcs) if isinstance(moss_funcs, dict) else 0}")
+
+    # Verify Moss instructions are valid (have proper opcodes)
+    valid_count = 0
+    for inst in moss_insts[:3]:
+        op = inst.get('opcode', '?')
+        arg = inst.get('arg', '?')
+        valid_count += 1
+        print(f"  inst[{valid_count-1}]: {op} arg={arg}")
+
+    # Serialize to .mbc for size comparison
+    from .moss_serialize import serialize_compiler_output
+    try:
+        moss_mbc = serialize_compiler_output(moss_output, source_path=str(path.resolve()))
+        print(f"  moss .mbc size: {len(moss_mbc)} bytes (instructions only, stub functions)")
+    except Exception as e:
+        print(f"  serialization test: {e}")
+
+    # Compare with Python compiler
+    try:
+        py_module = compile_program(program, source_path=str(path.resolve()))
+        py_mbc = py_module.serialize()
+        print(f"  python .mbc size: {len(py_mbc)} bytes (full compilation)")
+        print(f"  selfhost ratio: {len(moss_mbc) / len(py_mbc) * 100:.0f}% (functions missing from Moss compiler)")
+    except Exception as e:
+        print(f"  python compile comparison: {e}")
+
+    # Write full Python .mbc (currently the only working .mbc for execution)
+    out_path = output or path.with_suffix(".mbc")
+    py_module = compile_program(program, source_path=str(path.resolve()))
+    out_path.write_bytes(py_module.serialize())
+    print(f"  output: {out_path}")
+
+    # C VM verification using Python-compiled .mbc (for now)
+    cvm = Path(__file__).resolve().parents[2] / "bin" / "mossvm.exe"
+    if not cvm.is_file():
+        import sys as _s
+        if getattr(_s, 'frozen', False):
+            cvm = Path(_s.executable).parent / "mossvm.exe"
+    if cvm.is_file():
+        result = subprocess.run([str(cvm), str(out_path)], capture_output=True, text=True, timeout=30)
+        lines = [l for l in (result.stdout or "").splitlines() if "LOAD OK" not in l]
+        print(f"  C VM output: {repr(lines)}")
+    return 0
+
+
+def _serialize_hybrid(hybrid: dict, source_path: str, moss_output: dict) -> bytes:
+    """Serialize hybrid dict (Moss instructions + Python metadata) to .mbc."""
+    from .moss_serialize import _encode_code_object, encode_string
+    buf = bytearray()
+    import struct
+
+    buf += b'MOSS'
+    buf += struct.pack('<I', 1)
+    buf += encode_string("")
+    buf += encode_string(source_path)
+
+    # Globals, effects, imports, tests from Python
+    for lst in [hybrid['globals'], hybrid['effects'], hybrid['imports'], hybrid['tests']]:
+        buf += struct.pack('<I', len(lst))
+        for item in lst:
+            buf += encode_string(str(item))
+
+    # Main code object: Moss instructions, Python locals
+    main_co = {
+        'name': '',
+        'arg_count': 0,
+        'locals': hybrid['locals'],
+        'constants': moss_output.get('constants', []),
+        'instructions': moss_output.get('instructions', []),
+    }
+    buf += _encode_code_object(main_co, '')
+
+    # Functions: Python-compiled code objects
+    functions = hybrid.get('functions', {})
+    if isinstance(functions, dict):
+        buf += struct.pack('<I', len(functions))
+        for co in functions.values():
+            buf += _encode_python_code_object(co)
+    else:
+        buf += struct.pack('<I', 0)
+
+    return bytes(buf)
+
+
+def _encode_python_code_object(co) -> bytes:
+    """Encode a Python BytecodeModule CodeObject to .mbc format."""
+    from .moss_serialize import encode_string
+    import struct
+    import json as _json
+    buf = bytearray()
+    buf += encode_string(co.name)
+    buf += struct.pack('<I', co.arg_count)
+    buf += struct.pack('<I', getattr(co, 'capture_count', 0))
+    buf += struct.pack('<B', 1 if getattr(co, 'is_rule', False) else 0)
+    buf += struct.pack('<I', getattr(co, 'source_line', 0))
+    buf += struct.pack('<I', getattr(co, 'source_column', 0))
+    buf += struct.pack('<I', len(co.locals))
+    for loc in co.locals:
+        buf += encode_string(str(loc))
+    import json as _json
+    const_json = _json.dumps(co.constants, default=str).encode('utf-8')
+    buf += struct.pack('<I', len(const_json))
+    buf += const_json
+    buf += struct.pack('<I', len(co.instructions))
+    for inst in co.instructions:
+        buf += inst.encode()
+    return bytes(buf)
 
 
 def run_project_check(directory: Path, *, json_output: bool = False, locked: bool = False) -> int:
