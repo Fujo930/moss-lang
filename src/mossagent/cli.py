@@ -216,8 +216,12 @@ def cmd_agent(cv, task: str, *, json_mode: bool = False, provider: str = "openai
 
 
 def cmd_chat(*, json_mode: bool = False, message: str = "", provider: str = "openai", model: str | None = None) -> int:
-    """Single-turn chat with the LLM. No tools, just conversation."""
-    from .chat import Chat
+    """Multi-turn chat with conversation history and session persistence.
+    
+    Uses ChatSession for prefix-cache-optimized multi-turn conversation.
+    Saves session to corvus_chat.json so context survives restarts.
+    """
+    from .chat import ChatSession
     from .llm import create_adapter
 
     if not message:
@@ -230,13 +234,78 @@ def cmd_chat(*, json_mode: bool = False, message: str = "", provider: str = "ope
         _out({"ok": False, "error": f"LLM setup failed: {e}"}, json_mode=json_mode)
         return 1
 
-    chat = Chat(adapter.generate)
-    result = chat.ask(message)
+    # Load existing session or create new
+    session_path = Path("corvus_chat.json")
+    if session_path.is_file():
+        try:
+            session = ChatSession.load(session_path, adapter.generate)
+        except Exception:
+            session = ChatSession().bind(adapter.generate)
+    else:
+        session = ChatSession().bind(adapter.generate)
 
+    result = session.send(message)
+    session.save(session_path)
+
+    stats = session.stats()
     if json_mode:
-        _out({"ok": True, "question": result.question, "answer": result.answer, "elapsed_s": result.elapsed_s}, json_mode=True)
+        _out({
+            "ok": True,
+            "question": result.question,
+            "answer": result.answer,
+            "turn": result.turn,
+            "total_tokens": result.total_tokens,
+            "new_tokens": result.new_tokens,
+            "cache_hit_pct": result.cache_hit_pct,
+            "session_turns": stats["turns"],
+            "session_messages": stats["messages"],
+            "elapsed_s": result.elapsed_s,
+        }, json_mode=True)
     else:
         print(result.answer)
+        print(f"\n--- turn {result.turn} · cache hit {result.cache_hit_pct}% · {result.elapsed_s}s ---")
+    return 0
+
+
+def cmd_chat_reset(*, json_mode: bool = False) -> int:
+    """Reset the chat session."""
+    session_path = Path("corvus_chat.json")
+    if session_path.is_file():
+        session_path.unlink()
+    if json_mode:
+        _out({"ok": True, "message": "Chat session reset."}, json_mode=True)
+    else:
+        print("Chat session reset.")
+    return 0
+
+
+def cmd_chat_stats(*, json_mode: bool = False) -> int:
+    """Show chat session statistics."""
+    from .chat import ChatSession
+
+    session_path = Path("corvus_chat.json")
+    if not session_path.is_file():
+        if json_mode:
+            _out({"ok": True, "turns": 0, "messages": 0}, json_mode=True)
+        else:
+            print("No active chat session.")
+        return 0
+
+    try:
+        session = ChatSession.load(session_path)
+        stats = session.stats()
+        if json_mode:
+            _out({"ok": True, **stats}, json_mode=True)
+        else:
+            print(f"Chat session: {stats['turns']} turns, {stats['messages']} messages")
+            print(f"System prompt: {stats['system_chars']} chars (~{stats['system_chars']//4} tokens, cached)")
+            print(f"History: {stats['history_chars']} chars (~{stats['history_chars']//4} tokens)")
+            print(f"Estimated cache hit rate: {stats['estimated_cache_hit_pct']}%")
+    except Exception as e:
+        if json_mode:
+            _out({"ok": False, "error": str(e)}, json_mode=True)
+        else:
+            print(f"Error reading session: {e}")
     return 0
 
 
@@ -349,12 +418,16 @@ def main(argv: list[str] | None = None) -> int:
         from mossagent import Corvus
         return cmd_test(Corvus(), json_mode=json_mode)
 
-    # chat needs a message
+    # chat, chat-reset, chat-stats need no source/spec
     if cmd == "chat":
         if not message_text:
             print("corvus chat: missing --msg argument", file=sys.stderr)
             return 1
         return cmd_chat(json_mode=json_mode, message=message_text, provider=provider, model=model)
+    if cmd == "chat-reset":
+        return cmd_chat_reset(json_mode=json_mode)
+    if cmd == "chat-stats":
+        return cmd_chat_stats(json_mode=json_mode)
 
     # agent needs a task (--spec)
     if cmd == "agent":

@@ -52,13 +52,15 @@ class OpenAIAdapter:
         self.timeout = int(os.environ.get("LLM_TIMEOUT", "60"))
 
     def generate(self, prompt: str) -> str:
+        return self.generate_messages([{"role": "user", "content": prompt}])
+
+    def generate_messages(self, messages: list[dict]) -> str:
+        """Send a full message array. API caches the prefix for subsequent calls."""
         url = f"{self.base_url}/chat/completions"
 
         body = _json.dumps({
             "model": self.model,
-            "messages": [
-                {"role": "user", "content": prompt},
-            ],
+            "messages": messages,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
         }).encode("utf-8")
@@ -98,16 +100,30 @@ class ClaudeAdapter:
         self.timeout = int(os.environ.get("LLM_TIMEOUT", "60"))
 
     def generate(self, prompt: str) -> str:
+        return self.generate_messages([{"role": "user", "content": prompt}])
+
+    def generate_messages(self, messages: list[dict]) -> str:
         url = "https://api.anthropic.com/v1/messages"
 
-        body = _json.dumps({
+        # Claude API: system is a separate field, not a message role
+        system_content = ""
+        chat_messages = []
+        for m in messages:
+            if m["role"] == "system":
+                system_content = m["content"]
+            else:
+                chat_messages.append({"role": m["role"], "content": m["content"]})
+
+        body_dict = {
             "model": self.model,
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
-            "messages": [
-                {"role": "user", "content": prompt},
-            ],
-        }).encode("utf-8")
+            "messages": chat_messages,
+        }
+        if system_content:
+            body_dict["system"] = system_content
+
+        body = _json.dumps(body_dict).encode("utf-8")
 
         req = urllib.request.Request(url, data=body, method="POST")
         req.add_header("Content-Type", "application/json")
