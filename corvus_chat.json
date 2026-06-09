@@ -3,13 +3,13 @@
   "history": [
     {
       "role": "user",
-      "content": "hi",
-      "timestamp": 1781044242.6499834
+      "content": "你好",
+      "timestamp": 1781045379.3499706
     },
     {
       "role": "assistant",
-      "content": "(Error calling LLM: LLM API error 401: {\n    \"error\": {\n        \"message\": \"You didn't provide an API key. You need to provide your API key in an Authorization header using Bearer auth (i.e. Authorization: Bearer YOUR_KEY), or as the password field (with blank username) if you're accessing the API from your browser and are prompted for a username and password. You can obtain an API key from https://platform.openai.com/account/api-keys.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": null\n    }\n}\n)",
-      "timestamp": 1781044242.6499834
+      "content": "你好！我是 Corvus，Moss 编程语言和 Corvus Agent 平台的助手。有什么可以帮你的吗？",
+      "timestamp": 1781045379.3499706
     }
   ],
   "turn": 1

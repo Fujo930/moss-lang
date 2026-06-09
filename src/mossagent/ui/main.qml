@@ -36,16 +36,14 @@ ApplicationWindow {
 
     // ── Two-panel body: Chat (left) + Files (right) ─────────
     RowLayout {
-        anchors.fill: parent; spacing: 0
+        anchors.fill: parent; spacing: 0; anchors.margins: 12
 
         ChatPanel {
             id: chatPanel
             Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumWidth: 300
         }
 
-        Rectangle {
-            width: 1; Layout.fillHeight: true; color: cBg3
-        }
+        Rectangle { width: 12; Layout.fillHeight: true; color: "transparent" }
 
         WorkspacePanel {
             id: workspacePanel

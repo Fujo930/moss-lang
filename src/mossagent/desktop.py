@@ -22,6 +22,9 @@ import time
 from pathlib import Path
 from io import StringIO
 
+# ── Qt style fix: Basic supports background customization ─────
+os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Fusion")
+
 try:
     from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl
     from PySide6.QtGui import QGuiApplication
