@@ -215,6 +215,31 @@ def cmd_agent(cv, task: str, *, json_mode: bool = False, provider: str = "openai
     return 0 if result.ok else 1
 
 
+def cmd_chat(*, json_mode: bool = False, message: str = "", provider: str = "openai", model: str | None = None) -> int:
+    """Single-turn chat with the LLM. No tools, just conversation."""
+    from .chat import Chat
+    from .llm import create_adapter
+
+    if not message:
+        print("corvus chat: missing --message argument", file=sys.stderr)
+        return 1
+
+    try:
+        adapter = create_adapter(provider, model=model)
+    except Exception as e:
+        _out({"ok": False, "error": f"LLM setup failed: {e}"}, json_mode=json_mode)
+        return 1
+
+    chat = Chat(adapter.generate)
+    result = chat.ask(message)
+
+    if json_mode:
+        _out({"ok": True, "question": result.question, "answer": result.answer, "elapsed_s": result.elapsed_s}, json_mode=True)
+    else:
+        print(result.answer)
+    return 0
+
+
 def cmd_test(cv, *, json_mode: bool = False) -> int:
     """Run the Python test suite and report results.
     
@@ -278,11 +303,12 @@ def main(argv: list[str] | None = None) -> int:
     source_text: str | None = None
     source_file: str | None = None
     spec_text: str | None = None
+    message_text: str | None = None
     provider: str = "openai"
     model: str | None = None
     max_rounds: int = 15
 
-    # Parse --source, --spec, --file, --provider, --model, --max-rounds
+    # Parse --source, --spec, --file, --provider, --model, --max-rounds, --msg
     remaining: list[str] = []
     i = 1
     while i < len(args):
@@ -300,18 +326,20 @@ def main(argv: list[str] | None = None) -> int:
             try: max_rounds = int(args[i + 1])
             except ValueError: pass
             i += 2
+        elif args[i] in ("--message", "--msg") and i + 1 < len(args):
+            message_text = args[i + 1]; i += 2
         else:
             remaining.append(args[i]); i += 1
 
     if len(remaining) < 1:
         print("corvus: Moss Agent core engine", file=sys.stderr)
         print("usage: corvus <command> [--source code|--file path|--spec desc] [--json]", file=sys.stderr)
-        print("commands: verify execute safe token generate agent test version check", file=sys.stderr)
+        print("commands: verify execute safe token generate agent chat test version check", file=sys.stderr)
         return 1
 
     cmd = remaining[0]
 
-    # version, check, test need no source/spec
+    # version, check, test, chat need no source/spec
     if cmd == "version":
         from mossagent import Corvus
         return cmd_version(Corvus(), json_mode=json_mode)
@@ -320,6 +348,13 @@ def main(argv: list[str] | None = None) -> int:
     if cmd == "test":
         from mossagent import Corvus
         return cmd_test(Corvus(), json_mode=json_mode)
+
+    # chat needs a message
+    if cmd == "chat":
+        if not message_text:
+            print("corvus chat: missing --msg argument", file=sys.stderr)
+            return 1
+        return cmd_chat(json_mode=json_mode, message=message_text, provider=provider, model=model)
 
     # agent needs a task (--spec)
     if cmd == "agent":
@@ -345,7 +380,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"corvus {cmd}: need --source, --file, or a file path", file=sys.stderr)
         print("usage: corvus <command> [--source code|--file path] [--json]", file=sys.stderr)
-        print("commands: verify execute safe token generate agent test version check", file=sys.stderr)
+        print("commands: verify execute safe token generate agent chat test version check", file=sys.stderr)
         return 1
 
     from mossagent import Corvus
@@ -361,7 +396,7 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_token(cv, src, json_mode=json_mode)
     else:
         print(f"corvus: unknown command: {cmd}", file=sys.stderr)
-        print("commands: verify execute safe token generate version check", file=sys.stderr)
+        print("commands: verify execute safe token generate agent chat test version check", file=sys.stderr)
         return 1
 
 
