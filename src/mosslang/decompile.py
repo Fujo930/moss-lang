@@ -2,90 +2,83 @@
 
 Brand 4 of the dual-brand architecture (Trust + Token + Server + Decompile).
 
-Reads the .mbc binary format and produces a structural overview
-with instruction counts, function listings, and metadata.
+Uses BytecodeModule.deserialize() for reliable parsing,
+then produces a structural overview with instruction counts, function listings, and metadata.
 """
 
 from __future__ import annotations
 
-import struct
-import io
 from pathlib import Path
 
 
 def decompile_mbc(path: Path) -> str:
     """Decompile a .mbc file to a structural overview string."""
-    data = path.read_bytes()
+    try:
+        data = path.read_bytes()
+    except Exception as e:
+        return f"error reading file: {e}"
+
     if data[:4] != b'MOSS':
         return "error: not a valid .mbc file"
 
-    buf = io.BytesIO(data)
-    buf.read(4)  # magic
-    version = struct.unpack('<I', buf.read(4))[0]
+    try:
+        from .bytecode import BytecodeModule
+        mod = BytecodeModule.deserialize(data)
+    except Exception as e:
+        return f"error deserializing .mbc: {e}"
 
-    def _ru32(): return struct.unpack('<I', buf.read(4))[0]
-    def _rs(): l = _ru32(); return buf.read(l).decode('utf-8') if l > 0 else ""
-    def _rb(): l = _ru32(); return buf.read(l)
-
-    module_name = _rs()
-    source_path = _rs()
-
-    lines = [f"// decompiled: {source_path or module_name or '?'}",
-             f"// version {version}", ""]
-
-    n_globals = _ru32()
-    globals_list = [_rs() for _ in range(n_globals)]
-    n_eff = _ru32()
-    eff_list = [_rs() for _ in range(n_eff)]
-    for e in eff_list:
-        if e: lines.append(f"effect {e}")
-    n_imp = _ru32()
-    imp_list = [_rs() for _ in range(n_imp)]
-    for imp in imp_list:
-        if imp: lines.append(f'import "{imp}"')
-    n_tests_early = _ru32()
-    _ = [_rs() for _ in range(n_tests_early)]
-
-    if eff_list or imp_list:
-        lines.append("")
-
-    # Skip main code object header
-    _ = _rs()  # co_name
-    _ = _ru32(); _ = _ru32()  # argc, capc
-    _ = buf.read(1)  # is_rule
-    _ = _ru32(); _ = _ru32()  # source line, col
-    n_loc = _ru32()
-    loc_names = [_rs() for _ in range(n_loc)]
-    cl = _ru32()
-    _ = _rb()  # constants
-    n_inst = _ru32()
-    _ = buf.read(n_inst * 11)  # instructions
-
-    lines.append(f"// main: {n_inst} instructions, {n_loc} locals, {n_globals} globals")
+    lines = []
+    lines.append(f"// decompiled: {mod.source_path or mod.module_name or '?'}")
+    lines.append(f"// version {mod.version}")
     lines.append("")
 
-    # Functions
-    n_funcs = _ru32()
-    lines.append(f"// {n_funcs} functions:")
-    for fi in range(min(n_funcs, 50)):
-        fn_name = _rs(); _ = _rs()  # name, co_name
-        _ = _ru32(); _ = _ru32(); _ = buf.read(1)  # argc, capc, is_rule
-        _ = _ru32(); _ = _ru32()  # srcl, srcc
-        fl = _ru32(); _ = [_rs() for _ in range(fl)]
-        fc = _ru32(); _ = _rb()
-        fi_c = _ru32(); _ = buf.read(fi_c * 11)
-        lines.append(f"//   fn {fn_name} ({fl} locals, {fi_c} instructions)")
+    # Effects
+    for e in mod.effects:
+        lines.append(f"effect {e}")
+    # Imports
+    for imp in mod.imports:
+        lines.append(f'import "{imp}"')
 
-    # Skip remaining functions
-    for fi in range(50, n_funcs):
-        _ = _rs(); _ = _rs(); _ = _ru32(); _ = _ru32(); _ = buf.read(1)
-        _ = _ru32(); _ = _ru32(); fl = _ru32(); _ = [_rs() for _ in range(fl)]
-        fc = _ru32(); _ = _rb(); fi_c = _ru32(); _ = buf.read(fi_c * 11)
+    if mod.effects or mod.imports:
+        lines.append("")
+
+    # Main code object
+    co = mod.code
+    lines.append(f"// main: {len(co.instructions)} instructions, {len(co.locals)} locals, {len(co.constants)} constants")
+    lines.append("")
+
+    # Instruction listing
+    for i, inst in enumerate(co.instructions):
+        op_name = inst.opcode.name
+        detail = ""
+        if inst.arg is not None:
+            ci = inst.arg & 0x7FFFFFFF
+            if op_name == "LOAD_CONST" and ci < len(co.constants):
+                detail = f"  # {co.constants[ci]!r}"
+            elif op_name == "LOAD_GLOBAL" and ci < len(mod.globals):
+                detail = f"  # {mod.globals[ci]}"
+            elif op_name == "STORE_GLOBAL" and ci < len(mod.globals):
+                detail = f"  # {mod.globals[ci]}"
+            elif op_name == "LOAD_LOCAL" and ci < len(co.locals):
+                detail = f"  # {co.locals[ci]}"
+            elif op_name == "STORE_LOCAL" and ci < len(co.locals):
+                detail = f"  # {co.locals[ci]}"
+            elif op_name == "CALL" and ci > 0:
+                detail = f"  # {ci} args"
+        lines.append(f"  [{i:3d}] {op_name:16s} arg={inst.arg:4d}{detail}")
+
+    # Functions
+    if mod.functions:
+        lines.append("")
+        lines.append(f"// {len(mod.functions)} functions:")
+        for fn_name, fn_co in mod.functions.items():
+            lines.append(f"//   fn {fn_name} ({len(fn_co.locals)} locals, {len(fn_co.instructions)} instructions)")
 
     # Tests
-    tests = [_rs() for _ in range(n_tests_early if n_tests_early > 0 else _ru32())]
-    for t in tests:
-        if t:
+    if mod.tests:
+        lines.append("")
+        lines.append("// tests:")
+        for t in mod.tests:
             lines.append(f'//   test: "{t}"')
 
     lines.append("")
