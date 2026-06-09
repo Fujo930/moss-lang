@@ -270,6 +270,7 @@ class Compiler:
             n.LetStmt, n.AssignStmt, n.ExprStmt,
             n.ReturnStmt, n.RequireStmt, n.IfStmt,
             n.ForStmt, n.WhileStmt, n.BreakStmt, n.ContinueStmt,
+            n.PythonExternDecl,
         ))
 
     def _compile_statement(self, stmt: Any) -> None:
@@ -411,6 +412,14 @@ class Compiler:
         elif isinstance(stmt, n.ContinueStmt):
             if self.loop_continues:
                 self.emit(Opcode.JUMP, self.loop_continues[-1])
+
+        elif isinstance(stmt, n.PythonExternDecl):
+            # extern "python" fn name(params) -> T = "mod.fn"
+            # Store the target string as a global so imports can see it
+            target_idx = self._add_constant(stmt.target)
+            self.emit(Opcode.LOAD_CONST, target_idx)
+            gidx = self._register_global(stmt.name)
+            self.emit(Opcode.STORE_GLOBAL, gidx)
 
         elif isinstance(stmt, n.ExprStmt):
             self._compile_expression(stmt.expr)

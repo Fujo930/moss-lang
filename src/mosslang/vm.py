@@ -351,6 +351,7 @@ class VM:
         args = [frame.stack.pop() for _ in range(arg_count)]
         args.reverse()
         callee = frame.stack.pop()
+        original_name = callee if isinstance(callee, str) else None
         
         # Resolve name to callable
         if isinstance(callee, str):
@@ -361,6 +362,9 @@ class VM:
             frame.stack.append(result)
         elif isinstance(callee, Variant):
             frame.stack.append(Variant(callee.name, tuple(args)))
+        elif isinstance(callee, str) and "." in callee:
+            # Python extern dispatch: "module.function" target string
+            self._do_call_python_str(frame, arg_count, callee, args)
         elif isinstance(callee, CodeObject):
             fn_name = callee.name
             fn_globals = self._function_globals.get(fn_name, self._module.globals if self._module else [])
@@ -409,6 +413,31 @@ class VM:
                 frame.stack.append(Result(False, sig.value))
         else:
             raise MossRuntimeError(f"cannot call {type(callee).__name__}")
+
+    def _do_call_python_str(self, frame, arg_count, target, args):
+        """Dispatch a python extern call triggered by a dotted string callee."""
+        parts = target.rsplit(".", 1)
+        if len(parts) == 2:
+            mod_name, fn_name = parts
+        else:
+            mod_name, fn_name = "builtins", parts[0]
+
+        try:
+            mod = importlib.import_module(mod_name)
+            fn = getattr(mod, fn_name, None)
+        except (ImportError, AttributeError) as e:
+            raise MossRuntimeError(f"python extern '{target}': {e}")
+
+        if fn is None:
+            raise MossRuntimeError(f"python extern '{target}': function not found")
+
+        py_args = [self._moss_to_python(a) for a in args]
+        try:
+            result = fn(*py_args)
+        except Exception as e:
+            raise MossRuntimeError(f"python extern '{target}' error: {e}")
+
+        frame.stack.append(self._python_to_moss(result))
 
     def _do_call_python(self, frame, arg_count):
         """Execute a Python extern call. Target module.function is on stack."""
@@ -492,6 +521,10 @@ class VM:
         # Variant constructors
         if name and name[0].isupper():
             return Variant(name)
+        # Python extern: check if name is stored as a dotted target string in globals
+        val = self.globals.get(name)
+        if isinstance(val, str) and "." in val:
+            return val  # Return the dotted target string for _do_call to dispatch
         raise MossRuntimeError(f"undefined function '{name}'")
 
     def _do_binary(self, frame, op):
@@ -752,6 +785,10 @@ class VM:
                 self.globals[name] = fn_co
                 self._function_globals[name] = list(imported_mod.globals)
                 self._function_source_paths[name] = str(resolved)
+            # Register Python extern declarations from imported module
+            for item in program.items:
+                if item.__class__.__name__ == "PythonExternDecl":
+                    self.globals[item.name] = item.target
             self.effects.update(imported_mod.effects)
             self.tests.extend(imported_mod.tests)
             self._load_imports(imported_mod)
