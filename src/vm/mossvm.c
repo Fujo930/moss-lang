@@ -490,14 +490,23 @@ static void vm_run(VM *vm) {
                     } else if (strcmp(name, "textReplace") == 0) {
                         if (arg>=3 && fn_args[0] && fn_args[0]->kind == V_STRING) {
                             const char *s=fn_args[0]->as.string, *old=fn_args[1]->as.string, *nw=fn_args[2]->as.string;
-                            char buf[2048]=""; int pos=0;
-                            const char *p=s; int olen=(int)strlen(old);
+                            int olen=(int)strlen(old), nlen=(int)strlen(nw), slen=(int)strlen(s);
+                            int maxlen = slen + 1;
+                            if (nlen > olen) maxlen = slen * (nlen + 1);
+                            char *buf = malloc(maxlen);
+                            if (!buf) { stack_push(&vm->stack, val_null()); break; }
+                            int pos=0;
+                            const char *p=s;
                             while (*p) {
-                                if (strncmp(p,old,olen)==0) { pos+=snprintf(buf+pos,sizeof(buf)-pos,"%s",nw); p+=olen; }
-                                else buf[pos++]=*p++;
+                                if (strncmp(p,old,olen)==0) {
+                                    pos+=snprintf(buf+pos,maxlen-pos,"%s",nw);
+                                    if (pos >= maxlen) { maxlen*=2; buf=realloc(buf,maxlen); buf[pos-1]=0; pos--; }
+                                    p+=olen;
+                                } else buf[pos++]=*p++;
                             }
                             buf[pos]=0;
                             stack_push(&vm->stack, val_string(buf));
+                            free(buf);
                         } else stack_push(&vm->stack, val_null());
                     } else if (strcmp(name, "readText") == 0) {
                         if (fn_args[0] && fn_args[0]->kind == V_STRING) {
@@ -918,8 +927,22 @@ static void vm_run(VM *vm) {
             break;
         }
         case OP_REQUIRE: {
-            Value *err_val = stack_pop(&vm->stack);
-            fprintf(stderr, "mossvm: require failed: "); val_print(stderr, err_val); fprintf(stderr, "\n"); exit(1);
+            // require(condition, error_value):
+            //   condition is on stack top, error_value below it
+            //   If condition is truthy → pop both, continue
+            //   If condition is falsy → pop error_value, print it, exit(1)
+            Value *cond = stack_pop(&vm->stack);
+            bool ok = (cond && cond->kind != V_NULL);
+            if (!ok) {
+                Value *err_val = stack_pop(&vm->stack);
+                fprintf(stderr, "mossvm: require failed: ");
+                val_print(stderr, err_val);
+                fprintf(stderr, "\n");
+                exit(1);
+            }
+            // condition passed — pop the unused error value and continue
+            stack_pop(&vm->stack);
+            break;
         }
         default:
             fprintf(stderr, "mossvm: unhandled opcode %d at pc %d\n", op, vm->pc - 1);
@@ -1200,6 +1223,16 @@ int main(int argc, char *argv[]) {
         input = argv[2];
         const char *dot = strrchr(input, '.');
         if (dot && strcmp(dot, ".moss") == 0) {
+            // Validate filename: reject shell metacharacters to prevent injection
+            const char *bad = "`$(){}[]&|;<>!\"'\\\n\r";
+            int safe = 1;
+            for (const char *c = input; *c; c++) {
+                if (strchr(bad, *c)) { safe = 0; break; }
+            }
+            if (!safe) {
+                fprintf(stderr, "mossvm: unsafe filename (shell metacharacters): %s\n", input);
+                return -1;
+            }
             snprintf(temp_mbc, sizeof(temp_mbc), "%s.mbc_tmp", input);
             char cmd[1024];
             snprintf(cmd, sizeof(cmd), "python -m mosslang.cli compile \"%s\" -o \"%s\" 2>nul", input, temp_mbc);

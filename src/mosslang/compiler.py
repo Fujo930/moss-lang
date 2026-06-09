@@ -143,6 +143,13 @@ class Compiler:
         for param in decl.params:
             self._register_local(param.name)
 
+        # Emit CHECK_EFFECT at function entry for each declared effect requirement
+        # This enforces effect discipline at the VM level (not just the checker)
+        for effect_name in decl.uses:
+            effect_idx = self._add_constant(effect_name)
+            self.emit(Opcode.LOAD_CONST, effect_idx)
+            self.emit(Opcode.CHECK_EFFECT, 0)
+
         # Compile all but last statement; last may have implicit return
         body = decl.body
         for stmt in body[:-1]:
