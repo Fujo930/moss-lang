@@ -440,7 +440,7 @@ def main(argv: list[str] | None = None) -> int:
                     "effects": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") == "Effect"),
                     "imports": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") == "Import"),
                     "types": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") == "Type"),
-                    "callables": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") in ("Rule", "Function")),
+                    "callables": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") in ("Rule", "Function", "PythonExtern")),
                     "tests": sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") == "Test"),
                 }
                 if args.json:
@@ -2081,7 +2081,7 @@ def compare_selfhost_details(path: Path) -> dict:
         "effects": sum(1 for item in nodes if item["kind"] == "Effect"),
         "imports": sum(1 for item in nodes if item["kind"] == "Import"),
         "types": sum(1 for item in nodes if item["kind"] == "Type"),
-        "callables": sum(1 for item in nodes if item["kind"] in {"Rule", "Function"}),
+        "callables": sum(1 for item in nodes if item["kind"] in {"Rule", "Function", "PythonExtern"}),
         "tests": sum(1 for item in nodes if item["kind"] == "Test"),
     }
     selfhost_names = selfhost_declaration_names(nodes)

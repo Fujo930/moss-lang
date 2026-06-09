@@ -343,6 +343,17 @@ def moss_nodes_to_program(nodes: list[dict], source: str = "") -> n.Program:
             items.append(n.TestDecl(name=name, body=body))
             i += 1
 
+        elif kind == "PythonExtern":
+            # value format: "(params) -> Type = target"
+            params = _parse_params_from_value(value)
+            ret_type = _parse_return_type(value)
+            target = ""
+            eq_idx = value.rfind("=")
+            if eq_idx >= 0:
+                target = value[eq_idx + 1:].strip().strip('"')
+            items.append(n.PythonExternDecl(name=name, params=params, return_type=ret_type, target=target))
+            i += 1
+
         elif kind == "Let":
             expr = _moss_expr_to_ast(data) if isinstance(data, dict) else n.Literal(None)
             items.append(n.LetStmt(name=name, expr=expr))

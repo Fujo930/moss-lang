@@ -322,6 +322,49 @@ fn parseNamedLine(state: ParseState, kind: Text) -> ParseState {
   return addNode(state, node(kind, name.value, value, data))
 }
 
+fn parseExtern(state: ParseState) -> ParseState {
+  state = advance(state)  // skip "extern"
+  langToken = currentToken(state)
+  if langToken.kind != "STRING" {
+    state = addError(state, "expected language string after extern")
+    return advanceToNextLine(state)
+  }
+  lang = langToken.value
+  state = advance(state)
+  // skip "fn"
+  if currentToken(state).value != "fn" {
+    state = addError(state, "expected 'fn' after extern language")
+    return advanceToNextLine(state)
+  }
+  state = advance(state)
+  fnName = currentToken(state)
+  if fnName.kind != "IDENT" {
+    state = addError(state, "expected function name after extern fn")
+    return advanceToNextLine(state)
+  }
+  state = advance(state)
+  // Read everything until "=" as the signature
+  signature = ""
+  while currentToken(state).kind != "EOF" and currentToken(state).kind != "NEWLINE" and currentToken(state).value != "=" {
+    signature = tokenText(signature, currentToken(state))
+    state = advance(state)
+  }
+  if currentToken(state).value != "=" {
+    state = addError(state, "expected = after extern signature")
+    return advanceToNextLine(state)
+  }
+  signature = tokenText(signature, "=")
+  state = advance(state)
+  target = currentToken(state)
+  if target.kind != "STRING" {
+    state = addError(state, "expected target string after =")
+    return advanceToNextLine(state)
+  }
+  signature = tokenText(signature, target.value)
+  state = advance(state)
+  return addNode(state, node("PythonExtern", fnName.value, signature, null))
+}
+
 fn parseLet(state: ParseState) -> ParseState {
   state = advance(state)
   name = currentToken(state)
@@ -400,6 +443,10 @@ fn parseStatement(state: ParseState) -> ParseState {
 
   if item.kind == "IDENT" and item.value == "test" {
     return parseNamedLine(state, "Test")
+  }
+
+  if item.kind == "IDENT" and item.value == "extern" {
+    return parseExtern(state)
   }
 
   if item.kind == "IDENT" and item.value == "let" {
