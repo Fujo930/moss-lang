@@ -1,6 +1,6 @@
 """Moss Decompile — .mbc bytecode to structure overview.
 
-Brand 4 of the dual-brand architecture (Trust + Token + Server + Decompile).
+Brand 4 of the four-brand architecture (Trust + Token + Server + Decompile).
 
 Uses BytecodeModule.deserialize() for reliable parsing,
 then produces a structural overview with instruction counts, function listings, and metadata.

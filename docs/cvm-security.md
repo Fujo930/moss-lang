@@ -36,7 +36,7 @@ primary attack surface.
 - `readText()`: refuses files larger than 1 MB, returns empty string
 - These prevent malloc OOM and buffer overflow from crafted .mbc headers
 
-### Library-alloc-free memory model
+### Heap-allocated memory model
 - All values are heap-allocated via `calloc/malloc` with corresponding `free` calls
 - No use-after-free paths identified in the current codebase
 - Stack-allocated arrays use fixed sizes (256 chars for paths/file names, 32 for call args)

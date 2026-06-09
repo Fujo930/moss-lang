@@ -45,9 +45,13 @@ class Frame:
 class VM:
     """Stack-based bytecode virtual machine for Moss."""
     
+    MAX_FRAME_DEPTH = 100_000  # Python VM: selfhost recursive descent parser hits ~46k frames
+    MAX_STACK_SIZE  = 4096   # matches C VM mossvm.c STACK_MAX
+    
     def __init__(self, output=None, base_path=None, trace_rules=False, import_paths=None):
         self.globals = {}
         self.functions = {}
+        self._frame_depth = 0          # recursion depth guard
         self.effects = set()
         self.types = {}
         self.db = {}
@@ -189,11 +193,22 @@ class VM:
         raise MossRuntimeError(f"cannot call {type(func).__name__}")
 
     def _execute(self, frame):
+        self._frame_depth += 1
+        if self._frame_depth > VM.MAX_FRAME_DEPTH:
+            self._frame_depth -= 1
+            raise MossRuntimeError(
+                f"call stack overflow: max depth {VM.MAX_FRAME_DEPTH} exceeded"
+            )
         while frame.pc < len(frame.code.instructions):
             inst = frame.code.instructions[frame.pc]
             op = inst.opcode
             arg = inst.arg
             frame.pc += 1
+            
+            if len(frame.stack) > VM.MAX_STACK_SIZE:
+                raise MossRuntimeError(
+                    f"value stack overflow: max {VM.MAX_STACK_SIZE} values"
+                )
             
             if op == Opcode.NOP or op == Opcode.LABEL:
                 pass
@@ -360,6 +375,7 @@ class VM:
                 frame.stack.append(val if not isinstance(val, Result) else val.value)
             else:
                 raise MossRuntimeError(f"unknown opcode: {op}")
+        self._frame_depth -= 1
 
     def _do_call(self, frame, arg_count):
         args = [frame.stack.pop() for _ in range(arg_count)]

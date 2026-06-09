@@ -1,4 +1,9 @@
-from __future__ import annotations
+"""Moss Studio browser launcher.
+
+Opens Moss Studio (web-based workbench) in the default browser.
+This is a thin launcher, not a native desktop application — it creates
+a workspace directory, starts the Studio HTTP server, and opens the browser.
+"""
 
 import os
 import threading
