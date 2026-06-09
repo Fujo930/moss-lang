@@ -172,7 +172,7 @@ ApplicationWindow {
             }
             Item { Layout.fillWidth: true }
             Text {
-                text: bridge.stats ? bridge.stats.cache_hit : ""
+                text: bridge.stats && bridge.stats.cache_hit ? bridge.stats.cache_hit : ""
                 color: cFg3
                 font.pixelSize: Theme.font_size_xs
                 font.family: Theme.font_mono
@@ -192,10 +192,15 @@ ApplicationWindow {
         }
         function onProgressChanged(msg) {
             statusText.text = msg
-        }
-        function onTaskComplete(result) {
-            detailPanel.showResult(result)
-            statusText.text = "Task complete"
+            // Check if this is a task result JSON
+            try {
+                var result = JSON.parse(msg)
+                if (result.summary) {
+                    detailPanel.showResult(result)
+                }
+            } catch(e) {
+                // not JSON, just a status message
+            }
         }
     }
 

@@ -119,17 +119,17 @@ Rectangle {
             RowLayout {
                 spacing: Theme.space_sm
                 Text { text: "Cache hit:"; color: root.cFg2; font.family: Theme.font_sans; font.pixelSize: Theme.font_size_xs }
-                Text { text: bridge.stats ? bridge.stats.cache_hit_pct + "%" : "\u2014"; color: root.cGreen; font.family: Theme.font_mono; font.pixelSize: Theme.font_size_xs }
+                Text { text: bridge.stats && bridge.stats.cache_hit_pct ? bridge.stats.cache_hit_pct + "%" : "—"; color: root.cGreen; font.family: Theme.font_mono; font.pixelSize: Theme.font_size_xs }
             }
             RowLayout {
                 spacing: Theme.space_sm
                 Text { text: "Turns:"; color: root.cFg2; font.family: Theme.font_sans; font.pixelSize: Theme.font_size_xs }
-                Text { text: bridge.stats ? bridge.stats.turns : "\u2014"; color: root.cFg1; font.family: Theme.font_mono; font.pixelSize: Theme.font_size_xs }
+                Text { text: bridge.stats && bridge.stats.turns ? bridge.stats.turns : "—"; color: root.cFg1; font.family: Theme.font_mono; font.pixelSize: Theme.font_size_xs }
             }
             RowLayout {
                 spacing: Theme.space_sm
                 Text { text: "Messages:"; color: root.cFg2; font.family: Theme.font_sans; font.pixelSize: Theme.font_size_xs }
-                Text { text: bridge.stats ? bridge.stats.messages : "\u2014"; color: root.cFg1; font.family: Theme.font_mono; font.pixelSize: Theme.font_size_xs }
+                Text { text: bridge.stats && bridge.stats.messages ? bridge.stats.messages : "—"; color: root.cFg1; font.family: Theme.font_mono; font.pixelSize: Theme.font_size_xs }
             }
         }
 

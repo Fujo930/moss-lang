@@ -50,8 +50,7 @@ class CorvusBridge(QObject):
     # Signals → QML
     messageAdded = Signal(str, str, object)  # role, content, toolCall dict
     gateUpdated = Signal(str, str)            # gate name, status
-    progressChanged = Signal(str)             # status bar message
-    taskCompleted = Signal(object)            # result dict
+    progressChanged = Signal(str)             # status bar message + task results (JSON)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -157,10 +156,8 @@ class CorvusBridge(QObject):
                     status = "PASS" if ok is True else ("FAIL" if ok is False else "SKIP")
                     self.gateUpdated.emit(name, status)
 
-                summary = f"{'✅' if vr.trust else '❌'} {vr.gates}/{vr.gates_total} gates · {vr.elapsed_ms}ms"
-                if vr.failed_gates:
-                    summary += f" · failed: {', '.join(vr.failed_gates)}"
-                self.taskCompleted.emit({"ok": vr.trust, "summary": summary})
+                summary = json.dumps({"ok": vr.trust, "summary": f"{'PASS' if vr.trust else 'FAIL'} {vr.gates}/{vr.gates_total} gates · {vr.elapsed_ms}ms"})
+                self.progressChanged.emit(summary)
                 self.messageAdded.emit("system", summary, None)
                 self.progressChanged.emit("Verify complete.")
             except Exception as e:
@@ -222,7 +219,7 @@ class CorvusBridge(QObject):
                 else:
                     self.messageAdded.emit("system", f"❌ Failed after {result.attempts} attempts: {result.final_error}", None)
                     self.progressChanged.emit("Generation failed.")
-                self.taskCompleted.emit({"ok": result.trust, "summary": f"{result.attempts} attempts"})
+                self.progressChanged.emit(json.dumps({"ok": result.trust, "summary": f"{result.attempts} attempts"}))
             except Exception as e:
                 self.messageAdded.emit("system", f"Generate error: {e}", None)
                 self.progressChanged.emit("Error.")

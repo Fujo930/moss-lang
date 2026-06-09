@@ -4,23 +4,13 @@
     {
       "role": "user",
       "content": "你好",
-      "timestamp": 1781042226.4441156
+      "timestamp": 1781042483.877959
     },
     {
       "role": "assistant",
       "content": "(Error calling LLM: LLM API error 401: {\n    \"error\": {\n        \"message\": \"You didn't provide an API key. You need to provide your API key in an Authorization header using Bearer auth (i.e. Authorization: Bearer YOUR_KEY), or as the password field (with blank username) if you're accessing the API from your browser and are prompted for a username and password. You can obtain an API key from https://platform.openai.com/account/api-keys.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": null\n    }\n}\n)",
-      "timestamp": 1781042226.4441156
-    },
-    {
-      "role": "user",
-      "content": "你好？",
-      "timestamp": 1781042241.502105
-    },
-    {
-      "role": "assistant",
-      "content": "(Error calling LLM: LLM API error 401: {\n    \"error\": {\n        \"message\": \"You didn't provide an API key. You need to provide your API key in an Authorization header using Bearer auth (i.e. Authorization: Bearer YOUR_KEY), or as the password field (with blank username) if you're accessing the API from your browser and are prompted for a username and password. You can obtain an API key from https://platform.openai.com/account/api-keys.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": null\n    }\n}\n)",
-      "timestamp": 1781042241.502105
+      "timestamp": 1781042483.877959
     }
   ],
-  "turn": 2
+  "turn": 1
 }

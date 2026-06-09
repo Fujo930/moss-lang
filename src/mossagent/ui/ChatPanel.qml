@@ -188,7 +188,7 @@ Rectangle {
                     color: root.cFg1
                     font.pixelSize: Theme.font_size_md
                     font.family: Theme.font_sans
-                    background: Rectangle { color: "transparent" }
+                    background: null
                     wrapMode: TextArea.Wrap
 
                     Keys.onReturnPressed: {
