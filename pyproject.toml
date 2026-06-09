@@ -20,6 +20,7 @@ classifiers = [
 [project.scripts]
 moss = "mosslang.cli:main"
 moss-lsp = "mosslang.lsp:main"
+corvus = "mossagent.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/Fujo930/moss-lang"
