@@ -8,13 +8,13 @@ Rectangle {
     id: root
     color: window.cBg1
 
-    Column {
+    ColumnLayout {
         anchors.fill: parent; anchors.margins: 10; spacing: 8
 
         // ── Files card ──────────────────────────────────────
         Rectangle {
-            width: parent.width; height: parent.height * 0.6; radius: 12
-            color: window.cBg0; border.color: window.cBg3; border.width: 1
+            Layout.fillWidth: true; Layout.fillHeight: true
+            radius: 12; color: window.cBg0; border.color: window.cBg3; border.width: 1
 
             Column {
                 anchors.fill: parent
@@ -65,40 +65,42 @@ Rectangle {
             }
         }
 
-        // ── Memory card ─────────────────────────────────────
+        // ── Settings card ──────────────────────────────────
         Rectangle {
-            width: parent.width; height: parent.height * 0.38; radius: 12
+            Layout.fillWidth: true; implicitHeight: 44; radius: 12
             color: window.cBg0; border.color: window.cBg3; border.width: 1
 
-            Column {
-                anchors.fill: parent
+            RowLayout {
+                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                Text { text: "⚙️"; font.pixelSize: 12 }
+                Text { text: "Settings"; color: window.cFg1; font.pixelSize: 13 }
+                Item { Layout.fillWidth: true }
+            }
+        }
 
-                Rectangle {
-                    width: parent.width; height: 36; color: "transparent"
-                    RowLayout {
-                        anchors.fill: parent; anchors.leftMargin: 12; spacing: 6
-                        Text { text: "🧠"; font.pixelSize: 12 }
-                        Text { text: "Memory"; color: window.cFg1; font.pixelSize: 13; font.weight: Font.DemiBold }
-                    }
-                }
+        // ── History card ────────────────────────────────────
+        Rectangle {
+            Layout.fillWidth: true; implicitHeight: 44; radius: 12
+            color: window.cBg0; border.color: window.cBg3; border.width: 1
 
-                ListView {
-                    id: memoryList
-                    width: parent.width; height: parent.height - 36; clip: true
-                    model: bridge.memories; spacing: 4
+            RowLayout {
+                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                Text { text: "🕐"; font.pixelSize: 12 }
+                Text { text: "History"; color: window.cFg1; font.pixelSize: 13 }
+                Item { Layout.fillWidth: true }
+            }
+        }
 
-                    delegate: Rectangle {
-                        width: memoryList.width - 24; x: 12; implicitHeight: memText.implicitHeight + 12; radius: 8
-                        color: window.cBg2
+        // ── Trash card ──────────────────────────────────────
+        Rectangle {
+            Layout.fillWidth: true; implicitHeight: 44; radius: 12
+            color: window.cBg0; border.color: window.cBg3; border.width: 1
 
-                        Text {
-                            id: memText
-                            anchors.fill: parent; anchors.margins: 6
-                            text: modelData.key + ": " + modelData.value
-                            color: window.cFg2; font.pixelSize: 11; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight
-                        }
-                    }
-                }
+            RowLayout {
+                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                Text { text: "🗑️"; font.pixelSize: 12 }
+                Text { text: "Trash"; color: window.cFg1; font.pixelSize: 13 }
+                Item { Layout.fillWidth: true }
             }
         }
     }
