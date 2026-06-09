@@ -53,6 +53,7 @@ SINGLE_CHAR_TOKENS = {
     ";": "PUNCT",
     ".": "PUNCT",
     "?": "PUNCT",
+    "\\": "LAMBDA",
     "|": "PUNCT",
     "+": "OP",
     "-": "OP",
