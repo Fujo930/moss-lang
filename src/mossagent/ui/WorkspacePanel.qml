@@ -6,6 +6,8 @@ Rectangle {
     id: root
     color: "transparent"
 
+    property string selectedPath: ""
+
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 10; spacing: 8; z: 1
 
@@ -47,7 +49,9 @@ Rectangle {
 
                     delegate: Rectangle {
                         width: fileList.width - 12; x: 6; implicitHeight: 30; radius: 8
-                        color: mouseArea.containsMouse ? window.cBg2 : "transparent"
+                        color: modelData.path === root.selectedPath ? Qt.alpha(window.cAccent, 0.12) :
+                               isHovered ? window.cBg2 : "transparent"
+                        property bool isHovered: false
 
                         RowLayout {
                             anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 8; spacing: 6
@@ -60,9 +64,15 @@ Rectangle {
 
                         MouseArea {
                             id: mouseArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onEntered: parent.isHovered = true
+                            onExited: parent.isHovered = false
                             onClicked: {
-                                if (modelData.isDir) bridge.toggleDirectory(modelData.path)
-                                else bridge.openFile(modelData.path)
+                                if (modelData.isDir) {
+                                    bridge.toggleDirectory(modelData.path)
+                                } else {
+                                    root.selectedPath = modelData.path
+                                    bridge.openFile(modelData.path)
+                                }
                             }
                         }
                     }

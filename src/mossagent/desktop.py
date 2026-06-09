@@ -244,13 +244,12 @@ class CorvusBridge(QObject):
 
     @Slot(str)
     def openFile(self, path: str):
-        """Open a file in the active source."""
+        """Load a file into the active source (silent — no chat message)."""
         try:
             self._active_source = Path(path).read_text(encoding="utf-8", errors="replace")
-            self.messageAdded.emit("system", f"📄 Loaded {path} ({len(self._active_source)} chars)", None)
-            self.progressChanged.emit(f"Loaded {path}")
+            self.progressChanged.emit(f"Loaded {path} ({len(self._active_source)} chars)")
         except Exception as e:
-            self.messageAdded.emit("system", f"Error opening {path}: {e}", None)
+            self.progressChanged.emit(f"Error opening {path}: {e}")
 
     @Slot(result=str)
     def getActiveSource(self) -> str:
