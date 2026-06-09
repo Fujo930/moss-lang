@@ -56,7 +56,7 @@ moss run-vm examples/order.mbc         # run compiled binary
 
 ## Honest status
 
-- Moss is AI-designed and AI-built by Codex (ds-Mosslang fork by DeepSeek) in collaboration with Fujo930.
+- Moss is AI-designed and AI-built by Codex in collaboration with Fujo930.
 - Moss can execute useful programs and support project-scale workflows.
 - Moss has a working self-host loop: Moss code checks Moss code.
 - Moss remains experimental software.
