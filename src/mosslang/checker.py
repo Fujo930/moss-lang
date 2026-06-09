@@ -160,6 +160,10 @@ def check_program(program: Program) -> list[Diagnostic]:
             pass
 
     check_static_types(program, functions, diagnostics)
+
+    # ── alpha(t)3.1: AI-targeted constraint checks ──────────────
+    _check_ai_constraints(program, diagnostics)
+
     return diagnostics
 
 
@@ -696,3 +700,45 @@ def dotted_name(node: Any) -> str | None:
             return None
         return f"{prefix}.{node.field}"
     return None
+
+
+# ── alpha(t)3.1: AI-targeted constraint checks ─────────────────────
+
+def _check_ai_constraints(program, diagnostics):
+    """Warnings for patterns AI code generators commonly get wrong.
+    
+    These don't block execution but appear in Trust verify output as
+    fix_hints, helping the Agent's generate→verify→fix loop converge.
+    """
+    from .nodes import FunctionDecl, RuleDecl, PythonExternDecl
+
+    for item in program.items:
+        if isinstance(item, FunctionDecl):
+            # Missing return type annotation
+            if item.return_type is None or item.return_type == "Any":
+                diagnostics.append(Diagnostic(
+                    "warning",
+                    f"function '{item.name}' has no return type annotation",
+                    item.location,
+                    code="A001",
+                    hint=f"Add ': Type' to the function signature for AI verification.",
+                ))
+            # Empty body
+            if not item.body:
+                diagnostics.append(Diagnostic(
+                    "warning",
+                    f"function '{item.name}' has an empty body",
+                    item.location,
+                    code="A002",
+                    hint="Add a function body or use '= expr' for single-expression functions.",
+                ))
+
+        elif isinstance(item, RuleDecl):
+            if item.return_type is None:
+                diagnostics.append(Diagnostic(
+                    "warning",
+                    f"rule '{item.name}' has no return type",
+                    item.location,
+                    code="A001",
+                    hint="Add a return type annotation for trace verification.",
+                ))

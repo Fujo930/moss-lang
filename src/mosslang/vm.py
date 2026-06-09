@@ -135,6 +135,63 @@ class VM:
         b['fileExists'] = self._mk_builtin('fileExists', self.builtin_file_exists, 'FileSystem')
         b['listFiles'] = self._mk_builtin('listFiles', self.builtin_list_files, 'FileSystem')
 
+        # ── alpha(t)3.1 stdlib expansion: Math ─────────────────────
+        b['abs'] = self._mk_builtin('abs', self.builtin_abs)
+        b['min'] = self._mk_builtin('min', self.builtin_min)
+        b['max'] = self._mk_builtin('max', self.builtin_max)
+        b['round'] = self._mk_builtin('round', self.builtin_round)
+        b['floor'] = self._mk_builtin('floor', self.builtin_floor)
+        b['ceil'] = self._mk_builtin('ceil', self.builtin_ceil)
+        b['pow'] = self._mk_builtin('pow', self.builtin_pow)
+        b['sqrt'] = self._mk_builtin('sqrt', self.builtin_sqrt)
+
+        # ── Type conversion ────────────────────────────────────────
+        b['text'] = self._mk_builtin('text', self.builtin_text)
+        b['int'] = self._mk_builtin('int', self.builtin_int)
+        b['float'] = self._mk_builtin('float', self.builtin_float)
+        b['bool'] = self._mk_builtin('bool', self.builtin_bool)
+
+        # ── Text utilities ─────────────────────────────────────────
+        b['textUpper'] = self._mk_builtin('textUpper', self.builtin_text_upper)
+        b['textLower'] = self._mk_builtin('textLower', self.builtin_text_lower)
+        b['textLength'] = self._mk_builtin('textLength', self.builtin_text_length)
+        b['textFormat'] = self._mk_builtin('textFormat', self.builtin_text_format)
+        b['textRepeat'] = self._mk_builtin('textRepeat', self.builtin_text_repeat)
+
+        # ── List/Map utilities ─────────────────────────────────────
+        b['listLength'] = self._mk_builtin('listLength', self.builtin_list_length)
+        b['listReverse'] = self._mk_builtin('listReverse', self.builtin_list_reverse)
+        b['listSort'] = self._mk_builtin('listSort', self.builtin_list_sort)
+        b['listContains'] = self._mk_builtin('listContains', self.builtin_list_contains)
+        b['listFind'] = self._mk_builtin('listFind', self.builtin_list_find)
+        b['mapLength'] = self._mk_builtin('mapLength', self.builtin_map_length)
+
+        # ── Hashing / Crypto ───────────────────────────────────────
+        b['sha256'] = self._mk_builtin('sha256', self.builtin_sha256)
+        b['hmacSha256'] = self._mk_builtin('hmacSha256', self.builtin_hmac_sha256)
+
+        # ── Random ─────────────────────────────────────────────────
+        b['random'] = self._mk_builtin('random', self.builtin_random)
+        b['randomInt'] = self._mk_builtin('randomInt', self.builtin_random_int)
+
+        # ── Time ───────────────────────────────────────────────────
+        b['nowMs'] = self._mk_builtin('nowMs', self.builtin_now_ms)
+        b['sleep'] = self._mk_builtin('sleep', self.builtin_sleep)
+
+        # ── Regex ──────────────────────────────────────────────────
+        b['regexMatch'] = self._mk_builtin('regexMatch', self.builtin_regex_match)
+        b['regexFind'] = self._mk_builtin('regexFind', self.builtin_regex_find)
+        b['regexReplace'] = self._mk_builtin('regexReplace', self.builtin_regex_replace)
+
+        # ── UUID ───────────────────────────────────────────────────
+        b['uuid'] = self._mk_builtin('uuid', self.builtin_uuid)
+
+        # ── Encoding ───────────────────────────────────────────────
+        b['base64Encode'] = self._mk_builtin('base64Encode', self.builtin_base64_encode)
+        b['base64Decode'] = self._mk_builtin('base64Decode', self.builtin_base64_decode)
+        b['urlEncode'] = self._mk_builtin('urlEncode', self.builtin_url_encode)
+        b['urlDecode'] = self._mk_builtin('urlDecode', self.builtin_url_decode)
+
     def _mk_builtin(self, name, fn, effect=None):
         from .bytecode import CodeObject
         co = CodeObject(name="<builtin>", arg_count=0, capture_count=0, locals=[], constants=[], instructions=[])
@@ -811,6 +868,94 @@ class VM:
     def builtin_list_files(self, args):
         p = self._sandbox_path(args[0])
         return [str(x.relative_to(p)) for x in p.iterdir()] if p.exists() else []
+
+    # ── New builtins: Math (alpha(t)3.1 stdlib expansion) ──────────
+    def builtin_abs(self, args): return abs(args[0])
+    def builtin_min(self, args): return min(args)
+    def builtin_max(self, args): return max(args)
+    def builtin_round(self, args):
+        ndigits = int(args[1]) if len(args) > 1 else 0
+        return round(float(args[0]), ndigits)
+    def builtin_floor(self, args):
+        import math; return int(math.floor(float(args[0])))
+    def builtin_ceil(self, args):
+        import math; return int(math.ceil(float(args[0])))
+    def builtin_pow(self, args): return args[0] ** args[1]
+    def builtin_sqrt(self, args):
+        import math; return math.sqrt(float(args[0]))
+
+    # ── New builtins: Type conversion ──────────────────────────────
+    def builtin_text(self, args): return str(args[0])
+    def builtin_int(self, args):
+        v = args[0]
+        if isinstance(v, str): return int(v)
+        return int(float(v))
+    def builtin_float(self, args): return float(args[0])
+    def builtin_bool(self, args): return bool(args[0])
+
+    # ── New builtins: Text ─────────────────────────────────────────
+    def builtin_text_upper(self, args): return str(args[0]).upper()
+    def builtin_text_lower(self, args): return str(args[0]).lower()
+    def builtin_text_length(self, args): return len(str(args[0]))
+    def builtin_text_format(self, args):
+        fmt = args[0]
+        vals = args[1:] if len(args) > 1 else []
+        return fmt.format(*vals)
+    def builtin_text_repeat(self, args): return str(args[0]) * int(args[1])
+
+    # ── New builtins: List/Map utilities ───────────────────────────
+    def builtin_list_length(self, args): return len(args[0])
+    def builtin_list_reverse(self, args): return list(reversed(args[0]))
+    def builtin_list_sort(self, args):
+        lst = list(args[0])
+        lst.sort(key=str)
+        return lst
+    def builtin_list_contains(self, args): return args[1] in args[0]
+    def builtin_list_find(self, args):
+        try: return args[0].index(args[1])
+        except ValueError: return -1
+    def builtin_map_length(self, args): return len(args[0])
+
+    # ── New builtins: Hashing / Crypto ─────────────────────────────
+    def builtin_sha256(self, args):
+        import hashlib; return hashlib.sha256(str(args[0]).encode()).hexdigest()
+    def builtin_hmac_sha256(self, args):
+        import hashlib, hmac
+        return hmac.new(args[0].encode(), args[1].encode(), hashlib.sha256).hexdigest()
+
+    # ── New builtins: Random ───────────────────────────────────────
+    def builtin_random(self, args):
+        import random; return random.random()
+    def builtin_random_int(self, args):
+        import random; return random.randint(int(args[0]), int(args[1]))
+
+    # ── New builtins: Time ─────────────────────────────────────────
+    def builtin_now_ms(self, args):
+        import time; return int(time.time() * 1000)
+    def builtin_sleep(self, args):
+        import time; time.sleep(float(args[0]) / 1000.0); return None
+
+    # ── New builtins: Regex ────────────────────────────────────────
+    def builtin_regex_match(self, args):
+        import re; return bool(re.search(args[0], args[1]))
+    def builtin_regex_find(self, args):
+        import re; m = re.search(args[0], args[1]); return m.group(0) if m else ""
+    def builtin_regex_replace(self, args):
+        import re; return re.sub(args[0], args[1], args[2])
+
+    # ── New builtins: UUID ─────────────────────────────────────────
+    def builtin_uuid(self, args):
+        import uuid; return str(uuid.uuid4())
+
+    # ── New builtins: Encode / Decode ──────────────────────────────
+    def builtin_base64_encode(self, args):
+        import base64; return base64.b64encode(str(args[0]).encode()).decode()
+    def builtin_base64_decode(self, args):
+        import base64; return base64.b64decode(args[0]).decode()
+    def builtin_url_encode(self, args):
+        import urllib.parse; return urllib.parse.quote(str(args[0]))
+    def builtin_url_decode(self, args):
+        import urllib.parse; return urllib.parse.unquote(args[0])
 
     def _sandbox_path(self, raw: str) -> Path:
         """Resolve path relative to base_path; reject escapes above base_path."""
