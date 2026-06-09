@@ -1867,14 +1867,16 @@ def run_token_artifact(path: Path, *, output: Path | None = None, level: str = "
 
     # Trust header: write // @trust gates/hash to source file
     if add_header:
-        gates_ok = sum(1 for g in [
+        g_values = [
             bundle.get("check", {}).get("ok"),
             bundle.get("trace", {}).get("ok", True),
-            bundle.get("golden", {}).get("ok") is not False,
-            True,
+            bundle.get("golden", {}).get("ok"),  # None = skipped
+            True,  # lock gate
             bundle.get("selfhost", {}).get("ok", True),
-        ] if g)
-        header_line = f"// @trust {gates_ok}/5 {source_hash[:12]}"
+        ]
+        gates_ok = sum(1 for g in g_values if g is True)
+        gates_total = sum(1 for g in g_values if g is not None)
+        header_line = f"// @trust {gates_ok}/{gates_total} {source_hash[:12]}"
         source_lines = source.splitlines()
         if source_lines and source_lines[0].startswith("// @trust"):
             source_lines[0] = header_line

@@ -80,6 +80,7 @@ def token_from_source(source: str, *, level: str = "normal") -> dict:
     if cached:
         return dict(cached)
     from mosslang.checker import check_program
+    from mosslang.parser import parse_source
 
     try:
         program = parse_source(source)
@@ -262,18 +263,21 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
         bundle["selfhost"] = {"ok": False, "note": "selfhost comparison failed"}
         bundle["trust"] = False
 
-    # Gate passing count (for trust header alignment: @trust 5/5)
+    # Gate passing count (for trust header alignment: @trust N/M where M = applicable gates)
     gates = [
         bundle.get("check", {}).get("ok"),
         bundle.get("trace", {}).get("ok"),
-        bundle.get("golden", {}).get("ok") is not False,
+        bundle.get("golden", {}).get("ok"),  # None = skipped (no .golden file)
         True,  # lock gate: not applicable in API mode
         bundle.get("selfhost", {}).get("ok"),
     ]
     gate_names = ["check", "trace", "golden", "lock", "selfhost"]
-    bundle["gates"] = sum(1 for g in gates if g)
-    bundle["gates_total"] = 5
-    bundle["failed_gates"] = [gate_names[i] for i, ok in enumerate(gates) if not ok]
+    # Count gates: True=passed, None=skipped(not counted), False=failed
+    gates_passed = sum(1 for g in gates if g is True)
+    gates_applicable = sum(1 for g in gates if g is not None)
+    bundle["gates"] = gates_passed
+    bundle["gates_total"] = gates_applicable
+    bundle["failed_gates"] = [gate_names[i] for i, g in enumerate(gates) if g is False]
 
     bundle["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
 

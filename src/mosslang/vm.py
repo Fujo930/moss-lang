@@ -237,6 +237,14 @@ class VM:
                     frame.pc = arg
             elif op == Opcode.CALL:
                 self._do_call(frame, arg)
+            elif op == Opcode.CHECK_EFFECT:
+                effect_name = frame.stack.pop()
+                allowed = self._module.effects if self._module else []
+                if effect_name not in allowed:
+                    raise MossRuntimeError(
+                        f"effect '{effect_name}' not allowed in current context "
+                        f"(allowed: {allowed or 'none'})"
+                    )
             elif op == Opcode.CALL_PYTHON:
                 self._do_call_python(frame, arg)
             elif op == Opcode.RETURN:
