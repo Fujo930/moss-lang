@@ -200,10 +200,16 @@ def main(argv: list[str] | None = None) -> int:
     token_cmd.add_argument("--output", "-o", type=Path, help="write token artifact to file")
     token_cmd.add_argument("--level", choices=("brief", "normal", "full"), default="normal",
                            help="detail level (brief: ~10 tokens, normal: ~20, full: ~50)")
+    token_cmd.add_argument("--header", action="store_true",
+                           help="write // @trust gates/hash header to source file")
 
     token_diff_cmd = sub.add_parser("token-diff", help="diff two Moss files or Token Artifacts")
     token_diff_cmd.add_argument("file_a", type=Path, help="first file (.moss or .json)")
     token_diff_cmd.add_argument("file_b", type=Path, help="second file (.moss or .json)")
+
+    decompile_cmd = sub.add_parser("decompile", help="decompile .mbc bytecode (brand 4)")
+    decompile_cmd.add_argument("file", type=Path)
+    decompile_cmd.add_argument("--output", "-o", type=Path, help="output decomposition")
 
     run_vm_cmd = sub.add_parser("run-vm", help="execute compiled bytecode module")
     run_vm_cmd.add_argument("file", type=Path)
@@ -279,10 +285,24 @@ def main(argv: list[str] | None = None) -> int:
             return run_keygen(args.output)
 
         if args.command in ("token", "token-artifact"):
-            return run_token_artifact(args.file, output=args.output, level=args.level)
+            return run_token_artifact(args.file, output=args.output, level=args.level, add_header=args.header)
 
         if args.command == "token-diff":
             return run_token_diff(args.file_a, args.file_b)
+
+        if args.command == "decompile":
+            from .decompile import decompile_mbc
+            result = decompile_mbc(args.file)
+            if result.startswith("error:"):
+                print(result, file=sys.stderr)
+                return 1
+            if args.output:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(result, encoding="utf-8")
+                print(f"decompiled: {args.output}")
+            else:
+                print(result)
+            return 0
 
         if args.command == "trace-graph":
             return run_trace_graph(args.file)
@@ -1713,7 +1733,7 @@ def _build_token_artifact(bundle: dict, source_path: Path, source_hash: str, lev
     return json.dumps(payload, indent=2 if level == "brief" else 2)
 
 
-def run_token_artifact(path: Path, *, output: Path | None = None, level: str = "normal") -> int:
+def run_token_artifact(path: Path, *, output: Path | None = None, level: str = "normal", add_header: bool = False) -> int:
     """Produce a Token Artifact: AI-optimized structural summary of a Moss file."""
     import hashlib
     source = path.read_text(encoding="utf-8-sig")
@@ -1763,6 +1783,25 @@ def run_token_artifact(path: Path, *, output: Path | None = None, level: str = "
     except Exception as exc:
         bundle = {"trust": False, "check": {"ok": False, "diagnostics": [], "summary": {"effects": 0, "types": 0, "callables": 0}},
                   "trace": {}, "golden": {}, "selfhost": {}, "_error": str(exc)}
+
+    # Trust header: write // @trust gates/hash to source file
+    if add_header:
+        gates_ok = sum(1 for g in [
+            bundle.get("check", {}).get("ok"),
+            bundle.get("trace", {}).get("ok", True),
+            bundle.get("golden", {}).get("ok") is not False,
+            True,
+            bundle.get("selfhost", {}).get("ok", True),
+        ] if g)
+        header_line = f"// @trust {gates_ok}/5 {source_hash[:12]}"
+        source_lines = source.splitlines()
+        if source_lines and source_lines[0].startswith("// @trust"):
+            source_lines[0] = header_line
+        else:
+            source_lines.insert(0, header_line)
+        path.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
+        print(f"trust header written: {path}")
+
     result = _build_token_artifact(bundle, path, source_hash, level)
     if output:
         output.parent.mkdir(parents=True, exist_ok=True)

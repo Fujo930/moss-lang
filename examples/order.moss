@@ -1,3 +1,4 @@
+// @trust 5/5 0a5ff6731f39
 effect Database
 
 type Order =

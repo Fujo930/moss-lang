@@ -37,7 +37,29 @@ from pathlib import Path
 
 _TRUST_CACHE_LIMIT = 100
 _trust_cache: dict[str, dict] = {}
+_trust_cache_lru: list[str] = []  # LRU order list
 _token_cache: dict[str, dict] = {}
+_token_cache_lru: list[str] = []
+
+
+def _cache_put(cache: dict, lru: list[str], key: str, value: dict, limit: int = 100) -> None:
+    """LRU-aware cache store."""
+    if len(cache) >= limit:
+        if lru:
+            oldest = lru.pop(0)
+            cache.pop(oldest, None)
+    cache[key] = value
+    lru.append(key)
+
+
+def _cache_get(cache: dict, lru: list[str], key: str) -> dict | None:
+    """LRU-aware cache lookup."""
+    if key in cache:
+        if key in lru:
+            lru.remove(key)
+        lru.append(key)
+        return cache[key]
+    return None
 
 
 def token_from_source(source: str, *, level: str = "normal") -> dict:
@@ -53,8 +75,6 @@ def token_from_source(source: str, *, level: str = "normal") -> dict:
     cache_key = f"token.{level}.{source_sha256[:32]}"
     if cache_key in _token_cache:
         return dict(_token_cache[cache_key])
-
-    from mosslang.parser import parse_source
     from mosslang.checker import check_program
 
     try:
@@ -204,14 +224,18 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
     try:
         from mosslang.cli import compare_selfhost_details
         import tempfile
-        with tempfile.NamedTemporaryFile(suffix=".moss", mode="w", delete=False, encoding="utf-8") as f:
-            f.write(source)
-            temp_path = Path(f.name)
-        details = compare_selfhost_details(temp_path)
-        temp_path.unlink(missing_ok=True)
-        bundle["selfhost"] = {"ok": details["ok"]}
-        if not details["ok"]:
-            bundle["trust"] = False
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".moss", mode="w", delete=False, encoding="utf-8") as f:
+                f.write(source)
+                temp_path = Path(f.name)
+            details = compare_selfhost_details(temp_path)
+            bundle["selfhost"] = {"ok": details["ok"]}
+            if not details["ok"]:
+                bundle["trust"] = False
+        finally:
+            if temp_path:
+                temp_path.unlink(missing_ok=True)
     except Exception:
         bundle["selfhost"] = {"ok": False, "note": "selfhost comparison failed"}
         bundle["trust"] = False
@@ -239,7 +263,7 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
 
 def make_trust_handler() -> type[BaseHTTPRequestHandler]:
     class TrustHandler(BaseHTTPRequestHandler):
-        server_version = "MossTrustServer/alpha(t)2.3"
+        server_version = "MossTrustServer/alpha(t)3"
 
         def do_GET(self) -> None:
             if self.path == "/api/health":
@@ -284,8 +308,47 @@ def make_trust_handler() -> type[BaseHTTPRequestHandler]:
                 level = qs.get("level", ["normal"])[0]
                 result = token_from_source(source, level=level)
                 self.send_json(result)
+            elif self.path == "/api/trust-batch":
+                self._handle_trust_batch(source)
             else:
                 self.send_error(HTTPStatus.NOT_FOUND)
+
+        def _handle_trust_batch(self, body: str) -> None:
+            """POST /api/trust-batch — accept JSON {files: {name: source}} and return per-file status."""
+            try:
+                payload = json.loads(body)
+                files = payload.get("files", {})
+            except json.JSONDecodeError:
+                self.send_json({"error": "invalid JSON"}, status=400)
+                return
+
+            results = {}
+            failed_count = 0
+            total_count = 0
+            for fname, fsource in files.items():
+                total_count += 1
+                try:
+                    r = trust_from_source(str(fsource))
+                    results[fname] = {
+                        "trust": r.get("trust", False),
+                        "g": r.get("gates", 0),
+                        "h": r.get("source_sha256", "")[:16],
+                        "ms": r.get("elapsed_ms", 0),
+                    }
+                    if not r.get("trust"):
+                        failed_count += 1
+                        results[fname]["failed_gates"] = r.get("failed_gates", [])
+                        results[fname]["fix_hints"] = r.get("fix_hints", [])[:3]
+                except Exception as e:
+                    results[fname] = {"trust": False, "error": str(e)}
+                    failed_count += 1
+
+            self.send_json({
+                "total": total_count,
+                "passed": total_count - failed_count,
+                "failed": failed_count,
+                "files": results,
+            })
 
         def send_json(self, payload: dict, status: int = 200) -> None:
             data = json.dumps(payload).encode("utf-8")
