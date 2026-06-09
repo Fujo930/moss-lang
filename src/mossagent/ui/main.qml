@@ -96,27 +96,12 @@ ApplicationWindow {
         }
     }
 
-    // ── Three-panel body ────────────────────────────────────
+    // ── Two-panel body: Chat (center) + Tools (right) ──────
     RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        // LEFT: Workspace panel (Codex-style file tree + memory)
-        WorkspacePanel {
-            id: workspacePanel
-            Layout.preferredWidth: Theme.sidebar_w
-            Layout.minimumWidth: Theme.min_panel
-            Layout.fillHeight: true
-        }
-
-        // Divider
-        Rectangle {
-            width: 1
-            Layout.fillHeight: true
-            color: cBg3
-        }
-
-        // CENTER: Chat panel (Claude-style message bubbles)
+        // CENTER: Chat panel — main interaction area
         ChatPanel {
             id: chatPanel
             Layout.fillWidth: true
@@ -131,12 +116,32 @@ ApplicationWindow {
             color: cBg3
         }
 
-        // RIGHT: Detail panel (Reasonix-style gate visualization)
-        DetailPanel {
-            id: detailPanel
+        // RIGHT: Workspace + Detail stacked vertically
+        ColumnLayout {
             Layout.preferredWidth: Theme.detail_w
             Layout.minimumWidth: Theme.min_panel
             Layout.fillHeight: true
+            spacing: 0
+
+            WorkspacePanel {
+                id: workspacePanel
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredHeight: parent ? parent.height * 0.55 : 300
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: cBg3
+            }
+
+            DetailPanel {
+                id: detailPanel
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredHeight: parent ? parent.height * 0.45 : 200
+            }
         }
     }
 
@@ -184,11 +189,11 @@ ApplicationWindow {
     Connections {
         target: bridge
 
-        function onMessageAdded(msg) {
-            chatPanel.addMessage(msg.role, msg.content, msg.toolCall)
+        function onMessageAdded(role, content, toolCall) {
+            chatPanel.addMessage(role, content, toolCall)
         }
-        function onGateUpdated(gate) {
-            detailPanel.updateGate(gate.name, gate.status)
+        function onGateUpdated(name, status) {
+            detailPanel.updateGate(name, status)
         }
         function onProgressChanged(msg) {
             statusText.text = msg
