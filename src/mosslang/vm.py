@@ -195,7 +195,7 @@ class VM:
             arg = inst.arg
             frame.pc += 1
             
-            if op == Opcode.NOP:
+            if op == Opcode.NOP or op == Opcode.LABEL:
                 pass
             elif op == Opcode.LOAD_CONST:
                 frame.stack.append(frame.code.constants[arg])
@@ -275,6 +275,12 @@ class VM:
             elif op == Opcode.GET_FIELD:
                 record = frame.stack.pop()
                 field_name = frame.code.constants[arg] if arg < len(frame.code.constants) else str(arg)
+                # Guard against null dereference from selfhost compiler bugs
+                if record is None:
+                    raise MossRuntimeError(
+                        f"null dereference: cannot access .{field_name} on None "
+                        f"(selfhost compiler bug — the Moss compiler generated code that accesses a field on null)"
+                    )
                 # Money literal: number.currency
                 if isinstance(record, (int, float)) and isinstance(field_name, str):
                     from decimal import Decimal
@@ -734,15 +740,30 @@ class VM:
 
     def builtin_http_get(self, args):
         from urllib import request as url_request
-        with url_request.urlopen(args[0]) as resp:
+        from urllib.parse import urlparse
+        url = args[0]
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            raise IOError(f"httpGet: only http/https allowed, got {parsed.scheme}")
+        host = parsed.hostname or ''
+        if host.startswith('127.') or host.startswith('10.') or host.startswith('192.168.') or host.startswith('172.16.') or host == 'localhost' or host == '::1':
+            raise IOError(f"httpGet: private/internal hosts blocked")
+        with url_request.urlopen(url, timeout=10) as resp:
             return resp.read().decode('utf-8')
 
     def builtin_http_post_json(self, args):
         from urllib import request as url_request
+        from urllib.parse import urlparse
         url, body = args
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            raise IOError(f"httpPostJson: only http/https allowed, got {parsed.scheme}")
+        host = parsed.hostname or ''
+        if host.startswith('127.') or host.startswith('10.') or host.startswith('192.168.') or host.startswith('172.16.') or host == 'localhost' or host == '::1':
+            raise IOError(f"httpPostJson: private/internal hosts blocked")
         data = json.dumps(body).encode('utf-8')
         req = url_request.Request(url, data=data, headers={'Content-Type': 'application/json'})
-        with url_request.urlopen(req) as resp:
+        with url_request.urlopen(req, timeout=10) as resp:
             return json.loads(resp.read().decode('utf-8'))
 
     def builtin_db_put(self, args):
@@ -754,17 +775,28 @@ class VM:
         return self.db[args[0]]
 
     def builtin_read_text(self, args):
-        return Path(args[0]).read_text(encoding='utf-8')
+        return self._sandbox_path(args[0]).read_text(encoding='utf-8')
 
     def builtin_write_text(self, args):
-        Path(args[0]).write_text(args[1], encoding='utf-8')
+        self._sandbox_path(args[0]).write_text(args[1], encoding='utf-8')
         return None
 
     def builtin_file_exists(self, args):
-        return Path(args[0]).exists()
+        return self._sandbox_path(args[0]).exists()
 
     def builtin_list_files(self, args):
-        return [str(p) for p in Path(args[0]).iterdir()]
+        p = self._sandbox_path(args[0])
+        return [str(x.relative_to(p)) for x in p.iterdir()] if p.exists() else []
+
+    def _sandbox_path(self, raw: str) -> Path:
+        """Resolve path relative to base_path; reject escapes above base_path."""
+        base = self.base_path.resolve()
+        target = (base / raw).resolve()
+        try:
+            target.relative_to(base)
+        except ValueError:
+            raise IOError(f"path escapes sandbox: {raw}")
+        return target
 
     def _load_imports(self, module) -> None:
         """Compile and merge all imported modules into the VM state."""

@@ -29,6 +29,7 @@ import json
 import hashlib
 import time
 import sys
+import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import StringIO
@@ -40,10 +41,11 @@ _trust_cache: dict[str, dict] = {}
 _trust_cache_lru: list[str] = []  # LRU order list
 _token_cache: dict[str, dict] = {}
 _token_cache_lru: list[str] = []
+_cache_lock = threading.Lock()
 
 
 def _cache_put(cache: dict, lru: list[str], key: str, value: dict, limit: int = 100) -> None:
-    """LRU-aware cache store."""
+    """LRU-aware cache store. Must be called under _cache_lock."""
     if len(cache) >= limit:
         if lru:
             oldest = lru.pop(0)
@@ -53,7 +55,7 @@ def _cache_put(cache: dict, lru: list[str], key: str, value: dict, limit: int = 
 
 
 def _cache_get(cache: dict, lru: list[str], key: str) -> dict | None:
-    """LRU-aware cache lookup."""
+    """LRU-aware cache lookup. Must be called under _cache_lock."""
     if key in cache:
         if key in lru:
             lru.remove(key)
@@ -73,7 +75,8 @@ def token_from_source(source: str, *, level: str = "normal") -> dict:
     source_sha256 = hashlib.sha256(source.encode("utf-8")).hexdigest()
 
     cache_key = f"token.{level}.{source_sha256[:32]}"
-    cached = _cache_get(_token_cache, _token_cache_lru, cache_key)
+    with _cache_lock:
+        cached = _cache_get(_token_cache, _token_cache_lru, cache_key)
     if cached:
         return dict(cached)
     from mosslang.checker import check_program
@@ -118,7 +121,8 @@ def token_from_source(source: str, *, level: str = "normal") -> dict:
                 for d in diagnostics if d.level == "error" and d.hint
             ]
 
-    _cache_put(_token_cache, _token_cache_lru, cache_key, result, limit=_TRUST_CACHE_LIMIT)
+    with _cache_lock:
+        _cache_put(_token_cache, _token_cache_lru, cache_key, result, limit=_TRUST_CACHE_LIMIT)
     return result
 
 
@@ -131,7 +135,8 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
 
     # Check cache
     cache_key = source_sha256[:32]
-    cached = _cache_get(_trust_cache, _trust_cache_lru, cache_key)
+    with _cache_lock:
+        cached = _cache_get(_trust_cache, _trust_cache_lru, cache_key)
     if cached:
         result = dict(cached)
         result["cached"] = True
@@ -187,7 +192,8 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
         bundle["gates_total"] = 5
         bundle["failed_gates"] = ["check"]
         bundle["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
-        _cache_put(_trust_cache, _trust_cache_lru, cache_key, bundle, limit=_TRUST_CACHE_LIMIT)
+        with _cache_lock:
+            _cache_put(_trust_cache, _trust_cache_lru, cache_key, bundle, limit=_TRUST_CACHE_LIMIT)
         return bundle
 
     # 2. Trace gate
@@ -257,7 +263,8 @@ def trust_from_source(source: str, *, source_sha256: str | None = None) -> dict:
     bundle["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
 
     # Cache the result
-    _cache_put(_trust_cache, _trust_cache_lru, cache_key, bundle, limit=_TRUST_CACHE_LIMIT)
+    with _cache_lock:
+        _cache_put(_trust_cache, _trust_cache_lru, cache_key, bundle, limit=_TRUST_CACHE_LIMIT)
     return bundle
 
 

@@ -142,7 +142,7 @@ def check_program(program: Program) -> list[Diagnostic]:
     # Check for import cycles
     for item in program.items:
         if isinstance(item, ImportDecl):
-            _check_import_cycle(item.path, imported_paths, diagnostics, None)
+            _check_import_cycle(item.path, imported_paths, diagnostics, item.location)
 
     for item in program.items:
         if isinstance(item, FunctionDecl):

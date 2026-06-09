@@ -88,11 +88,12 @@ class Parser:
 
     def parse_import_decl(self) -> ImportDecl:
         self.expect_value("import")
+        location = self.previous().location
         if not self.match_kind("STRING"):
             raise self.error("expected import path string")
         path = self.previous().value
         self.consume_statement_end()
-        return ImportDecl(path)
+        return ImportDecl(path, location=location)
 
     def parse_type_decl(self) -> TypeDecl:
         location = self.peek().location

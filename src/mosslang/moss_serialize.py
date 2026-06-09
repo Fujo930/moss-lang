@@ -11,7 +11,7 @@ from typing import Any
 
 # Opcode name → number map (matches bytecode.py Opcode enum and compiler_core.moss)
 OPCODE_NAME_MAP = {
-    "OP_NOP": 0, "OP_LOAD_CONST": 1, "OP_LOAD_NULL": 2, "OP_LOAD_TRUE": 3, "OP_LOAD_FALSE": 4,
+    "OP_NOP": 0, "OP_LABEL": 119, "OP_LOAD_CONST": 1, "OP_LOAD_NULL": 2, "OP_LOAD_TRUE": 3, "OP_LOAD_FALSE": 4,
     "OP_LOAD_LOCAL": 5, "OP_LOAD_GLOBAL": 6, "OP_STORE_LOCAL": 7, "OP_STORE_GLOBAL": 8,
     "OP_POP": 9, "OP_DUP": 10,
     "OP_JUMP": 20, "OP_JUMP_IF_FALSE": 21, "OP_JUMP_IF_TRUE": 22,

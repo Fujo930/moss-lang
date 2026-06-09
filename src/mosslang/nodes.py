@@ -27,6 +27,7 @@ class EffectDecl:
 @dataclass(frozen=True)
 class ImportDecl:
     path: str
+    location: SourceLocation | None = None
 
 
 @dataclass(frozen=True)

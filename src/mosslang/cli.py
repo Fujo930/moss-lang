@@ -1558,15 +1558,32 @@ def run_artifact_sign(bundle_path: Path, *, key_path: Path, output: Path | None 
         print(f"error: key file too short ({len(key)} bytes, need at least 16)", file=sys.stderr)
         return 1
 
-    # Sign the core evidence fields
+    # Sign core evidence fields including content hashes
+    check_ok = bundle.get("check", {}).get("ok")
+    trace_ok = bundle.get("trace", {}).get("ok")
+    golden_ok = bundle.get("golden", {}).get("ok")
+    lock_ok = bundle.get("lock", {}).get("ok")
+    selfhost_ok = bundle.get("selfhost", {}).get("ok")
+
+    # Hash evidence bodies so signature covers them (not just boolean ok)
+    def _hash_evidence(obj, key: str) -> str | None:
+        v = obj.get(key, {})
+        if v is None:
+            return None
+        return hashlib.sha256(json.dumps(v, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
     payload = {
         "file": bundle.get("file"),
         "source_sha256": bundle.get("source_sha256"),
-        "check": bundle.get("check", {}).get("ok"),
-        "trace": bundle.get("trace", {}).get("ok"),
-        "golden": bundle.get("golden", {}).get("ok"),
-        "lock": bundle.get("lock", {}).get("ok"),
-        "selfhost": bundle.get("selfhost", {}).get("ok"),
+        "check": check_ok,
+        "trace": trace_ok,
+        "golden": golden_ok,
+        "lock": lock_ok,
+        "selfhost": selfhost_ok,
+        "evidence_check": _hash_evidence(bundle, "check"),
+        "evidence_trace": _hash_evidence(bundle, "trace"),
+        "evidence_golden": _hash_evidence(bundle, "golden"),
+        "evidence_selfhost": _hash_evidence(bundle, "selfhost"),
     }
     payload_json = json.dumps(payload, sort_keys=True).encode("utf-8")
     sig = hmac.new(key, payload_json, hashlib.sha256).hexdigest()
@@ -1605,6 +1622,12 @@ def run_artifact_verify_sig(bundle_path: Path, *, key_path: Path) -> int:
     key = key_path.read_bytes()
     stored_payload = sig_data.get("payload", {})
     # Recompute payload from current bundle values to detect field tampering
+    def _hash_evidence(obj, key: str) -> str | None:
+        v = obj.get(key, {})
+        if v is None:
+            return None
+        return hashlib.sha256(json.dumps(v, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
     current_payload = {
         "file": bundle.get("file"),
         "source_sha256": bundle.get("source_sha256"),
@@ -1613,6 +1636,10 @@ def run_artifact_verify_sig(bundle_path: Path, *, key_path: Path) -> int:
         "golden": bundle.get("golden", {}).get("ok"),
         "lock": bundle.get("lock", {}).get("ok"),
         "selfhost": bundle.get("selfhost", {}).get("ok"),
+        "evidence_check": _hash_evidence(bundle, "check"),
+        "evidence_trace": _hash_evidence(bundle, "trace"),
+        "evidence_golden": _hash_evidence(bundle, "golden"),
+        "evidence_selfhost": _hash_evidence(bundle, "selfhost"),
     }
     payload_match = (stored_payload == current_payload)
     payload_json = json.dumps(stored_payload, sort_keys=True).encode("utf-8")

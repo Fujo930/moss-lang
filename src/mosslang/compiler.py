@@ -699,7 +699,7 @@ class Compiler:
         return self.label_counter
 
     def _emit_label(self, label: int) -> None:
-        self.instructions.append(Instruction(Opcode.NOP, arg=label))
+        self.instructions.append(Instruction(Opcode.LABEL, arg=label))
 
     def emit(self, opcode: Opcode, arg: int = 0) -> None:
         self.instructions.append(Instruction(opcode, arg=arg))
@@ -709,7 +709,7 @@ class Compiler:
         # Build label -> instruction index map
         label_positions: dict[int, int] = {}
         for i, inst in enumerate(self.instructions):
-            if inst.opcode == Opcode.NOP and inst.arg > 0:
+            if inst.opcode == Opcode.LABEL and inst.arg > 0:
                 label_positions[inst.arg] = i
 
         # Patch jump instructions

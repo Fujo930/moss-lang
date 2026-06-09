@@ -92,11 +92,10 @@ class Opcode(IntEnum):
 
     # ── FFI / External ──
     CALL_PYTHON = 110   # Pop args, call Python function resolved via constant table, push result
-
-    # ── Import ──
-    IMPORT = 110        # Import and run module
+    IMPORT    = 111      # Import and run module (reserved, not yet emitted by compiler)
 
     # ── Special ──
+    LABEL = 119         # Jump target marker (arg = label id)
     PRINT = 120         # Print top of stack
 
 

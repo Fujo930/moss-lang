@@ -1,6 +1,6 @@
 [project]
 name = "mosslang"
-version = "alpha0.6"
+version = "0.1.0a3"
 description = "An AI-built programming language prototype for long-lived AI-and-human software projects."
 readme = "README.md"
 requires-python = ">=3.12"
