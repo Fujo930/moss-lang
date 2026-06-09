@@ -12,3 +12,4 @@ reasonix.toml
 .codegraph/
 .reasonix/
 bin/
+corvus_chat_*.json

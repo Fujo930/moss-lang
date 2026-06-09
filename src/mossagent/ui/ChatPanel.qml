@@ -8,7 +8,6 @@ Rectangle {
     radius: 12
     border.color: window.cBg3
     border.width: 1
-    clip: true
 
     property bool typing: false
     property bool hovered: false
@@ -28,7 +27,11 @@ Rectangle {
         Qt.callLater(function() { messageList.positionViewAtEnd() })
     }
     MouseArea {
-        anchors.fill: parent; z: 0
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 64
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
         onEntered: root.hovered = true
@@ -179,20 +182,26 @@ Rectangle {
     }
 
     // ── Floating input bar ──────────────────────────────────
+    // Shadow underlay
     Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom; anchors.bottomMargin: 10
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 10
         width: Math.min(parent.width - 48, 700); height: 48; radius: 12
         color: window.darkMode ? Qt.rgba(0, 0, 0, 0.35) : Qt.rgba(0, 0, 0, 0.06)
+        z: 2
     }
 
+    // Input box
     Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom; anchors.bottomMargin: 12
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 12
         width: Math.min(parent.width - 48, 700); height: 48; radius: 12
         color: window.cBg0
         border.color: window.darkMode ? Qt.rgba(139/255, 148/255, 158/255, 0.18) : Qt.rgba(0, 0, 0, 0.10)
         border.width: 1
+        z: 2
 
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 8; spacing: 8
