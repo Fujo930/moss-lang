@@ -90,7 +90,8 @@ class Diagnostic:
 
     def format(self) -> str:
         prefix = f"{self.location.format()}: " if self.location is not None else ""
-        return f"{self.level}: {prefix}{self.message}"
+        code_part = f" [{self.code}]" if self.code else ""
+        return f"{self.level}: {prefix}{self.message}{code_part}"
 
 
 BUILTIN_EFFECTS = {
