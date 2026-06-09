@@ -317,6 +317,12 @@ TOOL_LIST = [
 
 def dispatch_tool(name: str, params: dict) -> dict:
     """Call a tool by name. Returns the tool's result dict."""
+    # Aliases — LLMs often invent shorter names
+    aliases = {"read": "read_file", "write": "write_file", "list": "ls",
+               "verify": "moss_verify", "run": "moss_execute", "token": "moss_tokenize",
+               "shell": "bash", "search": "grep"}
+    name = aliases.get(name, name)
+
     tool = TOOL_REGISTRY.get(name)
     if not tool:
         return _err(f"unknown tool: {name}. Available: {', '.join(TOOL_REGISTRY)}")

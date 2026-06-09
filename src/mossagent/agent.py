@@ -35,13 +35,14 @@ TOOLS AVAILABLE:
 {tool_descriptions}
 
 RULES:
+- YOU MUST RESPOND WITH VALID JSON ONLY. NO PROSE. NO EXPLANATIONS. NO MARKDOWN.
+  Every single response must be exactly one JSON object: either a tool call or done.
 - Before writing code, EXPLORE the project: use read_file, ls, grep.
 - Write Moss code with write_file, then verify with moss_verify.
 - If verification fails, fix the code and re-verify. DO NOT give up.
 - When code passes Trust verification, test with moss_execute or bash pytest.
 - Commit working code with git add + git commit.
 - NEVER assume — always read files first.
-- Keep responses short. One action per response.
 - If a tool returns an error, read it, understand it, fix it.
 """
 
@@ -178,20 +179,19 @@ class Agent:
         except _json.JSONDecodeError:
             pass
 
-        # Try to extract JSON from within text
-        m = re.search(r'\{[^{}]*"tool"[^{}]*\}', text, re.DOTALL)
-        if m:
-            try:
-                return _json.loads(m.group())
-            except _json.JSONDecodeError:
-                pass
-
-        m = re.search(r'\{[^{}]*"done"[^{}]*\}', text, re.DOTALL)
-        if m:
-            try:
-                return _json.loads(m.group())
-            except _json.JSONDecodeError:
-                pass
+        # Extract first balanced JSON object (handles nested braces)
+        start = text.find("{")
+        if start >= 0:
+            depth = 0
+            for i, ch in enumerate(text[start:], start):
+                if ch == "{": depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            return _json.loads(text[start:i + 1])
+                        except _json.JSONDecodeError:
+                            break
 
         # Fallback: if the LLM just wrote code, treat it as done
         if "fn " in text or "effect " in text or "type " in text or "rule " in text:

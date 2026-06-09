@@ -32,8 +32,11 @@ SYSTEM_PROMPT = """You are a Moss code generator. Moss is a safe, verifiable pro
 Return ONLY valid Moss source code. No explanations, no markdown fences.
 
 MOSS RULES:
+- VALID TYPES: Number, Text, Bool, Any. DO NOT use Int, String, float, int, str.
+  Parameters do NOT need type annotations. Use '->' for return type only on complex functions.
 - Declare effects before use:  `effect Database` at top, then `fn save(o) uses Database { ... }`
 - Every function must have a body. Use `= expr` for single-expression functions.
+  Example: `fn add(x, y) = x + y` NOT `fn add(x: Number, y: Number): Number = x + y`
 - Types are declared with `type Name { field: Type }`
 - Match must be exhaustive (handle all variants)
 - Use `require(condition, "message")` for assertions
