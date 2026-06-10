@@ -29,7 +29,7 @@ ApplicationWindow {
     property string statusText: "Ready"
     property int activeSession: bridge.activeSession || 0
     property var sessionNames: bridge.sessionNames || ["Default"]
-    property bool welcomeDone: false
+    property bool welcomeDone: bridge.welcomeDone || false
     property bool welcomeClosing: false
 
     // ── Welcome screen ──────────────────────────────────────

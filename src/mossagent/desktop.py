@@ -72,6 +72,20 @@ class CorvusBridge(QObject):
         self._file_viewer_path = ""
         self._file_viewer_content = ""
 
+        # Check if config exists → skip welcome
+        self._config_path = Path("corvus_config.json")
+        self._welcome_done = self._config_path.is_file()
+
+        # Restore config from file
+        if self._config_path.is_file():
+            try:
+                cfg = json.loads(self._config_path.read_text(encoding="utf-8"))
+                if cfg.get("api_key"): os.environ["LLM_API_KEY"] = cfg["api_key"]
+                if cfg.get("base_url"): os.environ["LLM_BASE_URL"] = cfg["base_url"]
+                if cfg.get("model"): os.environ["LLM_MODEL"] = cfg["model"]
+            except Exception:
+                pass
+
         # Initialize workspace
         self._refresh_workspace()
 
@@ -104,6 +118,9 @@ class CorvusBridge(QObject):
     def _get_file_viewer_content(self) -> str:
         return self._file_viewer_content
 
+    def _get_welcome_done(self) -> bool:
+        return self._welcome_done
+
     version = Property("QVariantMap", fget=_get_version, constant=True)
     fileTree = Property("QVariantList", fget=_get_file_tree, notify=progressChanged)
     memories = Property("QVariantList", fget=_get_memories, notify=progressChanged)
@@ -112,6 +129,7 @@ class CorvusBridge(QObject):
     fileViewerContent = Property(str, fget=_get_file_viewer_content, notify=progressChanged)
     sessionNames = Property("QVariantList", fget=_get_session_names, notify=progressChanged)
     activeSession = Property(int, fget=_get_active_session, notify=progressChanged)
+    welcomeDone = Property(bool, fget=_get_welcome_done, notify=progressChanged)
 
     # ── Slots called from QML ─────────────────────────────────
 
@@ -255,6 +273,38 @@ class CorvusBridge(QObject):
         threading.Thread(target=_do, daemon=True).start()
 
     @Slot(str, str, str)
+    def testApiConnection(self, apiKey: str, baseUrl: str, model: str) -> None:
+        """Test API connectivity. Emits progressChanged with JSON result."""
+        from .llm import OpenAIAdapter, ClaudeAdapter
+        try:
+            # Anthropic uses a different API format
+            if "anthropic.com" in baseUrl:
+                adapter = ClaudeAdapter(
+                    model=model,
+                    api_key=apiKey.strip(),
+                    max_tokens=1,
+                )
+            else:
+                adapter = OpenAIAdapter(
+                    model=model,
+                    api_key=apiKey.strip(),
+                    base_url=baseUrl.strip(),
+                    max_tokens=1,
+                )
+            result = adapter.test_connection()
+            self.progressChanged.emit(json.dumps({
+                "action": "apiTest",
+                "ok": result["ok"],
+                "message": result["message"],
+            }))
+        except Exception as e:
+            self.progressChanged.emit(json.dumps({
+                "action": "apiTest",
+                "ok": False,
+                "message": f"连接测试失败: {e}",
+            }))
+
+    @Slot(str, str, str)
     def saveConfig(self, apiKey: str, baseUrl: str, model: str):
         """Save API configuration from the welcome screen."""
         if apiKey.strip():
@@ -263,6 +313,16 @@ class CorvusBridge(QObject):
             os.environ["LLM_BASE_URL"] = baseUrl.strip()
         if model.strip():
             os.environ["LLM_MODEL"] = model.strip()
+        # Persist config so next launch skips welcome
+        try:
+            self._config_path.write_text(json.dumps({
+                "api_key": apiKey.strip(),
+                "base_url": baseUrl.strip(),
+                "model": model.strip(),
+            }), encoding="utf-8")
+        except Exception:
+            pass
+        self._welcome_done = True
         # Reload adapter with new config
         try:
             self._adapter = create_adapter(os.environ.get("LLM_PROVIDER", "openai"))

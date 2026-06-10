@@ -80,6 +80,41 @@ class OpenAIAdapter:
         except Exception as e:
             raise RuntimeError(f"LLM call failed: {e}")
 
+    def test_connection(self) -> dict:
+        """Send a minimal request to verify API key, base URL, and model validity.
+        
+        Returns a dict with {ok, message} — ok is True if the API responds successfully.
+        """
+        url = f"{self.base_url}/chat/completions"
+
+        body = _json.dumps({
+            "model": self.model,
+            "messages": [{"role": "user", "content": "hi"}],
+            "temperature": 0.0,
+            "max_tokens": 1,
+        }).encode("utf-8")
+
+        req = urllib.request.Request(url, data=body, method="POST")
+        req.add_header("Content-Type", "application/json")
+        if self.api_key:
+            req.add_header("Authorization", f"Bearer {self.api_key}")
+
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+            reply = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            return {"ok": True, "message": f"Connected to {self.model}"}
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")
+            if e.code == 401:
+                return {"ok": False, "message": "API Key 错误 — 请检查你的 key"}
+            elif e.code == 404:
+                return {"ok": False, "message": f"模型 {self.model} 不存在或无权访问"}
+            else:
+                return {"ok": False, "message": f"API 错误 {e.code}: {body[:200]}"}
+        except Exception as e:
+            return {"ok": False, "message": f"连接失败: {e}"}
+
 
 # ── Claude adapter ────────────────────────────────────────────────
 
@@ -139,6 +174,34 @@ class ClaudeAdapter:
             raise RuntimeError(f"Claude API error {e.code}: {body[:500]}")
         except Exception as e:
             raise RuntimeError(f"Claude call failed: {e}")
+
+    def test_connection(self) -> dict:
+        url = "https://api.anthropic.com/v1/messages"
+        body = _json.dumps({
+            "model": self.model,
+            "max_tokens": 1,
+            "messages": [{"role": "user", "content": "hi"}],
+        }).encode("utf-8")
+        req = urllib.request.Request(url, data=body, method="POST")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("x-api-key", self.api_key)
+        req.add_header("anthropic-version", "2023-06-01")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+            return {"ok": True, "message": f"Connected to {self.model}"}
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")
+            if e.code == 401:
+                return {"ok": False, "message": "API Key 错误 — 请检查你的 key"}
+            elif e.code == 403:
+                return {"ok": False, "message": "无权访问此模型"}
+            elif e.code == 404:
+                return {"ok": False, "message": f"模型 {self.model} 不存在或无权访问"}
+            else:
+                return {"ok": False, "message": f"API 错误 {e.code}"}
+        except Exception as e:
+            return {"ok": False, "message": f"连接失败: {str(e)[:200]}"}
 
 
 # ── Factory ───────────────────────────────────────────────────────
