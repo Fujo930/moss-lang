@@ -48,101 +48,33 @@ Rectangle {
             topMargin: 16
             bottomMargin: 64
 
-            // ── Welcome canvas ─────────────────────────────
-            Canvas {
-                id: welcomeCanvas
+            // ── Empty-state greeting ───────────────────────
+            Item {
+                id: emptyGreeting
                 anchors.fill: parent
-                visible: chatModel.count === 0
+                anchors.bottomMargin: 72   // room for input bar
+                z: -1
+                opacity: chatModel.count === 0 ? 1 : 0
+                visible: opacity > 0.01
+                Behavior on opacity { NumberAnimation { duration: 300 } }
 
-                property var languages: [
-                    "Bonjour, l'ère de l'IA",
-                    "Hallo, KI-Zeitalter",
-                    "こんにちは、AI時代",
-                    "안녕, AI 시대",
-                    "Hola, era de la IA",
-                    "Olá, era da IA",
-                    "Ciao, era dell'IA",
-                    "Привет, эпоха ИИ",
-                    "مرحباً، عصر الذكاء",
-                    "Hallå, AI-eran",
-                    "Hej, AI-tidsalder",
-                    "नमस्ते, AI युग",
-                    "שלום, עידן ה-AI",
-                    "Salut, ère de l'IA",
-                    "สวัสดี, ยุค AI",
-                    "Ahoj, éro AI",
-                    "Γεια, εποχή AI",
-                    "Merhaba, YZ çağı",
-                    "Xin chào, kỷ nguyên AI",
-                    "Hei, AI-aikakausi"
-                ]
-
-                // Organic scatter offsets — balanced but not geometric
-                property var scatterX: [
-                     -0.72,  0.65, -0.45,  0.55, -0.85,
-                      0.38, -0.58,  0.78, -0.28,  0.82,
-                     -0.62,  0.42, -0.35,  0.70, -0.75,
-                      0.48, -0.52,  0.60, -0.68,  0.32
-                ]
-                property var scatterY: [
-                     -0.55, -0.48,  0.50, -0.35,  0.28,
-                     -0.62,  0.38, -0.30,  0.58,  0.10,
-                      0.42, -0.08, -0.45,  0.45, -0.15,
-                      0.35, -0.38, -0.52,  0.20,  0.55
-                ]
-
-                property int tick: 0
-                property real titleOpac: 0.0
-
-                Timer {
-                    interval: 50
-                    running: welcomeCanvas.visible
-                    repeat: true
-                    onTriggered: {
-                        welcomeCanvas.tick++
-                        if (welcomeCanvas.tick >= 4 && welcomeCanvas.titleOpac < 1.0)
-                            welcomeCanvas.titleOpac = Math.min(1.0, welcomeCanvas.titleOpac + 0.06)
-                        welcomeCanvas.requestPaint()
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 6
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "你好，AI时代"
+                        color: window.cFg1
+                        font.pixelSize: 28
+                        font.weight: Font.Light
                     }
-                }
-
-                onVisibleChanged: { if (!visible) { tick = 0; titleOpac = 0.0 } }
-
-                onPaint: {
-                    var ctx = getContext("2d")
-                    ctx.clearRect(0, 0, width, height)
-
-                    var cx = width / 2, cy = height / 2
-                    var rad = Math.min(width, height) * 0.20
-                    var count = languages.length, now = tick
-
-                    // Languages — each fades in over ~10 ticks (500ms)
-                    for (var i = 0; i < count; i++) {
-                        var start = i * 2
-                        if (now < start) continue
-                        var fade = Math.min(1.0, (now - start) / 6.0)
-                        var opac = 0.50 * fade
-
-                        var x = cx + scatterX[i] * rad * 0.75
-                        var y = cy + scatterY[i] * rad * 0.65
-
-                        ctx.globalAlpha = opac
-                        ctx.fillStyle = window.darkMode ? "#8b949e" : "#656d76"
-                        ctx.font = "300 11px 'Segoe UI'"
-                        ctx.textAlign = "center"
-                        ctx.fillText(languages[i], x, y)
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "Hi, AI Time"
+                        color: window.cFg2
+                        font.pixelSize: 18
+                        font.weight: Font.Light
                     }
-
-                    ctx.globalAlpha = titleOpac
-                    ctx.fillStyle = window.darkMode ? "#e6edf3" : "#1f2328"
-                    ctx.font = "300 28px 'Segoe UI'"
-                    ctx.textAlign = "center"
-                    ctx.fillText("你好，AI时代", cx, cy - 6)
-
-                    ctx.fillStyle = window.darkMode ? "#8b949e" : "#656d76"
-                    ctx.font = "300 20px 'Segoe UI'"
-                    ctx.fillText("Hi, AI Time", cx, cy + 24)
-                    ctx.globalAlpha = 1.0
                 }
             }
 
@@ -187,22 +119,27 @@ Rectangle {
     Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 10
+        anchors.bottomMargin: chatModel.count === 0 ? parent.height * 0.38 - 2 : 10
         width: Math.min(parent.width - 48, 700); height: 48; radius: 12
         color: window.darkMode ? Qt.rgba(0, 0, 0, 0.35) : Qt.rgba(0, 0, 0, 0.06)
         z: 2
+
+        Behavior on anchors.bottomMargin { NumberAnimation { duration: 350; easing.type: Easing.OutCubic } }
     }
 
     // Input box
     Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 12
+        // When empty: sits right below greeting, when chatting: sticks to bottom
+        anchors.bottomMargin: chatModel.count === 0 ? parent.height * 0.38 : 12
         width: Math.min(parent.width - 48, 700); height: 48; radius: 12
         color: window.cBg0
         border.color: window.darkMode ? Qt.rgba(139/255, 148/255, 158/255, 0.18) : Qt.rgba(0, 0, 0, 0.10)
         border.width: 1
         z: 2
+
+        Behavior on anchors.bottomMargin { NumberAnimation { duration: 350; easing.type: Easing.OutCubic } }
 
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 8; spacing: 8

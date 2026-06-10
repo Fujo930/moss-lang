@@ -29,10 +29,22 @@ ApplicationWindow {
     property string statusText: "Ready"
     property int activeSession: bridge.activeSession || 0
     property var sessionNames: bridge.sessionNames || ["Default"]
+    property bool welcomeDone: false
+
+    // ── Welcome screen ──────────────────────────────────────
+    Welcome {
+        id: welcomeScreen
+        anchors.fill: parent
+        z: 100
+        visible: !window.welcomeDone
+    }
 
     // ── Three-panel body ────────────────────────────────────
     Item {
         anchors.fill: parent; anchors.margins: 10
+        visible: welcomeDone
+        opacity: welcomeDone ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 400 } }
 
         // LEFT: Session sidebar
         Rectangle {
@@ -155,12 +167,19 @@ ApplicationWindow {
 
             ListView {
                 id: fileList
-                anchors.fill: parent; anchors.margins: 10; clip: true
+                anchors.fill: parent; anchors.topMargin: 10; anchors.leftMargin: 10
+                anchors.rightMargin: 10; anchors.bottomMargin: 0
+                clip: true; boundsBehavior: Flickable.StopAtBounds
                 model: bridge.fileTree; spacing: 2
 
                 delegate: Rectangle {
                     width: fileList.width; implicitHeight: 30; radius: 8
-                    color: modelData.path === window.selectedPath ? Qt.alpha(window.cAccent, 0.12) : "transparent"
+                    color: {
+                        if (modelData.path === window.selectedPath) return Qt.alpha(window.cAccent, 0.12)
+                        if (hovered) return window.cBg2
+                        return "transparent"
+                    }
+                    property bool hovered: false
 
                     RowLayout {
                         anchors.fill: parent
@@ -168,25 +187,32 @@ ApplicationWindow {
                         anchors.rightMargin: 8
                         spacing: 6
 
-                        // Expand arrow for directories
-                        Text {
-                            visible: modelData.isDir
-                            text: modelData.expanded ? "▼" : "▶"
-                            color: window.cFg3
-                            font.pixelSize: 8
-                            width: 12
+                        // Arrow placeholder — space always reserved for alignment
+                        Rectangle {
+                            width: 12; height: 12
+                            color: "transparent"
+                            Text {
+                                anchors.centerIn: parent
+                                visible: modelData.isDir
+                                text: modelData.expanded ? "▼" : "▶"
+                                color: window.cFg3
+                                font.pixelSize: 8
+                            }
                         }
-                        Item { visible: !modelData.isDir; width: 12 }
-
                         Text { text: modelData.isDir ? "📂" : "📄"; font.pixelSize: 11 }
                         Text { text: modelData.name; color: window.cFg1; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
                     }
 
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; hoverEnabled: true
+                        onEntered: parent.hovered = true
+                        onExited: parent.hovered = false
                         onClicked: {
-                            window.selectedPath = modelData.path
-                            if (modelData.isDir) bridge.toggleDirectory(modelData.path)
-                            else bridge.openFile(modelData.path)
+                            if (modelData.isDir) {
+                                bridge.toggleDirectory(modelData.path)
+                            } else {
+                                window.selectedPath = modelData.path
+                                bridge.openFile(modelData.path)
+                            }
                         }
                     }
                 }
