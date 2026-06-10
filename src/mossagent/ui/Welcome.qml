@@ -125,29 +125,112 @@ Rectangle {
     }
 
     // ── API config card ───────────────────────────────────────
-    Item {
+    Rectangle {
         id: configCard
         anchors.centerIn: parent
-        width: 440; height: 340
+        width: 460
+        height: 620
+        radius: 20; clip: true
+        color: Qt.rgba(1, 1, 1, 0.10)
+        border.color: Qt.rgba(1, 1, 1, 0.18)
+        border.width: 1
         opacity: 0; z: 2
         Behavior on opacity { NumberAnimation { duration: 400 } }
 
-        Rectangle {
-            anchors.fill: parent; radius: 20; clip: true
-            color: Qt.rgba(1, 1, 1, 0.10)
-            border.color: Qt.rgba(1, 1, 1, 0.18)
-            border.width: 1
+        property bool customVisible: false
 
-            ColumnLayout {
-                anchors.fill: parent; anchors.margins: 28; spacing: 16
+        ColumnLayout {
+            id: innerLayout
+            width: parent.width - 56
+            x: 28; y: 28
+            spacing: 16
 
                 Text {
-                    text: "Configure your AI provider"
+                    text: "Choose your AI provider"
                     color: "white"; font.pixelSize: 16; font.weight: Font.DemiBold
                     Layout.fillWidth: true
                 }
 
-                ColumnLayout { spacing: 10
+                // ── Provider list ──────────────────────────
+                Column {
+                    id: providerList
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    // Selection state
+                    property string selectedKey: ""
+
+                    function select(key) {
+                        selectedKey = key
+                        var p = providers[key]
+                        if (p) {
+                            apiKeyInput.text = ""
+                            apiKeyInput.placeholderText = "sk-...  (required)"
+                        }
+                    }
+
+                    property var providers: ({
+                        "deepseek":  { name: "DeepSeek",            baseUrl: "https://api.deepseek.com/v1",          model: "deepseek-chat" },
+                        "openai":    { name: "OpenAI",              baseUrl: "https://api.openai.com/v1",            model: "gpt-4o" },
+                        "anthropic": { name: "Anthropic (Claude)",  baseUrl: "https://api.anthropic.com/v1",         model: "claude-sonnet-4-20250514" },
+                        "google":    { name: "Google (Gemini)",     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.0-flash" },
+                        "groq":      { name: "Groq",                baseUrl: "https://api.groq.com/openai/v1",       model: "mixtral-8x7b-32768" },
+                        "together":  { name: "Together AI",         baseUrl: "https://api.together.xyz/v1",          model: "mistralai/Mixtral-8x7B-Instruct-v0.1" },
+                        "fireworks": { name: "Fireworks AI",        baseUrl: "https://api.fireworks.ai/inference/v1", model: "accounts/fireworks/models/llama-v3p1-70b-instruct" },
+                        "cerebras":  { name: "Cerebras",            baseUrl: "https://api.cerebras.ai/v1",           model: "llama3.1-70b" },
+                        "xai":       { name: "xAI (Grok)",          baseUrl: "https://api.x.ai/v1",                  model: "grok-beta" },
+                        "mistral":   { name: "Mistral",             baseUrl: "https://api.mistral.ai/v1",            model: "mistral-large-latest" },
+                        "cohere":    { name: "Cohere",              baseUrl: "https://api.cohere.ai/v1",             model: "command-r-plus" },
+                        "perplexity":{ name: "Perplexity",          baseUrl: "https://api.perplexity.ai",            model: "llama-3.1-sonar-large-128k-online" },
+                    })
+
+                    Repeater {
+                        model: ["deepseek","openai","anthropic","google","groq","together","fireworks","cerebras","xai","mistral","cohere","perplexity"]
+                        delegate: Rectangle {
+                            width: parent.width; implicitHeight: 44; radius: 12
+                            color: providerList.selectedKey === modelData
+                                   ? Qt.rgba(1,1,1,0.15)
+                                   : Qt.rgba(1,1,1,0.05)
+                            border.color: providerList.selectedKey === modelData
+                                          ? Qt.rgba(1,1,1,0.30)
+                                          : Qt.rgba(1,1,1,0.08)
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 14; spacing: 10
+                                Rectangle {
+                                    width: 18; height: 18; radius: 9
+                                    border.color: providerList.selectedKey === modelData ? "white" : Qt.rgba(1,1,1,0.3)
+                                    border.width: 2
+                                    Rectangle {
+                                        anchors.centerIn: parent; width: 8; height: 8; radius: 4
+                                        color: "white"
+                                        visible: providerList.selectedKey === modelData
+                                    }
+                                }
+                                Text {
+                                    text: providerList.providers[modelData].name
+                                    color: "white"; font.pixelSize: 13
+                                    Layout.fillWidth: true
+                                }
+                                Text {
+                                    text: providerList.providers[modelData].model
+                                    color: Qt.rgba(1,1,1,0.35); font.pixelSize: 10
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                onClicked: providerList.select(modelData)
+                            }
+                        }
+                    }
+                }
+
+                // ── API Key input (always visible after provider selection) ──
+                ColumnLayout {
+                    visible: providerList.selectedKey !== "" || customVisible
+                    spacing: 6
                     Text { text: "API Key"; color: Qt.rgba(1,1,1,0.6); font.pixelSize: 11 }
                     TextField {
                         id: apiKeyInput
@@ -160,52 +243,90 @@ Rectangle {
                     }
                 }
 
-                RowLayout { spacing: 10
-                    ColumnLayout { Layout.fillWidth: true; spacing: 6
-                        Text { text: "Base URL"; color: Qt.rgba(1,1,1,0.6); font.pixelSize: 11 }
-                        TextField {
-                            id: baseUrlInput; Layout.fillWidth: true; implicitHeight: 40
-                            text: "https://api.deepseek.com/v1"
-                            placeholderTextColor: Qt.rgba(1,1,1,0.25); color: "white"; font.pixelSize: 13
-                            background: Rectangle { radius: 10; color: Qt.rgba(1,1,1,0.08); border.color: Qt.rgba(1,1,1,0.20); border.width: 1 }
-                        }
-                    }
-                    ColumnLayout { Layout.preferredWidth: 140; spacing: 6
-                        Text { text: "Model"; color: Qt.rgba(1,1,1,0.6); font.pixelSize: 11 }
-                        TextField {
-                            id: modelInput; Layout.fillWidth: true; implicitHeight: 40
-                            text: "deepseek-chat"
-                            placeholderTextColor: Qt.rgba(1,1,1,0.25); color: "white"; font.pixelSize: 13
-                            background: Rectangle { radius: 10; color: Qt.rgba(1,1,1,0.08); border.color: Qt.rgba(1,1,1,0.20); border.width: 1 }
-                        }
-                    }
-                }
-
+                // ── Custom provider toggle ──────────────────
                 Rectangle {
-                    Layout.fillWidth: true; implicitHeight: 44; radius: 12
-                    color: "white"
-                    Text { anchors.centerIn: parent; text: "Continue"; color: "#5b6e7a"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                    Layout.fillWidth: true; implicitHeight: 36; radius: 10
+                    color: customVisible ? Qt.rgba(1,1,1,0.10) : "transparent"
+                    border.color: Qt.rgba(1,1,1,0.15); border.width: 1
+
+                    RowLayout {
+                        anchors.centerIn: parent; spacing: 6
+                        Text { text: customVisible ? "▲  Hide custom" : "▼  Other provider..."; color: Qt.rgba(1,1,1,0.4); font.pixelSize: 11 }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            // Save config
-                            bridge.saveConfig(apiKeyInput.text, baseUrlInput.text, modelInput.text)
-                            // Animate out
-                            finishAnim.start()
+                            customVisible = !customVisible
+                            if (customVisible) providerList.selectedKey = ""
                         }
                     }
                 }
 
-                Text {
-                    text: "Skip — use local model"; color: Qt.rgba(1,1,1,0.35)
-                    font.pixelSize: 11; Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                        onClicked: { bridge.saveConfig("", "", ""); finishAnim.start() }
+                // ── Custom fields ──────────────────────────
+                ColumnLayout {
+                    id: customBlock
+                    visible: customVisible
+                    spacing: 10
+
+                    RowLayout { spacing: 10
+                        ColumnLayout { Layout.fillWidth: true; spacing: 6
+                            Text { text: "Base URL"; color: Qt.rgba(1,1,1,0.6); font.pixelSize: 11 }
+                            TextField {
+                                id: baseUrlInput; Layout.fillWidth: true; implicitHeight: 40
+                                text: "https://api.deepseek.com/v1"
+                                placeholderTextColor: Qt.rgba(1,1,1,0.25); color: "white"; font.pixelSize: 13
+                                background: Rectangle { radius: 10; color: Qt.rgba(1,1,1,0.08); border.color: Qt.rgba(1,1,1,0.20); border.width: 1 }
+                            }
+                        }
+                        ColumnLayout { Layout.preferredWidth: 140; spacing: 6
+                            Text { text: "Model"; color: Qt.rgba(1,1,1,0.6); font.pixelSize: 11 }
+                            TextField {
+                                id: modelInput; Layout.fillWidth: true; implicitHeight: 40
+                                text: "deepseek-chat"
+                                placeholderTextColor: Qt.rgba(1,1,1,0.25); color: "white"; font.pixelSize: 13
+                                background: Rectangle { radius: 10; color: Qt.rgba(1,1,1,0.08); border.color: Qt.rgba(1,1,1,0.20); border.width: 1 }
+                            }
+                        }
+                    }
+                }
+
+                // ── Action buttons ──────────────────────────
+                Item {
+                    Layout.fillWidth: true; implicitHeight: 44
+
+                    RowLayout {
+                        anchors.fill: parent; spacing: 10
+
+                        Rectangle {
+                            Layout.fillWidth: true; implicitHeight: 44; radius: 12
+                            color: "white"
+                            opacity: (providerList.selectedKey !== "" && apiKeyInput.text.trim() !== "") ? 1.0 : 0.4
+                            Text { anchors.centerIn: parent; text: "Connect"; color: "#5b6e7a"; font.pixelSize: 14; font.weight: Font.DemiBold }
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (providerList.selectedKey === "" && !customVisible) return
+                                    var p = providerList.providers[providerList.selectedKey]
+                                    var url = customVisible ? baseUrlInput.text : (p ? p.baseUrl : "")
+                                    var model = customVisible ? modelInput.text : (p ? p.model : "")
+                                    bridge.saveConfig(apiKeyInput.text, url, model)
+                                    finishAnim.start()
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "Skip"; color: Qt.rgba(1,1,1,0.35)
+                            font.pixelSize: 12; Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignHCenter
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                onClicked: { bridge.saveConfig("", "", ""); finishAnim.start() }
+                            }
+                        }
                     }
                 }
             }
         }
-    }
 
     // ── Bottom tagline ──────────────────────────────────────
     Text {
