@@ -129,7 +129,7 @@ Rectangle {
         id: configCard
         anchors.centerIn: parent
         width: 420
-        height: 300
+        height: 320
         radius: 20
         color: Qt.rgba(1, 1, 1, 0.10)
         border.color: Qt.rgba(1, 1, 1, 0.18)
@@ -223,7 +223,7 @@ Rectangle {
             }
 
             // ── API Key input ──────────────────────────────
-            ColumnLayout { spacing: 6
+            ColumnLayout { spacing: 4
                 Text { text: "API Key"; color: Qt.rgba(1,1,1,0.6); font.pixelSize: 11 }
                 TextField {
                     id: apiKeyInput
@@ -232,26 +232,22 @@ Rectangle {
                     placeholderText: "sk-..."
                     placeholderTextColor: Qt.rgba(1,1,1,0.25)
                     color: "white"; font.pixelSize: 13
-                    background: Rectangle { radius: 10; color: Qt.rgba(1,1,1,0.08); border.color: apiError.visible ? Qt.rgba(1,0,0,0.5) : Qt.rgba(1,1,1,0.20); border.width: 1 }
-                    onTextChanged: { apiError.visible = false }
+                    background: Rectangle { radius: 10; color: Qt.rgba(1,1,1,0.08); border.color: apiError.text !== "" ? Qt.rgba(1,0,0,0.5) : Qt.rgba(1,1,1,0.20); border.width: 1 }
+                    onTextChanged: { apiError.text = "" }
                 }
-                Text { id: apiError; text: "请输入API key"; color: "#ff6b6b"; font.pixelSize: 11; visible: false }
+                // Always reserve space for error message
+                Text { id: apiError; text: ""; color: "#ff6b6b"; font.pixelSize: 11; Layout.preferredHeight: 16 }
             }
 
             // ── Action buttons ─────────────────────────────
             ColumnLayout { spacing: 8
                 Rectangle { Layout.fillWidth: true; implicitHeight: 48; radius: 12; color: "white"
-                    Text {
-                        anchors.centerIn: parent
-                        text: testingConnection ? "Testing..." : "Go to the future"
-                        color: "#5b6e7a"; font.pixelSize: 14; font.weight: Font.DemiBold
-                    }
+                    Text { anchors.centerIn: parent; text: testingConnection ? "Testing..." : "Go to the future"; color: "#5b6e7a"; font.pixelSize: 14; font.weight: Font.DemiBold }
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; enabled: !testingConnection
                         onClicked: {
-                            if (apiKeyInput.text.trim() === "") { apiError.visible = true; return }
-                            apiError.visible = false
+                            if (apiKeyInput.text.trim() === "") { apiError.text = "请输入API key"; return }
+                            apiError.text = ""
                             testStatus.text = ""
-                            testStatus.color = Qt.rgba(1,1,1,0.5)
                             testingConnection = true
                             var p = providerList.providers[providerList.selectedKey]
                             bridge.testApiConnection(apiKeyInput.text, p.baseUrl, p.model)
@@ -260,12 +256,7 @@ Rectangle {
                 }
 
                 // Test result / spinner
-                Text {
-                    id: testStatus
-                    text: ""
-                    color: "#ff6b6b"; font.pixelSize: 11
-                    Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter
-                }
+                Text { id: testStatus; text: ""; color: "#ff6b6b"; font.pixelSize: 11; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
 
                 Text { text: "Skip — local model"; color: Qt.rgba(1,1,1,0.35); font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor

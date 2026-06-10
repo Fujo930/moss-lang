@@ -17,7 +17,7 @@ from __future__ import annotations
 MOSS_VERSION = "0.1.0"
 
 # ── Moss Agent version (updated with each Agent change) ───────────────
-AGENT_VERSION = "0.1.0-dev"
+AGENT_VERSION = "A1"
 
 # ── Minimum Moss version the Agent requires to function ───────────────
 # Agent will refuse to start if the installed Moss is older than this.
