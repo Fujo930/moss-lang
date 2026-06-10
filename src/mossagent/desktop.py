@@ -254,6 +254,26 @@ class CorvusBridge(QObject):
 
         threading.Thread(target=_do, daemon=True).start()
 
+    @Slot(str, str, str)
+    def saveConfig(self, apiKey: str, baseUrl: str, model: str):
+        """Save API configuration from the welcome screen."""
+        if apiKey.strip():
+            os.environ["LLM_API_KEY"] = apiKey.strip()
+        if baseUrl.strip():
+            os.environ["LLM_BASE_URL"] = baseUrl.strip()
+        if model.strip():
+            os.environ["LLM_MODEL"] = model.strip()
+        # Reload adapter with new config
+        try:
+            self._adapter = create_adapter(os.environ.get("LLM_PROVIDER", "openai"))
+            for session in self._chat_sessions:
+                session.bind(self._adapter.generate)
+            self._generator = Generator(self._cv, self._adapter.generate)
+            self._agent = Agent(self._adapter.generate)
+            self.progressChanged.emit("API configured — AI connected.")
+        except Exception as e:
+            self.progressChanged.emit(f"API config saved, but connect failed: {e}")
+
     @Slot(str)
     def createSession(self, name: str):
         """Create a new chat session tab."""

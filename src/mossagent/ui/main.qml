@@ -30,13 +30,23 @@ ApplicationWindow {
     property int activeSession: bridge.activeSession || 0
     property var sessionNames: bridge.sessionNames || ["Default"]
     property bool welcomeDone: false
+    property bool welcomeClosing: false
 
     // ── Welcome screen ──────────────────────────────────────
-    Welcome {
-        id: welcomeScreen
+    Rectangle {
+        id: welcomeHost
         anchors.fill: parent
         z: 100
-        visible: !window.welcomeDone
+        color: "#5b6e7a"
+        visible: !welcomeDone
+
+        Timer {
+            running: welcomeClosing
+            interval: 600
+            onTriggered: { window.welcomeDone = true; welcomeHost.visible = false }
+        }
+
+        Welcome { anchors.fill: parent }
     }
 
     // ── Three-panel body ────────────────────────────────────
