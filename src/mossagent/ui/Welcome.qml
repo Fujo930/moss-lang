@@ -97,13 +97,13 @@ Rectangle {
         }
     }
 
-    // ── Greeting — centered, then slides up off-screen ──────
+    // ── Greeting — centered initially, slides up ──────────────
     Item {
         id: greetingBlock
         anchors.horizontalCenter: parent.horizontalCenter
-        y: (welcome.height - 120) / 2
         width: 600; height: 120
         z: 2
+        Component.onCompleted: { y = (welcome.height - 120) / 2 }
 
         Column {
             anchors.centerIn: parent; spacing: 18
@@ -250,8 +250,6 @@ Rectangle {
     SequentialAnimation {
         id: finishAnim
         PropertyAction { target: configCard; property: "opacity"; value: 0 }
-        PauseAnimation { duration: 200 }
-        NumberAnimation { target: greetingBlock; property: "y"; to: (welcome.height - 120) / 2; duration: 500; easing.type: Easing.OutCubic }
         PauseAnimation { duration: 200 }
         PropertyAction { target: window; property: "welcomeClosing"; value: true }
     }
