@@ -160,12 +160,27 @@ ApplicationWindow {
 
                 delegate: Rectangle {
                     width: fileList.width; implicitHeight: 30; radius: 8
-                    x: modelData.depth ? modelData.depth * 14 : 0
                     color: modelData.path === window.selectedPath ? Qt.alpha(window.cAccent, 0.12) : "transparent"
 
-                    RowLayout { anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 8; spacing: 6
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8 + (modelData.depth ? modelData.depth * 14 : 0)
+                        anchors.rightMargin: 8
+                        spacing: 6
+
+                        // Expand arrow for directories
+                        Text {
+                            visible: modelData.isDir
+                            text: modelData.expanded ? "▼" : "▶"
+                            color: window.cFg3
+                            font.pixelSize: 8
+                            width: 12
+                        }
+                        Item { visible: !modelData.isDir; width: 12 }
+
                         Text { text: modelData.isDir ? "📂" : "📄"; font.pixelSize: 11 }
-                        Text { text: modelData.name; color: window.cFg1; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true } }
+                        Text { text: modelData.name; color: window.cFg1; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
+                    }
 
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                         onClicked: {

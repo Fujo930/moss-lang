@@ -343,7 +343,10 @@ class CorvusBridge(QObject):
                     rel = str(f)
                     entries.append({"name": f.name, "path": rel, "isDir": True, "depth": depth})
                     if rel in self._expanded_dirs:
+                        entries[-1]["expanded"] = True
                         _scan(f, depth + 1)
+                    else:
+                        entries[-1]["expanded"] = False
                 elif f.suffix in (".moss", ".py", ".md", ".toml", ".json", ".c", ".h", ".txt", ".qml", ".js", ".ps1", ".cmd", ".ini", ".cfg", ".yml", ".yaml"):
                     entries.append({"name": f.name, "path": str(f), "isDir": False, "depth": depth})
 

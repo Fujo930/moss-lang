@@ -45,6 +45,7 @@ Rectangle {
             id: messageList
             Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 8
             model: chatModel; boundsBehavior: Flickable.StopAtBounds
+            topMargin: 16
             bottomMargin: 64
 
             // ── Welcome canvas ─────────────────────────────
